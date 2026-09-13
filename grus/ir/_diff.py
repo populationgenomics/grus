@@ -229,8 +229,11 @@ def match_individuals(a: pb.Pedigree, b: pb.Pedigree) -> dict[Key, Key]:
 
 
 def _conditions_sig(ind: pb.Individual) -> tuple[tuple[str, int, int], ...]:
-    """A hashable, order-independent signature of an individual's conditions: sorted ``(name, status,
-    inheritance)`` — inheritance included so a carrier's mode (which picks its glyph) is a scored difference."""
+    """Return a hashable, order-independent signature of an individual's conditions.
+
+    Sorted ``(name, status, inheritance)`` triples; inheritance is included so a carrier's mode (which picks its
+    glyph) is a scored difference.
+    """
     return tuple(sorted((c.name, int(c.status), int(c.inheritance)) for c in ind.conditions))
 
 

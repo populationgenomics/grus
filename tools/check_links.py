@@ -39,6 +39,8 @@ from typing import NamedTuple
 
 
 class Broken(NamedTuple):
+    """One unresolved link: where it appears, what it points at, and why it failed."""
+
     source: str
     line_no: int
     target: str
@@ -62,6 +64,7 @@ def _run(cmd: list[str]) -> str:
 
 
 def tracked_markdown(root: pathlib.Path) -> list[pathlib.Path]:
+    """Return every git-tracked ``.md`` file under ``root``."""
     out = _run(["git", "-C", str(root), "ls-files", "*.md"])
     return [root / line for line in out.splitlines() if line]
 
@@ -85,6 +88,7 @@ def _prose_lines(path: pathlib.Path) -> list[tuple[int, str]]:
 
 
 def heading_slugs(path: pathlib.Path) -> set[str]:
+    """Return the GitHub anchor slugs of every heading in a Markdown file."""
     slugs: set[str] = set()
     for _, line in _prose_lines(path):
         m = HEADING_RE.match(line)
@@ -137,6 +141,7 @@ def resolve(source: pathlib.Path, target: str, root: pathlib.Path) -> str | None
 
 
 def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Broken]:
+    """Return the broken links in one Markdown file."""
     broken: list[Broken] = []
     for n, line in _prose_lines(path):
         for m in LINK_RE.finditer(INLINE_CODE_RE.sub("", line)):
@@ -148,6 +153,7 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Broken]:
 
 
 def main() -> int:
+    """Check every tracked Markdown file; print each broken link and return 1 if any."""
     root = pathlib.Path(_run(["git", "rev-parse", "--show-toplevel"]).strip())
     broken = [b for md in tracked_markdown(root) for b in check_file(md, root)]
     for b in broken:

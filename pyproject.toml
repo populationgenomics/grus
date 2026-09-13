@@ -69,7 +69,16 @@ target-version = "py313"
 extend-exclude = ["grus/models", "buf"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "SIM", "PTH", "RUF"]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "PTH", "RUF", "D", "TID252"]
+# D1xx is docstring *presence* — policy, not lint (docs/style/python.md). Format is enforced when one exists.
+ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+# Absolute imports only (docs/style/python.md).
+ban-relative-imports = "all"
 
 [tool.pyright]
 pythonVersion = "3.13"

@@ -51,14 +51,15 @@ The following symbol imports are allowed:
 
 - `from __future__ import ...` — required syntax for future statements, not a normal import.
 
-- A package's own surface. A `grus.<pkg>/__init__.py` re-exports its public names from its private sibling modules
-  (`from grus.ir._diff import diff`), and a private module imports what it needs from a sibling the same way
-  (`from ._layout import Layout`). These are the package's internal wiring, not a foreign symbol; the reader is already
-  inside the package. The generated stubs are imported as a module (`from grus.models import pedigree_pb2 as pb`), never
-  their messages.
+- A package's public surface, once. A package `__init__.py` re-exports its public names from the private modules that
+  define them (`from grus.ir._diff import diff`) and lists them in `__all__`; that is the one place a symbol import
+  defines an API. It is not a licence to import a private symbol the package does not export, or to expose the same name
+  from two packages. Every other module — a private sibling included — imports the module and qualifies
+  (`from grus.convert import _core`, then `_core.Person`).
 
 Anything not on this list — including `pathlib.Path`, `dataclasses.dataclass`, `contextlib.contextmanager`,
-`functools.partial`, third-party classes — should be accessed via its module.
+`functools.partial`, third-party classes — should be accessed via its module. Imports are absolute (ruff `TID252`);
+never `from ._sibling import`.
 
 ### No `TYPE_CHECKING` blocks
 
@@ -167,8 +168,10 @@ that instead.
 ## Docstrings
 
 Use Google-style docstrings on public APIs that warrant explanation. Public APIs *should* have docstrings; this is
-policy, not lint — ruff's pydocstyle rules are not selected, so neither presence nor format fails CI. Beyond format, the
-*content* matters:
+policy, not lint — ruff's `D1xx` rules are ignored, so a missing docstring won't fail CI.
+
+When a docstring exists, its format is enforced by ruff (Google convention: one-line summary, blank line, body, closing
+quotes on their own line). Beyond format, the *content* matters:
 
 - **Module docstring**: what the module is for; what to use it for.
 - **Function/method docstring**: what the caller needs to know to call it correctly. Not a paraphrase of the

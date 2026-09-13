@@ -47,6 +47,7 @@ def _protoc(include: pathlib.Path, protos: list[str]) -> None:
 
 
 def main() -> int:
+    """Export the buf module and regenerate every committed Python stub; return the exit code."""
     if shutil.which("buf") is None:
         raise SystemExit("buf not found on PATH; install buf (https://buf.build) to regenerate stubs")
 

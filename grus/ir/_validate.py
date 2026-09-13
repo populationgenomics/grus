@@ -150,9 +150,12 @@ _TERMINAL_OUTCOMES = frozenset(
 
 
 def _check_reproductive_outcome_terminal(p: pb.Pedigree) -> None:
-    """A pregnancy or loss (pregnancy / stillbirth / SAB / TOP / ectopic) never reproduces, so it may not be a
-    mating partner — and therefore has no offspring. (Adoption and parentage are deliberately NOT constrained
-    against each other: an adopted-out child is the couple's biological child raised elsewhere.)"""
+    """Reject a pregnancy or loss that appears as a mating partner.
+
+    A pregnancy / stillbirth / SAB / TOP / ectopic never reproduces, so it may not be a mating partner and
+    therefore has no offspring. Adoption and parentage are deliberately NOT constrained against each other: an
+    adopted-out child is the couple's biological child raised elsewhere.
+    """
     partners = {_key(ref) for m in p.matings for ref in _partners(m)}
     for ind in p.individuals:
         if ind.reproductive_outcome in _TERMINAL_OUTCOMES and (ind.generation, ind.index) in partners:

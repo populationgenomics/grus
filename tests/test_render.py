@@ -23,9 +23,8 @@ import re
 
 import pytest
 
-from grus import ir
+from grus import ir, render
 from grus.models import pedigree_pb2 as pb
-from grus.render import DEFAULT_GEOMETRY, CarrierStyle, DeferredFeatureError, Geometry, Layout, layout, render_svg
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 _NAMES = sorted(path.stem for path in _GOLDENS.glob("*.pbtxt"))
@@ -37,7 +36,7 @@ def _load(name: str) -> pb.Pedigree:
     return ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
 
 
-def _coords(lay: Layout) -> dict[int, tuple[int, int, float]]:
+def _coords(lay: render.Layout) -> dict[int, tuple[int, int, float]]:
     """Individual index -> (level, column, x)."""
     out: dict[int, tuple[int, int, float]] = {}
     for level, row in enumerate(lay.nid):
@@ -72,7 +71,7 @@ def _texts(svg: str) -> list[tuple[float, float, float, str]]:
 
 def _label_lines(svg: str) -> list[tuple[float, float, str]]:
     """Just the label-stack lines (font size == label_size): ``(x, y, content)``."""
-    size = DEFAULT_GEOMETRY.label_size
+    size = render.DEFAULT_GEOMETRY.label_size
     return [(x, y, s) for x, y, sz, s in _texts(svg) if sz == size]
 
 
@@ -86,7 +85,7 @@ def _markers(svg: str) -> list[tuple[float, float, float, str]]:
 
 def _symbol_center_ys(svg: str) -> set[float]:
     """Distinct y of each symbol's centre (circle ``cy``; rect top + half)."""
-    half = DEFAULT_GEOMETRY.symbol_size / 2
+    half = render.DEFAULT_GEOMETRY.symbol_size / 2
     ys = {round(float(cy), 3) for cy in re.findall(r'<circle cx="[-0-9.]+" cy="([-0-9.]+)"', svg)}
     ys |= {round(float(y) + half, 3) for _x, y in re.findall(r'<rect x="([-0-9.]+)" y="([-0-9.]+)"', svg)}
     return ys
@@ -114,7 +113,7 @@ def test_golden_set_is_non_empty() -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_golden_svg(name: str) -> None:
-    svg = render_svg(_load(name))
+    svg = render.render_svg(_load(name))
     path = _GOLDENS / f"{name}.svg"
     if _REGEN:
         path.write_text(svg)
@@ -124,7 +123,7 @@ def test_golden_svg(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_render_is_well_formed_svg(name: str) -> None:
-    svg = render_svg(_load(name))
+    svg = render.render_svg(_load(name))
     assert svg.startswith("<svg ")
     assert svg.rstrip().endswith("</svg>")
     assert "viewBox" in svg
@@ -133,8 +132,8 @@ def test_render_is_well_formed_svg(name: str) -> None:
 @pytest.mark.parametrize("name", _NAMES)
 def test_render_is_deterministic(name: str) -> None:
     p = _load(name)
-    assert render_svg(p) == render_svg(p)
-    assert layout(p) == layout(p)
+    assert render.render_svg(p) == render.render_svg(p)
+    assert render.layout(p) == render.layout(p)
 
 
 # --- structural invariants (robust to spacing) ----------------------------------------------------
@@ -143,7 +142,7 @@ def test_render_is_deterministic(name: str) -> None:
 @pytest.mark.parametrize("name", _NAMES)
 def test_generations_are_monotonic_rows(name: str) -> None:
     p = _load(name)
-    at = _coords(layout(p))
+    at = _coords(render.layout(p))
     idx = _index(p)
     for m in p.matings:
         if not m.HasField("partner_a"):
@@ -159,16 +158,16 @@ def test_generations_are_monotonic_rows(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_no_two_symbols_overlap(name: str) -> None:
-    lay = layout(_load(name))
+    lay = render.layout(_load(name))
     for row in lay.pos:
         for a, b in itertools.pairwise(sorted(row)):
-            assert b - a >= DEFAULT_GEOMETRY.couple_gap - _EPS
+            assert b - a >= render.DEFAULT_GEOMETRY.couple_gap - _EPS
 
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_couples_are_adjacent(name: str) -> None:
     p = _load(name)
-    at = _coords(layout(p))
+    at = _coords(render.layout(p))
     idx = _index(p)
     for m in p.matings:
         if not m.HasField("partner_b"):
@@ -181,7 +180,7 @@ def test_couples_are_adjacent(name: str) -> None:
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
     p = _load(name)
-    at = _coords(layout(p))
+    at = _coords(render.layout(p))
     idx = _index(p)
     for m in p.matings:
         if not m.offspring or not m.HasField("partner_a"):
@@ -199,9 +198,9 @@ def test_label_lines_do_not_overlap(name: str) -> None:
     # The node pitch widens for label width, so no two label lines sharing a baseline collide. Estimate
     # each line's drawn width with the renderer's own heuristic (0.6*label_size px per character) and
     # require the boxes of consecutive lines on a row to clear each other.
-    size = DEFAULT_GEOMETRY.label_size
+    size = render.DEFAULT_GEOMETRY.label_size
     rows: dict[float, list[tuple[float, str]]] = {}
-    for x, y, s in _label_lines(render_svg(_load(name))):
+    for x, y, s in _label_lines(render.render_svg(_load(name))):
         rows.setdefault(round(y, 3), []).append((x, s))
     for row in rows.values():
         row.sort()
@@ -216,7 +215,7 @@ def test_wide_label_widens_only_adjacent_columns() -> None:
     # would collide, not the whole figure's column pitch. Four founder siblings, all short-labelled but
     # the second carrying a long annotation -> the gaps beside it widen, the far C-D gap keeps the
     # geometric sib pitch.
-    g = DEFAULT_GEOMETRY
+    g = render.DEFAULT_GEOMETRY
     floor = g.sib_gap * g.x_unit
     p = pb.Pedigree(
         individuals=[
@@ -232,7 +231,7 @@ def test_wide_label_widens_only_adjacent_columns() -> None:
         ],
         matings=[pb.Mating(offspring=[pb.Offspring(child=pb.Position(generation=1, index=i)) for i in (1, 2, 3, 4)])],
     )
-    svg = render_svg(p)
+    svg = render.render_svg(p)
     xs = sorted(float(x) for x in re.findall(r'<rect x="([-0-9.]+)"', svg))  # men -> squares, left to right
     a, b, c, d = xs
     assert abs((d - c) - floor) < _EPS, "columns away from the wide label keep the geometric sib pitch"
@@ -253,11 +252,11 @@ def test_wide_edge_label_is_not_clipped() -> None:
             ),
         ],
     )
-    svg = render_svg(p)
+    svg = render.render_svg(p)
     m = _WIDTH_RE.search(svg)
     assert m is not None
     width = float(m.group(1))
-    size = DEFAULT_GEOMETRY.label_size
+    size = render.DEFAULT_GEOMETRY.label_size
     for x, _y, s in _label_lines(svg):
         half_w = 0.6 * size * len(s) / 2
         assert x - half_w >= -_EPS, f"label {s!r} clips off the left edge"
@@ -268,29 +267,29 @@ def test_childless_couple_draws_the_bennett_glyph() -> None:
     # A childless mating (no offspring) hangs a stub + bar below the couple: one bar for by-choice, two
     # for infertility. The layout records the value on the couple's left column; drawing emits the bars.
     p = _load("childless")
-    lay = layout(p)
+    lay = render.layout(p)
     drawn = [v for row in lay.childless for v in row if v]
     assert sorted(drawn) == [
         int(pb.CHILDLESSNESS_BY_CHOICE),
         int(pb.CHILDLESSNESS_INFERTILITY),
     ], "both childless couples are recorded on their left column"
     # A fertile couple records nothing.
-    fertile = layout(_load("trio")).childless
+    fertile = render.layout(_load("trio")).childless
     assert not any(v for row in fertile for v in row), "a couple with children draws no childless glyph"
 
 
 def test_carrier_glyph_depends_on_inheritance() -> None:
     # The carrier glyph is chosen by the condition's inheritance: a half-filled symbol (clipped to the shape)
     # for autosomal recessive, a central dot for X-linked; an unspecified carrier defaults to the AR half-fill.
-    ar = render_svg(
+    ar = render.render_svg(
         _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE))
     )
     assert "<clipPath" in ar and 'clip-path="url(#' in ar, "an AR carrier is a shape-clipped half-fill"
-    xl = render_svg(
+    xl = render.render_svg(
         _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE))
     )
     assert "<clipPath" not in xl and 'r="' in xl, "an X-linked carrier is a central dot, not a half-fill"
-    default = render_svg(_one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER)))
+    default = render.render_svg(_one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER)))
     assert "<clipPath" in default, "an unspecified-inheritance carrier defaults to the AR half-fill"
 
 
@@ -304,9 +303,11 @@ def test_carrier_style_toggle_controls_the_x_linked_glyph() -> None:
     import dataclasses
 
     xl = _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE))
-    default = render_svg(xl)  # DEFAULT_GEOMETRY -> INHERITANCE_GLYPH
+    default = render.render_svg(xl)  # DEFAULT_GEOMETRY -> INHERITANCE_GLYPH
     assert "<clipPath" not in default, "default (existing-literature) X-linked carrier is a central dot"
-    partition = render_svg(xl, dataclasses.replace(DEFAULT_GEOMETRY, carrier_style=CarrierStyle.PARTITION_FILL))
+    partition = render.render_svg(
+        xl, dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.CarrierStyle.PARTITION_FILL)
+    )
     assert "<clipPath" in partition, "under 2022 PARTITION_FILL the X-linked carrier is a region fill, not a dot"
 
 
@@ -328,9 +329,9 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
     def rect_xs(svg: str) -> list[float]:
         return sorted(float(x) for x in re.findall(r'<rect x="([-0-9.]+)"[^>]*clip-path=', svg))
 
-    different = rect_xs(render_svg(two("varA", "varB")))
-    same = rect_xs(render_svg(two("varA", "varA")))
-    assert max(different) - max(same) == DEFAULT_GEOMETRY.symbol_size / 2, (
+    different = rect_xs(render.render_svg(two("varA", "varB")))
+    same = rect_xs(render.render_svg(two("varA", "varA")))
+    assert max(different) - max(same) == render.DEFAULT_GEOMETRY.symbol_size / 2, (
         "a carrier of a different variant fills the opposite half"
     )
 
@@ -410,8 +411,11 @@ def _avuncular_loop() -> pb.Pedigree:
 
 
 def _double_cousin_loop() -> pb.Pedigree:
-    """Two founder couples cross-marry both ways (II-1xII-3, II-2xII-4), then those children (III-1, III-2)
-    marry — two joins the second pass can't make adjacent, so it defers (partners not adjacent)."""
+    """Two founder couples cross-marry both ways, then those children marry; the join defers.
+
+    II-1xII-3 and II-2xII-4, then III-1 x III-2 — two joins the second pass can't make adjacent, so it defers
+    (partners not adjacent).
+    """
     return pb.Pedigree(
         individuals=[_ind(1, i) for i in (1, 2, 3, 4)]
         + [_ind(2, i) for i in (1, 2, 3, 4)]
@@ -454,11 +458,13 @@ def _double_cousin_loop() -> pb.Pedigree:
 
 
 def test_cousin_marriage_loop_lays_out() -> None:
-    """A first-cousin marriage is a loop closed solely by that cross-mating, so it now lays out: the cousins
-    are placed as an adjacent, doubled (consanguineous) couple with their child below. Harder loops defer."""
+    """A first-cousin marriage lays out as an adjacent, doubled couple with their child below.
+
+    The loop is closed solely by that cross-mating. Harder loops defer.
+    """
     p = _cousin_marriage_loop()
-    lay = layout(p)  # must not raise: the ordering draws the loop's cross-mating as an adjacent couple
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)  # must not raise: the ordering draws the loop's cross-mating as an adjacent couple
+    assert render.render_svg(p).startswith("<svg ")
     at, idx = _coords(lay), _index(p)
     c1, c2 = at[idx[(3, 1)]], at[idx[(3, 2)]]  # the marrying first cousins
     assert c1[0] == c2[0] and abs(c1[1] - c2[1]) == 1  # adjacent couple on one row
@@ -468,11 +474,13 @@ def test_cousin_marriage_loop_lays_out() -> None:
 
 
 def test_avuncular_loop_duplicates_the_cross_generation_partner() -> None:
-    """An uncle-niece marriage (partners on different IR generations) lays out by duplicating the shallower
-    partner down to the niece's row: the uncle is drawn on his own row and again as a ghost beside the niece,
-    the two joined by a dashed 'same individual' link, with their child below the ghost couple."""
+    """An uncle-niece marriage lays out by duplicating the shallower partner down to the niece's row.
+
+    The partners are on different IR generations: the uncle is drawn on his own row and again as a ghost beside
+    the niece, the two joined by a dashed 'same individual' link, with their child below the ghost couple.
+    """
     p = _avuncular_loop()
-    lay = layout(p)  # was a deferral; now drawn via duplication
+    lay = render.layout(p)  # was a deferral; now drawn via duplication
     assert len(lay.ghost_of) == 1
     ghost, real = next(iter(lay.ghost_of.items()))
     assert real == _index(p)[(2, 1)]  # the uncle (II-1) is the duplicated (shallower) partner
@@ -483,21 +491,24 @@ def test_avuncular_loop_duplicates_the_cross_generation_partner() -> None:
     assert at[real][0] == niece[0] - 1  # the real uncle stays one generation up
     child = at[_index(p)[(4, 1)]]
     assert child[0] == niece[0] + 1  # the couple's child hangs one row below
-    svg = render_svg(p)
+    svg = render.render_svg(p)
     assert svg.startswith("<svg ") and svg.count("stroke-dasharray") >= 1  # a dashed same-individual link
 
 
 def test_double_cousin_loop_still_defers() -> None:
-    """Double first cousins — an interlocking loop the ordering cannot open as adjacent couples without tearing
-    a sibship — still defer to a placeholder, never a crossing or crash (the torn-sibship backstop fires)."""
-    with pytest.raises(DeferredFeatureError, match="descent bars overlap"):
-        render_svg(_double_cousin_loop())
+    """Double first cousins still defer to a placeholder, never a crossing or crash.
+
+    An interlocking loop the ordering cannot open as adjacent couples without tearing a sibship; the
+    torn-sibship backstop fires.
+    """
+    with pytest.raises(render.DeferredFeatureError, match="descent bars overlap"):
+        render.render_svg(_double_cousin_loop())
 
 
 def _same_generation_split_join() -> pb.Pedigree:
-    """The c16 shape: two cousins on the same drawn generation (both gen III) whose lineages have unequal
-    length, so ``kindepth`` puts them on different computed levels and packing leaves them far apart.
+    """The c16 shape: same-generation cousins whose lineages have unequal length.
 
+    Both are gen III, so ``kindepth`` puts them on different computed levels and packing leaves them far apart.
     III-1 descends from a founder couple II-3 x II-4 drawn at generation II (a short lineage), III-2 from the
     longer I-1 -> II-2 -> III-2 line and heads a sibship {III-2, III-3, III-4}. Generation-aware alignment
     pulls III-1's lineage down to row III; relocation then slides III-1's separable birth block over so the
@@ -543,11 +554,13 @@ def _same_generation_split_join() -> pb.Pedigree:
 
 
 def test_same_generation_split_join_relocates() -> None:
-    """A same-generation cross join split across levels by kindepth aligns to one row and relocates so the
-    cousins are an adjacent couple, their child below — drawn once, no duplicate (the c16 shape)."""
+    """A same-generation cross join split by kindepth aligns to one row and relocates (the c16 shape).
+
+    The cousins end as an adjacent couple, their child below — drawn once, no duplicate.
+    """
     p = _same_generation_split_join()
-    lay = layout(p)  # must not raise
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)  # must not raise
+    assert render.render_svg(p).startswith("<svg ")
     at, idx = _coords(lay), _index(p)
     c1, c2 = at[idx[(3, 1)]], at[idx[(3, 2)]]
     assert c1[0] == c2[0] and abs(c1[1] - c2[1]) == 1  # same row, adjacent columns
@@ -588,8 +601,8 @@ def test_more_than_two_matings_is_deferred() -> None:
     # A >2-mate individual routes its overflow mating (design), but routing a mating that HAS offspring is not
     # yet drawn — its child's descent hangs from a non-adjacent parent pair, which _build cannot express — so
     # this shape (every mating bears a child) still defers rather than mislay the descent out.
-    with pytest.raises(DeferredFeatureError, match="not an adjacent couple"):
-        layout(p)
+    with pytest.raises(render.DeferredFeatureError, match="not an adjacent couple"):
+        render.layout(p)
 
 
 def test_child_of_two_matings_is_deferred() -> None:
@@ -614,18 +627,17 @@ def test_child_of_two_matings_is_deferred() -> None:
             ),
         ],
     )
-    with pytest.raises(DeferredFeatureError, match="more than one mating"):
-        layout(p)
+    with pytest.raises(render.DeferredFeatureError, match="more than one mating"):
+        render.layout(p)
 
 
 def _two_parented_marriage() -> pb.Pedigree:
-    """Two unrelated founder couples each have a child; the two children marry (a non-consanguineous
-    join of two drawn lineages).
+    """Two unrelated founder couples each have a child; the two children marry.
 
-    Both partners of the II-1 x II-2 mating are born-in — each already anchored by its own founder
-    subtree — so the single-mate recursion has no marry-in to hang the couple on. This is the exact
-    shape that crashed ``render_svg`` with a bare ``KeyError`` (in ``_centroid``, on the child the
-    second lineage could no longer place) on real extracted figures; it must now defer cleanly.
+    A non-consanguineous join of two drawn lineages. Both partners of the II-1 x II-2 mating are born-in — each
+    already anchored by its own founder subtree — so the single-mate recursion has no marry-in to hang the couple
+    on. This is the exact shape that crashed ``render_svg`` with a bare ``KeyError`` (in ``_centroid``, on the
+    child the second lineage could no longer place) on real extracted figures; it must now defer cleanly.
     """
     return pb.Pedigree(
         individuals=[
@@ -701,9 +713,11 @@ def _two_parented_marriage_with_extra_mate() -> pb.Pedigree:
 
 
 def _two_lineage_join_not_adjacent() -> pb.Pedigree:
-    """Three families A/B/C; A's child (II-1) marries C's child (II-3). In birth order B's child (II-2) falls
-    between them; the v2 ordering reorders the families so the two born-in partners sit adjacent (v1 could not
-    and deferred)."""
+    """Three families A/B/C; A's child (II-1) marries C's child (II-3).
+
+    In birth order B's child (II-2) falls between them; the v2 ordering reorders the families so the two
+    born-in partners sit adjacent (v1 could not and deferred).
+    """
     return pb.Pedigree(
         individuals=[
             pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN),
@@ -743,11 +757,12 @@ def _two_lineage_join_not_adjacent() -> pb.Pedigree:
 
 
 def _child_marries_multi_mate_founder() -> pb.Pedigree:
-    """A born-in child (II-1) marries a marry-in founder (II-2) who has a *second* marriage to another
-    marry-in (II-3). Only one partner of each mating is born-in, so the marry-in demotes onto the
-    child's row and the single-mate recursion places the couple. A look-alike of the crashing shape
-    (same spouse-hinge redirect) that must keep rendering — a guard against the two-lineage rule
-    over-deferring supported half-sib pedigrees.
+    """A born-in child marries a marry-in founder who has a second marriage to another marry-in.
+
+    II-1 x II-2, then II-2 x II-3. Only one partner of each mating is born-in, so the marry-in demotes onto the
+    child's row and the single-mate recursion places the couple. A look-alike of the crashing shape (same
+    spouse-hinge redirect) that must keep rendering — a guard against the two-lineage rule over-deferring
+    supported half-sib pedigrees.
     """
     return pb.Pedigree(
         individuals=[
@@ -780,11 +795,13 @@ def _child_marries_multi_mate_founder() -> pb.Pedigree:
 
 
 def test_two_parented_marriage_lays_out() -> None:
-    """A two-lineage join — a born-in child from each of two families marries — lays out: the ordering brings
-    the two born-in partners together as an adjacent couple and their child hangs below."""
+    """A two-lineage join — a born-in child from each of two families marries — lays out.
+
+    The ordering brings the two born-in partners together as an adjacent couple and their child hangs below.
+    """
     p = _two_parented_marriage()
-    lay = layout(p)  # must not raise: the ordering brings the join's partners adjacent
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)  # must not raise: the ordering brings the join's partners adjacent
+    assert render.render_svg(p).startswith("<svg ")
     at, idx = _coords(lay), _index(p)
     a, b, child = at[idx[(2, 1)]], at[idx[(2, 2)]], at[idx[(3, 1)]]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1  # the marrying pair: same row, adjacent columns
@@ -793,11 +810,14 @@ def test_two_parented_marriage_lays_out() -> None:
 
 
 def test_two_parented_marriage_with_extra_mate_lays_out() -> None:
-    """The join partner (II-3) also has a marry-in second mate (II-4): the two-lineage join and the
-    half-sib mating coexist — the join pair is an adjacent couple and both children are placed."""
+    """The join partner (II-3) also has a marry-in second mate (II-4); both matings lay out.
+
+    The two-lineage join and the half-sib mating coexist — the join pair is an adjacent couple and both children
+    are placed.
+    """
     p = _two_parented_marriage_with_extra_mate()
-    lay = layout(p)
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)
+    assert render.render_svg(p).startswith("<svg ")
     at, idx = _coords(lay), _index(p)
     a, b = at[idx[(2, 2)]], at[idx[(2, 3)]]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1  # the two-lineage join is an adjacent couple
@@ -805,16 +825,19 @@ def test_two_parented_marriage_with_extra_mate_lays_out() -> None:
 
 
 def test_two_lineage_join_not_adjacent_reorders() -> None:
-    """A two-lineage join whose partners packed non-adjacent under v1 (a third family fell between them) now
-    lays out: the ordering brings A's child and C's child together as an adjacent couple, their child below.
-    A's own descent centering yields to the couple pull (a soft-constraint tradeoff v1 could not make, so it
-    deferred); the layout is topologically sound — no overlaps, couple adjacent, join child within span."""
+    """A two-lineage join whose partners packed non-adjacent under v1 now lays out.
+
+    A third family fell between them; the ordering brings A's child and C's child together as an adjacent
+    couple, their child below. A's own descent centering yields to the couple pull (a soft-constraint tradeoff
+    v1 could not make, so it deferred); the layout is topologically sound — no overlaps, couple adjacent, join
+    child within span.
+    """
     p = _two_lineage_join_not_adjacent()
-    lay = layout(p)
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)
+    assert render.render_svg(p).startswith("<svg ")
     for row in lay.pos:  # no two symbols overlap
         for x, y in itertools.pairwise(sorted(row)):
-            assert y - x >= DEFAULT_GEOMETRY.couple_gap - _EPS
+            assert y - x >= render.DEFAULT_GEOMETRY.couple_gap - _EPS
     at, idx = _coords(lay), _index(p)
     a, b, child = at[idx[(2, 1)]], at[idx[(2, 3)]], at[idx[(3, 1)]]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1  # A's child x C's child: adjacent couple
@@ -823,8 +846,8 @@ def test_two_lineage_join_not_adjacent_reorders() -> None:
 
 def test_child_of_multi_mate_founder_still_renders() -> None:
     p = _child_marries_multi_mate_founder()
-    lay = layout(p)  # must not raise: one born-in partner per mating is within tier 1
-    assert render_svg(p).startswith("<svg ")
+    lay = render.layout(p)  # must not raise: one born-in partner per mating is within tier 1
+    assert render.render_svg(p).startswith("<svg ")
     at, idx = _coords(lay), _index(p)
     # the born-in child II-1 and its two-mate spouse II-2 are placed as an adjacent couple
     assert abs(at[idx[(2, 1)]][1] - at[idx[(2, 2)]][1]) == 1
@@ -885,10 +908,11 @@ def _cross_join_child_collision() -> pb.Pedigree:
 
 
 def _cross_join_chain(third_family: bool) -> pb.Pedigree:
-    """The c07-A shape (gen I-IV): a consanguineous cousin marriage III-3 x III-4 with a wide sibship next
-    to its cousins' sibship, so the join's children must slide right past IV-1..IV-5 and the couple must be
-    *pulled* right to keep its descent connected. Because III-4 is the single child of II-4 x II-3, the pull
-    drags that couple too (the cascade slice 23 must handle).
+    """The c07-A shape (gen I-IV): a consanguineous cousin marriage beside a wide sibship.
+
+    III-3 x III-4 sits next to its cousins' sibship, so the join's children must slide right past IV-1..IV-5
+    and the couple must be *pulled* right to keep its descent connected. Because III-4 is the single child of
+    II-4 x II-3, the pull drags that couple too (the cascade slice 23 must handle).
 
     With ``third_family`` an unrelated family C is added whose gen-III member packed immediately beside the
     cross couple, which boxed v1's pull in and made it defer; the v2 ordering finds room and lays it out.
@@ -964,10 +988,12 @@ def _cross_join_chain(third_family: bool) -> pb.Pedigree:
 
 
 def _boundary_bridge_join() -> pb.Pedigree:
-    """Two families joined at their sibship boundary (the c03 shape). Family 1's last child (II-2) marries
-    family 2's first child (II-3); their children III-1/III-2 must hang between the families — but family 2's
-    next child II-4 already heads a sibship (III-3/III-4) right there. The couple can't be pulled (its right
-    member II-3 is anchored in family 2's sibship), so the second pass spreads family 2 rightward to open room.
+    """Two families joined at their sibship boundary (the c03 shape).
+
+    Family 1's last child (II-2) marries family 2's first child (II-3); their children III-1/III-2 must hang
+    between the families — but family 2's next child II-4 already heads a sibship (III-3/III-4) right there.
+    The couple can't be pulled (its right member II-3 is anchored in family 2's sibship), so the second pass
+    spreads family 2 rightward to open room.
     """
     return pb.Pedigree(
         individuals=[
@@ -1013,11 +1039,14 @@ def _boundary_bridge_join() -> pb.Pedigree:
 
 
 def test_boundary_bridge_join_spreads_the_neighbour() -> None:
-    """The c03 shape lays out: the bridge couple's children hang between the families and the neighbouring
-    sibship is spread right to make room (rather than the join deferring as it did before slice 29)."""
+    """The c03 shape lays out.
+
+    The bridge couple's children hang between the families and the neighbouring sibship is spread right to
+    make room (rather than the join deferring as it did before slice 29).
+    """
     p = _boundary_bridge_join()
     _assert_join_laid_out(p)  # no overlaps, couples adjacent, every descent midpoint within its sibship span
-    at, idx = _coords(layout(p)), _index(p)
+    at, idx = _coords(render.layout(p)), _index(p)
     a, b = at[idx[(2, 2)]], at[idx[(2, 3)]]
     bridge_kids = [at[idx[(3, i)]] for i in (1, 2)]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1  # bridge couple adjacent
@@ -1028,11 +1057,11 @@ def test_boundary_bridge_join_spreads_the_neighbour() -> None:
 
 def _assert_join_laid_out(p: pb.Pedigree) -> None:
     """A cross-join pedigree lays out with the drawing's load-bearing invariants intact."""
-    lay = layout(p)
+    lay = render.layout(p)
     at, idx = _coords(lay), _index(p)
     for row in lay.pos:  # no two symbols overlap
         for a, b in itertools.pairwise(sorted(row)):
-            assert b - a >= DEFAULT_GEOMETRY.couple_gap - _EPS
+            assert b - a >= render.DEFAULT_GEOMETRY.couple_gap - _EPS
     for m in p.matings:  # couples adjacent; every descent midpoint stays within its sibship span
         parents = [at[idx[_pos(m.partner_a)]]]
         if m.HasField("partner_b"):
@@ -1042,34 +1071,39 @@ def _assert_join_laid_out(p: pb.Pedigree) -> None:
             mid = sum(pt[2] for pt in parents) / len(parents)
             child_x = [at[idx[_pos(o.child)]][2] for o in m.offspring]
             assert min(child_x) - _EPS <= mid <= max(child_x) + _EPS
-    assert render_svg(p).startswith("<svg ")
+    assert render.render_svg(p).startswith("<svg ")
 
 
 def test_cross_join_child_collision_slides_clear() -> None:
     """A join whose centred children collide with a neighbour slides them clear and still lays out."""
     p = _cross_join_child_collision()
     _assert_join_laid_out(p)
-    at, idx = _coords(layout(p)), _index(p)
+    at, idx = _coords(render.layout(p)), _index(p)
     kids = [at[idx[(3, i)]] for i in (4, 5, 6)]
     neighbour = [at[idx[(3, i)]] for i in (1, 2, 3)]
     assert min(k[2] for k in kids) > max(n[2] for n in neighbour)  # join children moved clear to the right
 
 
 def test_cross_join_chain_pulls_couple_and_ancestry() -> None:
-    """The c07-A chain lays out: the cousin couple is pulled right over its slid sibship and the single-child
-    parent couple is dragged with it, keeping both descents connected."""
+    """The c07-A chain lays out.
+
+    The cousin couple is pulled right over its slid sibship and the single-child parent couple is dragged with
+    it, keeping both descents connected.
+    """
     p = _cross_join_chain(third_family=False)
     _assert_join_laid_out(p)
-    at, idx = _coords(layout(p)), _index(p)
+    at, idx = _coords(render.layout(p)), _index(p)
     # III-4 (single child of II-4 x II-3) stays exactly under its parents' midpoint after the drag
     mid = (at[idx[(2, 4)]][2] + at[idx[(2, 3)]][2]) / 2
     assert abs(at[idx[(3, 4)]][2] - mid) < _EPS
 
 
 def test_cross_join_chain_with_blocker_lays_out() -> None:
-    """The c07-A chain with an extra family packed beside the cross couple — which boxed v1's pull in and made
-    it defer — now lays out: the ordering places the cousin marriage and its wide sibship with no special
-    pull/spread pass, invariants intact."""
+    """The c07-A chain with an extra family packed beside the cross couple lays out.
+
+    That family boxed v1's pull in and made it defer; the ordering places the cousin marriage and its wide
+    sibship with no special pull/spread pass, invariants intact.
+    """
     _assert_join_laid_out(_cross_join_chain(third_family=True))
 
 
@@ -1124,7 +1158,7 @@ def test_cousin_marriage_with_siblings_lays_out() -> None:
         ],
     )
     _assert_join_laid_out(p)  # no overlaps, couples adjacent, every descent midpoint within its sibship span
-    at, idx = _coords(lay := layout(p)), _index(p)
+    at, idx = _coords(lay := render.layout(p)), _index(p)
     a, b = at[idx[(3, 3)]], at[idx[(3, 4)]]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1, "the marrying cousins are an adjacent couple"
     assert lay.spouse[a[0]][min(a[1], b[1])] == 2, "drawn consanguineous (doubled mating line)"
@@ -1170,8 +1204,8 @@ def test_renderer_is_total(p: pb.Pedigree) -> None:
     # returns an SVG document or raises DeferredFeatureError — never a bare KeyError/IndexError. Only
     # DeferredFeatureError is caught here, so any other exception propagates and fails the test.
     try:
-        svg = render_svg(p)
-    except DeferredFeatureError:
+        svg = render.render_svg(p)
+    except render.DeferredFeatureError:
         return
     assert svg.startswith("<svg ") and svg.rstrip().endswith("</svg>")
 
@@ -1202,9 +1236,9 @@ def _twin_pedigree(twin_type: pb.ZygosityType) -> pb.Pedigree:
 
 @pytest.mark.parametrize("twin_type", [pb.ZYGOSITY_TYPE_DIZYGOTIC, pb.ZYGOSITY_TYPE_UNKNOWN])
 def test_twin_zygosity_is_marked_and_drawn(twin_type: pb.ZygosityType) -> None:
-    lay = layout(_twin_pedigree(twin_type))
+    lay = render.layout(_twin_pedigree(twin_type))
     assert lay.twins[1][0] == int(twin_type)
-    svg = render_svg(_twin_pedigree(twin_type))
+    svg = render.render_svg(_twin_pedigree(twin_type))
     assert svg.startswith("<svg ")
     if twin_type == pb.ZYGOSITY_TYPE_UNKNOWN:
         assert ">?<" in svg  # unknown zygosity marks the convergence with a "?"
@@ -1214,13 +1248,13 @@ def test_founder_sibship_lays_out_with_bar_and_no_parents() -> None:
     # A partnerless mating (founder sibship): three siblings, no drawn parents. They lay out packed in birth
     # order at the top row, carry no fam pointer, and are recorded as a founder sibship for drawing.
     p = _load("founder_sibship")
-    lay = layout(p)
+    lay = render.layout(p)
     assert lay.founder_sibships == [(0, (0, 1, 2))]
     assert [f for row in lay.fam for f in row] == [-1, -1, -1], "a founder sibship draws no parent cell"
     at, idx = _coords(lay), _index(p)
     xs = [at[idx[(1, i)]][2] for i in (1, 2, 3)]
     assert xs == sorted(xs), "siblings placed left to right in birth order"
-    svg = render_svg(p)
+    svg = render.render_svg(p)
     assert svg.startswith("<svg ")
     # The implied hanger is a short vertical stub rising above the sib bar to a point with no symbol at its top.
     verticals = [
@@ -1235,7 +1269,7 @@ def test_founder_sibship_lays_out_with_bar_and_no_parents() -> None:
 def test_founder_sibship_marriage_lays_out() -> None:
     # The c19 gen-I shape: two founder sibships whose members marry (I-2 x I-3), with a descending generation.
     p = _load("founder_sibship_marry_in")
-    lay = layout(p)
+    lay = render.layout(p)
     assert len(lay.founder_sibships) == 2, "both parentless sib rows are recorded"
     at, idx = _coords(lay), _index(p)
     a, b = at[idx[(1, 2)]], at[idx[(1, 3)]]
@@ -1243,7 +1277,7 @@ def test_founder_sibship_marriage_lays_out() -> None:
     kids = [at[idx[(2, i)]] for i in (1, 2)]
     assert all(k[0] == a[0] + 1 for k in kids), "gen II hangs one row below the joined couple"
     assert min(a[2], b[2]) - _EPS <= sum(k[2] for k in kids) / 2 <= max(a[2], b[2]) + _EPS
-    assert render_svg(p).startswith("<svg ")
+    assert render.render_svg(p).startswith("<svg ")
 
 
 def test_founder_sibship_marriage_children_head_marry_in_families() -> None:
@@ -1297,7 +1331,7 @@ def test_founder_sibship_marriage_children_head_marry_in_families() -> None:
             ),
         ],
     )
-    lay = layout(p)
+    lay = render.layout(p)
     assert len(lay.founder_sibships) == 2, "both parentless gen-I sib rows are recorded"
     at, idx = _coords(lay), _index(p)
     a, b = at[idx[(1, 2)]], at[idx[(1, 3)]]
@@ -1305,7 +1339,7 @@ def test_founder_sibship_marriage_children_head_marry_in_families() -> None:
     for child, spouse in (((2, 1), (2, 10)), ((2, 2), (2, 11))):
         c, s = at[idx[child]], at[idx[spouse]]
         assert c[0] == s[0] and abs(c[1] - s[1]) == 1, "each cross child sits beside its marry-in spouse"
-    assert render_svg(p).startswith("<svg ")
+    assert render.render_svg(p).startswith("<svg ")
 
 
 def test_founder_sib_marrying_a_founder_lays_out() -> None:
@@ -1333,13 +1367,13 @@ def test_founder_sib_marrying_a_founder_lays_out() -> None:
             ),
         ],
     )
-    lay = layout(p)  # was a deferral; now drawn
+    lay = render.layout(p)  # was a deferral; now drawn
     assert lay.founder_sibships, "the parentless gen-I sibship {I-1, I-2} is recorded"
     at, idx = _coords(lay), _index(p)
     a, b = at[idx[(1, 1)]], at[idx[(1, 3)]]
     assert a[0] == b[0] and abs(a[1] - b[1]) == 1, "the founder-sib I-1 abuts its spouse I-3"
     assert at[idx[(2, 1)]][0] == a[0] + 1, "their child hangs one row below"
-    assert render_svg(p).startswith("<svg ")
+    assert render.render_svg(p).startswith("<svg ")
 
 
 def test_label_stack_draws_id_then_annotation() -> None:
@@ -1347,7 +1381,7 @@ def test_label_stack_draws_id_then_annotation() -> None:
     # ("II-1", from generation + index) first, the annotation (here the genotype) centred beneath it. trio
     # annotates every individual with a genotype; the bare arabic index rides in the id line, never as its
     # own "1" label line.
-    lines = _label_lines(render_svg(_load("trio")))
+    lines = _label_lines(render.render_svg(_load("trio")))
     by_text = {s: (x, y) for x, y, s in lines}
     assert {"I-1", "I-2", "II-1"} <= set(by_text), "the position id is line 1 of every stack"
     assert {"N/N", "N/M", "M/M"} <= set(by_text), "the annotation line is drawn under the id"
@@ -1361,7 +1395,7 @@ def test_label_stack_drops_empty_annotation() -> None:
     # The position id is always line 1; an individual with no annotations adds no further line. This DZ-twin
     # fixture annotates no one, so each of its four individuals draws exactly its id line and nothing
     # else (no genotype, no zygosity glyph).
-    lines = _label_lines(render_svg(_twin_pedigree(pb.ZYGOSITY_TYPE_DIZYGOTIC)))
+    lines = _label_lines(render.render_svg(_twin_pedigree(pb.ZYGOSITY_TYPE_DIZYGOTIC)))
     assert sorted(s for *_, s in lines) == ["I-1", "I-2", "II-1", "II-2"]
 
 
@@ -1379,7 +1413,7 @@ def test_individual_number_annotation_not_drawn() -> None:
             ),
         ],
     )
-    texts = [s for *_, s in _label_lines(render_svg(p))]
+    texts = [s for *_, s in _label_lines(render.render_svg(p))]
     assert "II-2" in texts, "the position id (encoding the index) is drawn"
     assert "N/M" in texts, "a typed annotation is drawn"
     assert "2" not in texts, "the bare index is not drawn as a standalone label line"
@@ -1404,7 +1438,7 @@ def test_label_stack_dedups_id_equal_annotation() -> None:
             ),
         ],
     )
-    texts = [s for *_, s in _label_lines(render_svg(p))]
+    texts = [s for *_, s in _label_lines(render.render_svg(p))]
     assert texts.count("I-1") == 1, "id-equals-annotation collapses to a single line"
     assert texts.count("I-2") == 1 and texts.count("N/M") == 1, "a distinct annotation is still a second line"
 
@@ -1413,10 +1447,10 @@ def test_wide_labels_widen_node_pitch() -> None:
     # Annotations can be wider than the symbol; the horizontal heuristic raises the column pitch so wide
     # text still clears. A long annotation therefore yields a wider canvas than the short-annotation figure.
     p = _load("trio")
-    narrow = float(_WIDTH_RE.search(render_svg(p)).group(1))  # type: ignore[union-attr]
+    narrow = float(_WIDTH_RE.search(render.render_svg(p)).group(1))  # type: ignore[union-attr]
     for ind in p.individuals:
         ind.annotations.append(pb.Annotation(text="GENOTYPE-XXL", type=pb.ANNOTATION_TYPE_OTHER))  # 12 chars, wide
-    wide = float(_WIDTH_RE.search(render_svg(p)).group(1))  # type: ignore[union-attr]
+    wide = float(_WIDTH_RE.search(render.render_svg(p)).group(1))  # type: ignore[union-attr]
     assert wide > narrow
 
 
@@ -1436,7 +1470,7 @@ def test_render_validates_input() -> None:
         ],
     )
     with pytest.raises(ir.IntegrityError):
-        render_svg(bad)
+        render.render_svg(bad)
 
 
 def test_unconnected_individuals_render() -> None:
@@ -1446,39 +1480,39 @@ def test_unconnected_individuals_render() -> None:
             pb.Individual(generation=1, index=2, gender=pb.GENDER_WOMAN),
         ]
     )
-    lay = layout(p)
+    lay = render.layout(p)
     assert lay.n == [2]
-    assert render_svg(p).startswith("<svg ")
+    assert render.render_svg(p).startswith("<svg ")
 
 
 def test_geometry_spacing_changes_layout() -> None:
     p = _load("sibship")
-    assert layout(p, Geometry(sib_gap=3.0)) != layout(p)
+    assert render.layout(p, render.Geometry(sib_gap=3.0)) != render.layout(p)
 
 
 def test_consanguineous_founder_couple_draws_double_line() -> None:
     # The double-line marker follows the explicit Mating.consanguineous flag (never inferred), founders
     # included: the founder couple's spouse cell is 2 and _matings emits two parallel mating lines.
     p = _load("consanguineous")  # I-1 x I-2 founders, consanguineous: true
-    assert layout(p).spouse[0][0] == 2, "the flagged founder couple is marked as a double-line mating"
+    assert render.layout(p).spouse[0][0] == 2, "the flagged founder couple is marked as a double-line mating"
     horiz = sorted(
         (float(y1), float(x1), float(x2))
         for x1, y1, x2, y2 in re.findall(
-            r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render_svg(p)
+            r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render.render_svg(p)
         )
         if y1 == y2
     )
     assert len(horiz) == 2, "a consanguineous mating draws two parallel lines"
     (y_top, x1a, x2a), (y_bot, x1b, x2b) = horiz
     assert (x1a, x2a) == (x1b, x2b), "the two lines span the same x-range"
-    assert abs(y_bot - y_top) == DEFAULT_GEOMETRY.double_line_offset
+    assert abs(y_bot - y_top) == render.DEFAULT_GEOMETRY.double_line_offset
 
 
 def test_generation_markers_sit_in_left_gutter() -> None:
     # A three-generation pedigree gets one Roman-numeral marker per row (I, II, III), each centred in
     # the reserved left gutter and on its row's symbols, clear of every symbol and the proband arrow.
-    svg = render_svg(_load("three_generation"))
-    gutter = DEFAULT_GEOMETRY.gen_marker_gutter
+    svg = render.render_svg(_load("three_generation"))
+    gutter = render.DEFAULT_GEOMETRY.gen_marker_gutter
     markers = _markers(svg)
     assert {s for *_, s in markers} == {"I", "II", "III"}
     assert [s for *_, s in sorted(markers, key=lambda t: t[1])] == ["I", "II", "III"], "top-to-bottom"
@@ -1541,8 +1575,8 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
             ),
         ],
     )
-    lay = layout(p)
-    draw = _Draw(p, lay, DEFAULT_GEOMETRY)
+    lay = render.layout(p)
+    draw = _Draw(p, lay, render.DEFAULT_GEOMETRY)
     at, idx = _coords(lay), _index(p)
     (lvl, k, _cx) = at[idx[(3, 1)]]  # III-1: only child of II-1 x II-2
     ii1, ii2 = at[idx[(2, 1)]], at[idx[(2, 2)]]
@@ -1550,7 +1584,7 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     assert abs(lay.pos[lvl][k] - (ii1[2] + ii2[2]) / 2) > 0.1, (
         "precondition: III-1 is offset from its parents' midpoint"
     )
-    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render_svg(p))
+    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render.render_svg(p))
     parent_y = draw.py(1)
     # a descent leg leaves the mating midpoint at the parents' row y (the bug emitted a leg only at the child x)
     assert any(

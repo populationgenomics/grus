@@ -318,8 +318,11 @@ def _cross_matings(g: _Graph) -> set[int]:
 
 
 def _born_in(g: _Graph, i: int) -> bool:
-    """Whether ``i``'s horizontal position is fixed by its own lineage block: a drawn parent, or a founder
-    sibship (an undrawn parent couple whose siblings are laid out as a group)."""
+    """Whether ``i``'s horizontal position is fixed by its own lineage block.
+
+    That is a drawn parent, or a founder sibship (an undrawn parent couple whose siblings are laid out as a
+    group).
+    """
     return i in g.parents or i in g.foundersib_members
 
 
