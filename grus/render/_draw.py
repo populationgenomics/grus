@@ -17,10 +17,7 @@ import math
 from collections import defaultdict
 
 from grus.models import pedigree_pb2 as pb
-
-from ._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry
-from ._layout import DeferredFeatureError, Layout, RoutedMating
-from ._layout2 import layout
+from grus.render import _geometry, _layout, _layout2
 
 _X_EPS = 1e-9  # float slack when clustering near-equal layout-x into one column
 
@@ -36,14 +33,14 @@ _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _Tile = tuple[str, float, float, list[str]]
 
 
-def render_svg(p: pb.Pedigree, geometry: Geometry | None = None) -> str:
+def render_svg(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> str:
     """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string."""
-    geom = geometry or DEFAULT_GEOMETRY
-    lay = layout(p, geom)
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
+    lay = _layout2.layout(p, geom)
     return _Draw(p, lay, geom).svg()
 
 
-def render_set_svg(pedigree_set: pb.PedigreeSet, geometry: Geometry | None = None) -> str:
+def render_set_svg(pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None) -> str:
     """Render a whole figure's ``PedigreeSet`` as one SVG (docs/design/renderer.md).
 
     Each pedigree is laid out and drawn exactly as ``render_svg`` does, then the tiles are stacked
@@ -51,20 +48,20 @@ def render_set_svg(pedigree_set: pb.PedigreeSet, geometry: Geometry | None = Non
     first). A pedigree the tier-1 layout defers becomes a labelled placeholder box so the rest of the
     figure still renders. An empty set yields a minimal empty canvas.
     """
-    geom = geometry or DEFAULT_GEOMETRY
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
     tiles: list[_Tile] = []
     for ped in pedigree_set.pedigrees:
         title = _display_title(ped)
         try:
-            draw = _Draw(ped, layout(ped, geom), geom, id_prefix=f"p{len(tiles)}-")
+            draw = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=f"p{len(tiles)}-")
             width, height = draw.dimensions()
             tiles.append((title, width, height, draw.body()))
-        except DeferredFeatureError as deferred:
+        except _layout.DeferredFeatureError as deferred:
             tiles.append(_placeholder_tile(title, str(deferred)))
     return _compose_tiles(tiles, geom)
 
 
-def render_svgs(pedigree_set: pb.PedigreeSet, geometry: Geometry | None = None) -> list[tuple[str, str]]:
+def render_svgs(pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None) -> list[tuple[str, str]]:
     """Render each pedigree in a set to its **own** standalone SVG document — one per family.
 
     Unlike ``render_set_svg`` (which stacks the families into a single composed canvas), this returns a
@@ -73,13 +70,13 @@ def render_svgs(pedigree_set: pb.PedigreeSet, geometry: Geometry | None = None) 
     "deferred" placeholder SVG rather than raising, mirroring ``render_set_svg`` — so the list always has one
     entry per pedigree, each a complete document.
     """
-    geom = geometry or DEFAULT_GEOMETRY
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
     out: list[tuple[str, str]] = []
     for ped in pedigree_set.pedigrees:
         title = _display_title(ped)
         try:
-            svg = _Draw(ped, layout(ped, geom), geom).svg()
-        except DeferredFeatureError as deferred:
+            svg = _Draw(ped, _layout2.layout(ped, geom), geom).svg()
+        except _layout.DeferredFeatureError as deferred:
             _, width, height, body = _placeholder_tile(title, str(deferred))
             svg = _svg_root(width, height, body)
         out.append((title, svg))
@@ -94,7 +91,7 @@ def _display_title(ped: pb.Pedigree) -> str:
     return ped.labels[0].text if ped.labels else ""
 
 
-def _compose_tiles(tiles: list[_Tile], geom: Geometry) -> str:
+def _compose_tiles(tiles: list[_Tile], geom: _geometry.Geometry) -> str:
     """Stack tiles vertically into one SVG document, each centred under its title."""
     margin = geom.margin
     if not tiles:
@@ -176,10 +173,25 @@ def _num(v: float) -> str:
     return f"{r:.3f}".rstrip("0").rstrip(".")
 
 
+def _label_lines(ind: pb.Individual) -> list[str]:
+    """Label stack for ``ind``: the as-drawn position id first, then each annotation's text.
+
+    Line 1 is the reconstructed position ``"II-2"`` (Roman ``generation`` + ``index``); then each
+    ``Annotation``'s verbatim text. Blanks and duplicates are dropped (first occurrence wins).
+    """
+    out: list[str] = []
+    lines = [f"{_roman(ind.generation)}-{ind.index}"]
+    lines += [a.text for a in ind.annotations]
+    for line in lines:
+        if line and line not in out:
+            out.append(line)
+    return out
+
+
 class _Draw:
     """Holds the pedigree, its layout, and geometry; emits the SVG body once."""
 
-    def __init__(self, p: pb.Pedigree, lay: Layout, geom: Geometry, id_prefix: str = "") -> None:
+    def __init__(self, p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry, id_prefix: str = "") -> None:
         self.p = p
         self.lay = lay
         self.geom = geom
@@ -195,21 +207,6 @@ class _Draw:
         self._legend = self._condition_legend()  # ordered condition names -> carrier fill region (which half)
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
-
-    @staticmethod
-    def _label_lines(ind: pb.Individual) -> list[str]:
-        """Label stack for ``ind``: the as-drawn position id first, then each annotation's text.
-
-        Line 1 is the reconstructed position ``"II-2"`` (Roman ``generation`` + ``index``); then each
-        ``Annotation``'s verbatim text. Blanks and duplicates are dropped (first occurrence wins).
-        """
-        out: list[str] = []
-        lines = [f"{_roman(ind.generation)}-{ind.index}"]
-        lines += [a.text for a in ind.annotations]
-        for line in lines:
-            if line and line not in out:
-                out.append(line)
-        return out
 
     def _arrow_bottom(self, ind: pb.Individual) -> float:
         """How far a proband/consultand arrow reaches below the symbol's bottom edge (0.0 if none).
@@ -237,7 +234,7 @@ class _Draw:
         arrow_bottom = self._arrow_bottom(ind)
         ys: list[float] = []
         push = 0.0
-        for line in self._label_lines(ind):
+        for line in _label_lines(ind):
             base = gap + size / 2 + len(ys) * step + push
             wide = 0.6 * size * len(line) > self.geom.symbol_size  # extends past the symbol's left edge
             if arrow_bottom and wide and base - size / 2 < arrow_bottom:
@@ -258,7 +255,7 @@ class _Draw:
 
     def _label_w(self, ind: pb.Individual) -> float:
         """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here)."""
-        return 0.6 * self.geom.label_size * max((len(line) for line in self._label_lines(ind)), default=1)
+        return 0.6 * self.geom.label_size * max((len(line) for line in _label_lines(ind)), default=1)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset, widening only the gaps where wide labels would collide.
@@ -302,7 +299,8 @@ class _Draw:
 
         A label is centred on its symbol and can be wider than it, so it — not the symbol — sets the
         canvas edge. Returns the min/max content edge in ``_px`` offset units (symbol half or label
-        half, whichever reaches further from each cell's centre)."""
+        half, whichever reaches further from each cell's centre).
+        """
         los: list[float] = []
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
@@ -390,9 +388,10 @@ class _Draw:
         columns and only meet their own partner at its top edge). Consanguinity doubles the track. Several
         routed edges on one row stagger by ``routed_track_gap`` (ordered by ``(min col, max col)``) so they
         never coincide — deterministic. Descent from a routed mating is not drawn (Stage C routes only
-        childless matings; a routed mating with offspring falls back to v1 upstream)."""
+        childless matings; a routed mating with offspring falls back to v1 upstream).
+        """
         out: list[str] = []
-        by_row: dict[int, list[RoutedMating]] = defaultdict(list)
+        by_row: dict[int, list[_layout.RoutedMating]] = defaultdict(list)
         for rm in self.lay.routed:
             by_row[rm.a[0]].append(rm)
         for level in sorted(by_row):
@@ -401,7 +400,7 @@ class _Draw:
                 out += self._routed_edge(rm, track)
         return out
 
-    def _routed_edge(self, rm: RoutedMating, track: int) -> list[str]:
+    def _routed_edge(self, rm: _layout.RoutedMating, track: int) -> list[str]:
         la, ka = rm.a
         lb, kb = rm.b
         xl, xr = sorted((self.px(self.lay.pos[la][ka]), self.px(self.lay.pos[lb][kb])))
@@ -418,9 +417,12 @@ class _Draw:
         return [path(0.0)]
 
     def _childless(self) -> list[str]:
-        """Bennett childless glyph under a couple with no children: a vertical stub from the mating-line
-        midpoint down to a short horizontal bar — one bar for childlessness by choice, two parallel bars
-        for infertility. Drawn instead of a descent (the couple has no offspring)."""
+        """Bennett childless glyph under a couple with no children.
+
+        A vertical stub from the mating-line midpoint down to a short horizontal bar — one bar for
+        childlessness by choice, two parallel bars for infertility. Drawn instead of a descent (the couple
+        has no offspring).
+        """
         out: list[str] = []
         for level in range(len(self.lay.childless)):
             for k in range(self.lay.n[level] - 1):
@@ -555,12 +557,14 @@ class _Draw:
         return out
 
     def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
-        """A duplicated individual (cross-generation join): the same shape/affection and id label as the real
-        one, but no arrow, annotations, or status marks — those belong to the primary instance. The dashed
-        link (``_ghost_links``) ties it back to that instance."""
+        """A duplicated individual (cross-generation join).
+
+        The same shape/affection and id label as the real one, but no arrow, annotations, or status marks —
+        those belong to the primary instance. The dashed link (``_ghost_links``) ties it back to that instance.
+        """
         affected = pb.CONDITION_STATUS_AFFECTED in {c.status for c in ind.conditions}
         out = [self._shape(ind.gender, cx, cy, _STROKE if affected else "#ffffff")]
-        lines, ys = self._label_lines(ind), self._line_ys(ind)
+        lines, ys = _label_lines(ind), self._line_ys(ind)
         if lines:
             out.append(_text(cx, cy + self.half + ys[0], lines[0], self.geom.label_size))
         return out
@@ -602,7 +606,7 @@ class _Draw:
         elif ind.consultand:
             out += self._arrow(cx, cy, label=None)
         base_y = cy + self.half
-        for line, off in zip(self._label_lines(ind), self._line_ys(ind), strict=True):
+        for line, off in zip(_label_lines(ind), self._line_ys(ind), strict=True):
             out.append(_text(cx, base_y + off, line, self.geom.label_size))
         return out
 
@@ -627,11 +631,14 @@ class _Draw:
         return order
 
     def _carrier_glyph(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
-        """The carrier mark. Under ``CarrierStyle.INHERITANCE_GLYPH`` (default, matching existing literature) an
-        X-linked carrier is a central dot and everything else a region fill; under ``PARTITION_FILL`` (NSGC 2022,
-        dot retired) every carrier is a region fill regardless of inheritance."""
+        """The carrier mark.
+
+        Under ``CarrierStyle.INHERITANCE_GLYPH`` (default, matching existing literature) an X-linked carrier is
+        a central dot and everything else a region fill; under ``PARTITION_FILL`` (NSGC 2022, dot retired) every
+        carrier is a region fill regardless of inheritance.
+        """
         carriers = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_CARRIER]
-        if self.geom.carrier_style is CarrierStyle.INHERITANCE_GLYPH:
+        if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH:
             x_linked = {pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT}
             if {c.inheritance for c in carriers} & x_linked:
                 return [f'<circle cx="{_num(cx)}" cy="{_num(cy)}" r="{_num(self.half * 0.26)}" fill="{_STROKE}"/>']
@@ -657,8 +664,10 @@ class _Draw:
         return [clip, *(self._region_rect(cx, cy, i, slots, clip_id) for i in indices)]
 
     def _region_rect(self, cx: float, cy: float, index: int, slots: int, clip_id: str) -> str:
-        """A fill rectangle for region ``index`` of a ``slots``-way split (2 = left/right halves, 4 = quadrants
-        TL/TR/BL/BR), clipped to the symbol shape."""
+        """A fill rectangle for region ``index`` of a ``slots``-way split, clipped to the symbol shape.
+
+        ``slots`` is 2 (left/right halves) or 4 (quadrants TL/TR/BL/BR).
+        """
         h = self.half
         if slots == 2:
             rx, ry, rw, rh = (cx - h if index == 0 else cx), cy - h, h, 2 * h
