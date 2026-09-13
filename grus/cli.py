@@ -13,8 +13,8 @@ says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders a
 from __future__ import annotations
 
 import argparse
+import pathlib
 import sys
-from pathlib import Path
 from typing import Literal
 
 from google.protobuf import json_format, text_format
@@ -26,13 +26,13 @@ from grus.render import DEFAULT_GEOMETRY, CarrierStyle, Geometry, rasterize, ren
 TextFormat = Literal["pbtxt", "json"]
 
 
-def _text_format(path: Path, explicit: str | None) -> TextFormat:
+def _text_format(path: pathlib.Path, explicit: str | None) -> TextFormat:
     if explicit in ("pbtxt", "json"):
         return explicit  # type: ignore[return-value]
     return "json" if path.suffix.lower() == ".json" else "pbtxt"
 
 
-def load_ir(path: Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree:
+def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree:
     """Parse and validate ``path`` as a ``PedigreeSet``, else as a bare ``Pedigree``.
 
     A set is tried first because its top-level field (``pedigrees``) is disjoint from a pedigree's; a
@@ -77,7 +77,7 @@ def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
     svg = render_set_svg(loaded, geom) if isinstance(loaded, pb.PedigreeSet) else render_svg(loaded, geom)
-    out: Path | None = args.output
+    out: pathlib.Path | None = args.output
     if args.png:
         png = rasterize(svg, scale=args.scale)
         if out is None:
@@ -107,13 +107,13 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     validate = sub.add_parser("validate", help="parse + validate IR files (pbtxt / JSON), report each")
-    validate.add_argument("inputs", nargs="+", type=Path)
+    validate.add_argument("inputs", nargs="+", type=pathlib.Path)
     validate.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
     validate.set_defaults(func=_cmd_validate)
 
     render = sub.add_parser("render", help="render an IR file to SVG (or PNG)")
-    render.add_argument("input", type=Path)
-    render.add_argument("-o", "--output", type=Path, help="output path (default: stdout)")
+    render.add_argument("input", type=pathlib.Path)
+    render.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
     render.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
     render.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra + libcairo)")
     render.add_argument("--scale", type=float, default=2.0, help="PNG scale factor (default 2.0)")
@@ -125,7 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
     render.set_defaults(func=_cmd_render)
 
     imp = sub.add_parser("import", help="convert an external pedigree file into the IR")
-    imp.add_argument("input", type=Path)
+    imp.add_argument("input", type=pathlib.Path)
     imp.add_argument(
         "--from",
         dest="from_format",
@@ -133,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="source format (default: inferred from the suffix, or sniffed for .json; .csv needs kinship2)",
     )
     imp.add_argument("--to", choices=("pbtxt", "json"), default="pbtxt", help="IR text surface to write")
-    imp.add_argument("-o", "--output", type=Path, help="output path (default: stdout)")
+    imp.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
     imp.set_defaults(func=_cmd_import)
     return parser
 

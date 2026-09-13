@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import contextlib
 import json
+import pathlib
 from collections.abc import Callable
-from pathlib import Path
 
 from grus.convert import _kinship2, _openpedigree, _ped, _phenopackets
 from grus.convert._core import Extras, PedigreeImportError, Person, build_pedigree, build_set
@@ -40,13 +40,13 @@ class UnknownFormatError(ValueError):
     """No importer is registered for the requested / inferred format."""
 
 
-def infer_format(path: Path | str, text: str | None = None) -> str:
+def infer_format(path: pathlib.Path | str, text: str | None = None) -> str:
     """The format name for ``path``: by suffix, or for ``.json`` by the document's shape.
 
     A Phenopackets ``Family`` is an object with ``pedigree``/``proband``; Open Pedigree simple JSON is an
     array of person objects. Raises ``UnknownFormatError`` when neither applies.
     """
-    path = Path(path)
+    path = pathlib.Path(path)
     suffix = path.suffix.lower()
     if suffix in _SUFFIXES:
         return _SUFFIXES[suffix]
@@ -75,12 +75,12 @@ def import_text(text: str, fmt: str) -> pb.PedigreeSet:
     return importer(text)
 
 
-def import_file(path: Path | str, fmt: str | None = None) -> pb.PedigreeSet:
+def import_file(path: pathlib.Path | str, fmt: str | None = None) -> pb.PedigreeSet:
     """Import ``path``; the format is ``fmt`` or inferred (``infer_format``).
 
     kinship2 tables may carry their relation matrix in a ``<stem>.rel.csv`` sidecar next to the file.
     """
-    path = Path(path)
+    path = pathlib.Path(path)
     text = path.read_text()
     fmt = fmt or infer_format(path, text)
     if fmt == _kinship2.FORMAT:
