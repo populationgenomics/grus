@@ -57,5 +57,6 @@ are provenance, not links.
 
 `uv sync`, then `uv run pytest`, `uv run --group lint pyright`, `pre-commit install`. CI runs the same gates
 (`.github/workflows/`): pre-commit, pytest (with and without the `raster` extra), stub freshness, and `buf breaking`
-against the base branch. Protos are the source of truth; after editing one, `buf lint`,
+against the base branch. A `v*` tag matching the pyproject version builds, publishes to PyPI (trusted publisher) and
+creates the GitHub release (`release.yml`). Protos are the source of truth; after editing one, `buf lint`,
 `buf breaking --against .git#branch=main`, and `uv run --group codegen python -m tools.schema.regen` (needs `buf`).
