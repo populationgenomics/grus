@@ -19,9 +19,8 @@ from typing import Literal
 
 from google.protobuf import json_format, text_format
 
-from grus import convert, ir
+from grus import convert, ir, render
 from grus.models import pedigree_pb2 as pb
-from grus.render import DEFAULT_GEOMETRY, CarrierStyle, Geometry, rasterize, render_set_svg, render_svg
 
 TextFormat = Literal["pbtxt", "json"]
 
@@ -52,10 +51,10 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
     return p
 
 
-def _geometry(args: argparse.Namespace) -> Geometry:
-    geom = DEFAULT_GEOMETRY
+def _geometry(args: argparse.Namespace) -> render.Geometry:
+    geom = render.DEFAULT_GEOMETRY
     if args.carrier_style:
-        geom = Geometry(carrier_style=CarrierStyle(args.carrier_style))
+        geom = render.Geometry(carrier_style=render.CarrierStyle(args.carrier_style))
     return geom
 
 
@@ -76,10 +75,10 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
-    svg = render_set_svg(loaded, geom) if isinstance(loaded, pb.PedigreeSet) else render_svg(loaded, geom)
+    svg = render.render_set_svg(loaded, geom) if isinstance(loaded, pb.PedigreeSet) else render.render_svg(loaded, geom)
     out: pathlib.Path | None = args.output
     if args.png:
-        png = rasterize(svg, scale=args.scale)
+        png = render.rasterize(svg, scale=args.scale)
         if out is None:
             sys.stdout.buffer.write(png)
         else:
@@ -103,6 +102,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the ``grus`` argument parser with its validate / render / import subcommands."""
     parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, import.")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -111,18 +111,18 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
     validate.set_defaults(func=_cmd_validate)
 
-    render = sub.add_parser("render", help="render an IR file to SVG (or PNG)")
-    render.add_argument("input", type=pathlib.Path)
-    render.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
-    render.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
-    render.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra + libcairo)")
-    render.add_argument("--scale", type=float, default=2.0, help="PNG scale factor (default 2.0)")
-    render.add_argument(
+    render_cmd = sub.add_parser("render", help="render an IR file to SVG (or PNG)")
+    render_cmd.add_argument("input", type=pathlib.Path)
+    render_cmd.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
+    render_cmd.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
+    render_cmd.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra + libcairo)")
+    render_cmd.add_argument("--scale", type=float, default=2.0, help="PNG scale factor (default 2.0)")
+    render_cmd.add_argument(
         "--carrier-style",
-        choices=[s.value for s in CarrierStyle],
+        choices=[s.value for s in render.CarrierStyle],
         help="carrier glyph convention (default: inheritance_glyph)",
     )
-    render.set_defaults(func=_cmd_render)
+    render_cmd.set_defaults(func=_cmd_render)
 
     imp = sub.add_parser("import", help="convert an external pedigree file into the IR")
     imp.add_argument("input", type=pathlib.Path)
@@ -139,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the CLI on ``argv`` (default ``sys.argv[1:]``) and return the process exit code."""
     args = build_parser().parse_args(argv)
     return int(args.func(args))
 

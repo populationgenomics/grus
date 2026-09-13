@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from grus.convert._core import Extras, PedigreeImportError, Person, build_set
+from grus.convert import _core
 from grus.models import pedigree_pb2 as pb
 
 FORMAT = "phenopackets"
@@ -90,11 +90,11 @@ def _conditions_from_diseases(diseases: list[dict[str, Any]]) -> list[pb.Conditi
     return out
 
 
-def _family(fam: dict[str, Any]) -> tuple[list[Person], Extras, str]:
+def _family(fam: dict[str, Any]) -> tuple[list[_core.Person], _core.Extras, str]:
     pedigree = _get(fam, "pedigree", {}) or {}
     persons: list[dict[str, Any]] = _get(pedigree, "persons", []) or []
     if not persons:
-        raise PedigreeImportError("Family has no pedigree.persons")
+        raise _core.PedigreeImportError("Family has no pedigree.persons")
     family_id = str(_get(fam, "id", "") or _get(persons[0], "familyId", ""))
 
     packets: dict[str, dict[str, Any]] = {}
@@ -110,18 +110,18 @@ def _family(fam: dict[str, Any]) -> tuple[list[Person], Extras, str]:
     known = {str(_get(p, "individualId", "")) for p in persons}
     stray = sorted(k for k in packets if k not in known)
     if stray:
-        raise PedigreeImportError(f"Phenopacket subject(s) {stray} are not in pedigree.persons")
+        raise _core.PedigreeImportError(f"Phenopacket subject(s) {stray} are not in pedigree.persons")
 
-    people: list[Person] = []
+    people: list[_core.Person] = []
     for p in persons:
         pid = str(_get(p, "individualId", ""))
         if not pid or pid == "0":
-            raise PedigreeImportError("pedigree.persons entry lacks an individualId")
+            raise _core.PedigreeImportError("pedigree.persons entry lacks an individualId")
         father, mother = str(_get(p, "paternalId", "0")), str(_get(p, "maternalId", "0"))
         sex_code = str(_get(p, "sex", "UNKNOWN_SEX"))
         gender = _SEX.get(sex_code)
         if gender is None:
-            raise PedigreeImportError(f"person {pid!r}: unrecognised sex {sex_code!r}")
+            raise _core.PedigreeImportError(f"person {pid!r}: unrecognised sex {sex_code!r}")
         annotations: list[pb.Annotation] = []
         if sex_code in ("OTHER_SEX", "3"):
             annotations.append(pb.Annotation(text="OTHER_SEX", type=pb.ANNOTATION_TYPE_OTHER))
@@ -150,7 +150,7 @@ def _family(fam: dict[str, Any]) -> tuple[list[Person], Extras, str]:
             if diseases := _get(packet, "diseases"):
                 conditions = _conditions_from_diseases(diseases)
         people.append(
-            Person(
+            _core.Person(
                 id=pid,
                 family=family_id,
                 father=None if father in _MISSING_PARENT else father,
@@ -163,15 +163,17 @@ def _family(fam: dict[str, Any]) -> tuple[list[Person], Extras, str]:
             )
         )
 
-    extras = Extras()
+    extras = _core.Extras()
     if _get(fam, "consanguinousParents", False) and proband_id is not None:
         pro = next((x for x in people if x.id == proband_id), None)
         if pro is None:
-            raise PedigreeImportError(f"proband {proband_id!r} is not in pedigree.persons")
+            raise _core.PedigreeImportError(f"proband {proband_id!r} is not in pedigree.persons")
         if pro.father and pro.mother:
             extras.consanguineous.add(frozenset({pro.father, pro.mother}))
         else:
-            raise PedigreeImportError("consanguinousParents is set but the proband does not have two parents listed")
+            raise _core.PedigreeImportError(
+                "consanguinousParents is set but the proband does not have two parents listed"
+            )
     return people, extras, family_id
 
 
@@ -180,17 +182,17 @@ def import_phenopackets(text: str) -> pb.PedigreeSet:
     try:
         doc = json.loads(text)
     except json.JSONDecodeError as e:
-        raise PedigreeImportError(f"not JSON: {e}") from e
+        raise _core.PedigreeImportError(f"not JSON: {e}") from e
     families = doc if isinstance(doc, list) else [doc]
     ps = pb.PedigreeSet(provenance=pb.Provenance(source_format=FORMAT))
     for fam in families:
         if not isinstance(fam, dict):
-            raise PedigreeImportError("expected a Family object")
+            raise _core.PedigreeImportError("expected a Family object")
         people, extras, family_id = _family(fam)
         # Each Family is one pedigree; build_set groups by Person.family, which we set uniformly.
         for person in people:
             person.family = family_id
-        ps.pedigrees.extend(build_set(people, extras).pedigrees)
+        ps.pedigrees.extend(_core.build_set(people, extras).pedigrees)
     if not ps.pedigrees:
-        raise PedigreeImportError("no families found")
+        raise _core.PedigreeImportError("no families found")
     return ps

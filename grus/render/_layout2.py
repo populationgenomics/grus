@@ -30,22 +30,7 @@ from collections.abc import Callable, Iterable
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
-
-from ._geometry import DEFAULT_GEOMETRY, Geometry
-from ._layout import (
-    DeferredFeatureError,
-    Layout,
-    RoutedMating,
-    _align_couples,
-    _build,
-    _cross_matings,
-    _derive,
-    _detect_loops,
-    _duplicate_cross_generation,
-    _Graph,
-    _kindepth,
-)
-from ._ordering import order as order_ranks
+from grus.render import _geometry, _layout, _ordering
 
 _MAX_ITERS = 2000  # barycentre sweeps; the contraction converges far inside this on drawable pedigrees
 _TOL = 1e-11  # per-sweep max move to stop at (well below the 1e-9 invariant slack on centring residual)
@@ -108,7 +93,7 @@ class _Block:
 _Desired = Callable[[list[float], int, _Ctx], float]
 
 
-def layout(p: pb.Pedigree, geometry: Geometry | None = None) -> Layout:
+def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layout.Layout:
     """Lay ``p`` out on the (level, x) grid; return the per-level arrays the drawing step reads.
 
     The v2 constraint model, in four stages: validate and prepare the graph (``_layout``'s front end —
@@ -130,21 +115,21 @@ def layout(p: pb.Pedigree, geometry: Geometry | None = None) -> Layout:
             interlocking loop, a child of more than one mating, an order ``_build`` cannot express (a
             routed/overflow mating that *has* offspring), or a torn sibship whose descent bars would overlap.
     """
-    geom = geometry or DEFAULT_GEOMETRY
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
     ir.validate(p)
-    g = _derive(p)
-    ghost_of = _duplicate_cross_generation(g)
-    cross = _cross_matings(g)
-    _detect_loops(g, cross)
-    depth = _kindepth(g)
-    _align_couples(g, depth, cross)
+    g = _layout._derive(p)
+    ghost_of = _layout._duplicate_cross_generation(g)
+    cross = _layout._cross_matings(g)
+    _layout._detect_loops(g, cross)
+    depth = _layout._kindepth(g)
+    _layout._align_couples(g, depth, cross)
     base_level = min(depth) if depth else 0
     g.level = [d - base_level for d in depth]
 
-    ordering = order_ranks(g, cross)
+    ordering = _ordering.order(g, cross)
     xpos = {i: float(k) for row in ordering.ranks for k, i in enumerate(row)}
     foundersib_groups = [mr.kids for mr in g.partnerless]
-    built = _build(g, xpos, ghost_of, foundersib_groups)  # a routed/overflow mating with offspring defers here
+    built = _layout._build(g, xpos, ghost_of, foundersib_groups)  # a routed/overflow mating with offspring defers here
 
     routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
@@ -155,14 +140,14 @@ def layout(p: pb.Pedigree, geometry: Geometry | None = None) -> Layout:
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
     result = dataclasses.replace(built, pos=pos, routed=routed)
     if _overlapping_sibships(g, result):
-        raise DeferredFeatureError(
+        raise _layout.DeferredFeatureError(
             "the ordering could not keep every sibship contiguous, so two sibships' descent bars overlap (a "
             "child would read as issue of several matings) — an interlocking loop/multi-mate shape; deferred"
         )
     return result
 
 
-def _routed_matings(g: _Graph, lay: Layout, routed: frozenset[int]) -> list[RoutedMating]:
+def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[int]) -> list[_layout.RoutedMating]:
     """Turn the ordering's routed mating indices into drawable ``RoutedMating``s in cell coordinates.
 
     Each routed mating is an overflow adjacency an individual with >2 matings could not keep — its two partners
@@ -174,13 +159,13 @@ def _routed_matings(g: _Graph, lay: Layout, routed: frozenset[int]) -> list[Rout
     if not routed:
         return []
     cellof = {i: (lvl, k) for lvl, row in enumerate(lay.nid) for k, i in enumerate(row)}
-    out: list[RoutedMating] = []
+    out: list[_layout.RoutedMating] = []
     for mi in sorted(routed):
         mr = g.matings[mi]
         if mr.b is None:  # pragma: no cover - only two-partner matings overflow (a lone parent has no mate)
             continue
         out.append(
-            RoutedMating(
+            _layout.RoutedMating(
                 a=cellof[mr.a],
                 b=cellof[mr.b],
                 consanguineous=mr.consanguineous,
@@ -190,7 +175,7 @@ def _routed_matings(g: _Graph, lay: Layout, routed: frozenset[int]) -> list[Rout
     return out
 
 
-def _overlapping_sibships(g: _Graph, lay: Layout) -> bool:
+def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> bool:
     """Whether any two matings' child x-spans overlap on a row — the torn-sibship backstop.
 
     A cross-join order that pulls a partner with siblings to its mate can tear that sibship, stretching its sib
@@ -216,7 +201,7 @@ def _overlapping_sibships(g: _Graph, lay: Layout) -> bool:
     return False
 
 
-def _relations(lay: Layout) -> list[_Sibship]:
+def _relations(lay: _layout.Layout) -> list[_Sibship]:
     """Reconstruct the drawn descent groups from the Layout arrays (order-only; independent of the final ``pos``).
 
     Founder sibships carry no parent anchor, so they are omitted — the row's min-separation alone holds their
@@ -239,9 +224,11 @@ def _relations(lay: Layout) -> list[_Sibship]:
     return out
 
 
-def _couples(lay: Layout) -> list[tuple[int, int]]:
-    """Each drawn couple as ``(left cell, right cell)`` — adjacent columns flagged by ``spouse`` (any mating,
-    childless included)."""
+def _couples(lay: _layout.Layout) -> list[tuple[int, int]]:
+    """Each drawn couple as ``(left cell, right cell)``.
+
+    Adjacent columns flagged by ``spouse`` (any mating, childless included).
+    """
     return [
         (lay.nid[level][k], lay.nid[level][k + 1])
         for level in range(len(lay.nid))
@@ -250,7 +237,7 @@ def _couples(lay: Layout) -> list[tuple[int, int]]:
     ]
 
 
-def _row_seps(lay: Layout, couple_gap: float, sib_gap: float) -> list[list[float]]:
+def _row_seps(lay: _layout.Layout, couple_gap: float, sib_gap: float) -> list[list[float]]:
     """Hard min-separation between each adjacent pair on a row: ``couple_gap`` within a couple, else ``sib_gap``.
 
     Both are >= ``couple_gap``, so the non-overlap invariant holds; the tighter couple gap realises the soft
@@ -307,7 +294,7 @@ def _assign_x(
     return x
 
 
-def _blocks(lay: Layout, seps: list[list[float]], sibships: list[_Sibship]) -> list[list[_Block]]:
+def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibship]) -> list[list[_Block]]:
     """Partition each row into contiguity blocks — the rigid bodies the solve translates as units.
 
     A block is a maximal run of adjacent columns joined by a **cohesion bond**. Three relations bond:
@@ -419,7 +406,8 @@ def _up_desired(x: list[float], c: int, ctx: _Ctx) -> float:
     """Up-sweep target: shift a parent so each mating it heads centres its midpoint on that mating's children.
 
     A shared hinge averages the shifts, balancing the matings it anchors. Couple cohesion is applied by the
-    rigid-body step, not here."""
+    rigid-body step, not here.
+    """
     matings = ctx.as_parent.get(c)
     if matings:
         return x[c] + sum(s.centroid(x) - s.anchor(x) for s in matings) / len(matings)

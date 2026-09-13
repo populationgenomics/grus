@@ -10,12 +10,12 @@ rather than being mislaid out.
 
 from __future__ import annotations
 
-from ._draw import render_set_svg, render_svg, render_svgs
-from ._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry
-from ._layout import DeferredFeatureError, Layout
-from ._layout2 import layout
-from ._ordering import Ordering, order
-from ._raster import rasterize
+from grus.render._draw import render_set_svg, render_svg, render_svgs
+from grus.render._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry
+from grus.render._layout import DeferredFeatureError, Layout
+from grus.render._layout2 import layout
+from grus.render._ordering import Ordering, order
+from grus.render._raster import rasterize
 
 __all__ = [
     "DEFAULT_GEOMETRY",

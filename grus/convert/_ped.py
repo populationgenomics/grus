@@ -13,7 +13,7 @@ numeric = a quantitative trait, kept verbatim as a MEASUREMENT annotation. ``phe
 
 from __future__ import annotations
 
-from grus.convert._core import PedigreeImportError, Person, build_set
+from grus.convert import _core
 from grus.models import pedigree_pb2 as pb
 
 FORMAT = "ped"
@@ -65,7 +65,7 @@ def _columns(lines: list[str]) -> tuple[dict[str, int], list[list[str]]]:
         return {"FID": 0, "IID": 1, "PAT": 2, "MAT": 3, "SEX": 4, "PHENO": 5}, rows
     cols = {name: i for i, name in enumerate(header)}
     if "IID" not in cols:
-        raise PedigreeImportError("psam header names no IID column")
+        raise _core.PedigreeImportError("psam header names no IID column")
     for name in ("PAT", "MAT", "SEX"):
         cols.setdefault(name, -1)
     # The first non-standard column is the phenotype, per the .psam rules; none -> no phenotype.
@@ -79,10 +79,12 @@ def import_ped(text: str, *, pheno_01: bool = False) -> pb.PedigreeSet:
     """Parse PED/FAM/PSAM/LINKAGE-pre text into a validated ``PedigreeSet`` (one pedigree per family id)."""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     cols, rows = _columns(lines)
-    people: list[Person] = []
+    people: list[_core.Person] = []
     for n, row in enumerate(rows, 1):
         if len(row) < 5:
-            raise PedigreeImportError(f"line {n}: expected at least 5 columns (FID IID PAT MAT SEX), got {len(row)}")
+            raise _core.PedigreeImportError(
+                f"line {n}: expected at least 5 columns (FID IID PAT MAT SEX), got {len(row)}"
+            )
 
         def col(name: str, row: list[str] = row) -> str:
             i = cols[name]
@@ -90,11 +92,11 @@ def import_ped(text: str, *, pheno_01: bool = False) -> pb.PedigreeSet:
 
         iid = col("IID")
         if iid in ("", "0"):
-            raise PedigreeImportError(f"line {n}: within-family id may not be '0' or empty")
+            raise _core.PedigreeImportError(f"line {n}: within-family id may not be '0' or empty")
         father, mother = col("PAT"), col("MAT")
         condition, measurement = _phenotype(col("PHENO"), pheno_01=pheno_01)
         people.append(
-            Person(
+            _core.Person(
                 id=iid,
                 family=col("FID"),
                 father=None if father in _MISSING_PARENT else father,
@@ -105,5 +107,5 @@ def import_ped(text: str, *, pheno_01: bool = False) -> pb.PedigreeSet:
             )
         )
     if not people:
-        raise PedigreeImportError("no pedigree rows found")
-    return build_set(people, provenance=pb.Provenance(source_format=FORMAT))
+        raise _core.PedigreeImportError("no pedigree rows found")
+    return _core.build_set(people, provenance=pb.Provenance(source_format=FORMAT))

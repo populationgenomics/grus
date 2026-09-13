@@ -23,7 +23,7 @@ from __future__ import annotations
 import csv
 import io
 
-from grus.convert._core import Extras, PedigreeImportError, Person, build_set
+from grus.convert import _core
 from grus.models import pedigree_pb2 as pb
 
 FORMAT = "kinship2"
@@ -93,7 +93,7 @@ def _read(text: str) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for n, r in enumerate(body, 2):
         if len(r) > len(header):
-            raise PedigreeImportError(f"line {n}: more fields than header columns")
+            raise _core.PedigreeImportError(f"line {n}: more fields than header columns")
         r = r + [""] * (len(header) - len(r))
         rows.append({k: v.strip().strip('"') for k, v in zip(header, r, strict=True)})
     return rows
@@ -108,7 +108,7 @@ def _resolve(header: set[str]) -> dict[str, str]:
                 break
     for req in ("id", "dadid", "momid", "sex"):
         if req not in found:
-            raise PedigreeImportError(f"kinship2 table lacks a {req!r} column (aliases: {_ALIASES[req]})")
+            raise _core.PedigreeImportError(f"kinship2 table lacks a {req!r} column (aliases: {_ALIASES[req]})")
     return found
 
 
@@ -150,10 +150,10 @@ def _affected(v: str) -> pb.ConditionStatus | None:
         return pb.CONDITION_STATUS_AFFECTED
     if low in ("0", "false", "f", "no", "n", "unaffected"):
         return pb.CONDITION_STATUS_UNAFFECTED
-    raise PedigreeImportError(f"unrecognised affected value {v!r}")
+    raise _core.PedigreeImportError(f"unrecognised affected value {v!r}")
 
 
-def _relations(text: str, extras: Extras, twin: dict[str, tuple[int, pb.ZygosityType]]) -> None:
+def _relations(text: str, extras: _core.Extras, twin: dict[str, tuple[int, pb.ZygosityType]]) -> None:
     rows = _read(text)
     groups: dict[str, int] = {}
     types: dict[int, pb.ZygosityType] = {}
@@ -161,12 +161,12 @@ def _relations(text: str, extras: Extras, twin: dict[str, tuple[int, pb.Zygosity
     for r in rows:
         a, b, code = r.get("id1", ""), r.get("id2", ""), r.get("code", "").lower()
         if not a or not b:
-            raise PedigreeImportError("relation row lacks id1/id2")
+            raise _core.PedigreeImportError("relation row lacks id1/id2")
         if code in ("4", "spouse"):
             extras.spouses.add(frozenset({a, b}))
             continue
         if code not in _TWIN_CODES:
-            raise PedigreeImportError(f"unrecognised relation code {code!r} (1 MZ, 2 DZ, 3 UZ, 4 spouse)")
+            raise _core.PedigreeImportError(f"unrecognised relation code {code!r} (1 MZ, 2 DZ, 3 UZ, 4 spouse)")
         ga, gb = groups.get(a), groups.get(b)
         g = ga or gb
         if g is None:
@@ -185,22 +185,22 @@ def import_kinship2(text: str, relation_text: str | None = None) -> pb.PedigreeS
     table, embedded = _split_tables(text)
     rows = _read(table)
     if not rows:
-        raise PedigreeImportError("empty kinship2 table")
+        raise _core.PedigreeImportError("empty kinship2 table")
     cols = _resolve(set(rows[0]))
     affected_cols = [c for c in rows[0] if c.startswith("affect") and c not in cols.values()]
     sex_table = _sex_codes([r[cols["sex"]] for r in rows])
 
-    extras = Extras()
+    extras = _core.Extras()
     twin: dict[str, tuple[int, pb.ZygosityType]] = {}
     rel = relation_text if relation_text is not None else embedded
     if rel:
         _relations(rel, extras, twin)
 
-    people: list[Person] = []
+    people: list[_core.Person] = []
     for r in rows:
         pid = r[cols["id"]]
         if pid in _MISSING:
-            raise PedigreeImportError("an id is missing or blank")
+            raise _core.PedigreeImportError("an id is missing or blank")
         gender, terminated = sex_table[r[cols["sex"]]]
         conditions: list[pb.Condition] = []
         for c in affected_cols:
@@ -225,7 +225,7 @@ def import_kinship2(text: str, relation_text: str | None = None) -> pb.PedigreeS
         tg = twin.get(pid)
         dad, mum = r[cols["dadid"]], r[cols["momid"]]
         people.append(
-            Person(
+            _core.Person(
                 id=pid,
                 family=r[cols["famid"]] if "famid" in cols else "",
                 father=None if dad in _MISSING else dad,
@@ -250,4 +250,4 @@ def import_kinship2(text: str, relation_text: str | None = None) -> pb.PedigreeS
         for pair in extras.spouses:
             if pair & infertile:
                 extras.childless[pair] = pb.CHILDLESSNESS_INFERTILITY
-    return build_set(people, extras, provenance=pb.Provenance(source_format=FORMAT))
+    return _core.build_set(people, extras, provenance=pb.Provenance(source_format=FORMAT))

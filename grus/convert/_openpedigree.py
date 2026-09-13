@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from grus.convert._core import Extras, PedigreeImportError, Person, build_set
+from grus.convert import _core
 from grus.models import pedigree_pb2 as pb
 
 FORMAT = "openpedigree"
@@ -74,7 +74,7 @@ class _Refs:
         try:
             return self.by_key[str(ref)]
         except KeyError:
-            raise PedigreeImportError(f"{what} reference {ref!r} names no person") from None
+            raise _core.PedigreeImportError(f"{what} reference {ref!r} names no person") from None
 
 
 def _person_id(p: dict[str, Any], i: int) -> str:
@@ -85,11 +85,11 @@ def _person_id(p: dict[str, Any], i: int) -> str:
     return f"#{i}"
 
 
-def _person(p: dict[str, Any], i: int, refs: _Refs) -> Person:
+def _person(p: dict[str, Any], i: int, refs: _Refs) -> _core.Person:
     pid = _person_id(p, i)
     sex = str(p.get("sex", "") or "").lower()
     if sex not in _SEX:
-        raise PedigreeImportError(f"person {pid!r}: unrecognised sex {sex!r}")
+        raise _core.PedigreeImportError(f"person {pid!r}: unrecognised sex {sex!r}")
     annotations: list[pb.Annotation] = []
     if sex in ("other", "o"):
         annotations.append(pb.Annotation(text="other", type=pb.ANNOTATION_TYPE_OTHER))
@@ -97,12 +97,12 @@ def _person(p: dict[str, Any], i: int, refs: _Refs) -> Person:
     life = str(p.get("lifestatus", "alive") or "alive").lower()
     deceased = life == "deceased" or bool(p.get("deathdate"))
     if life not in ("alive", "deceased") and life not in _LIFE:
-        raise PedigreeImportError(f"person {pid!r}: unrecognised lifeStatus {life!r}")
+        raise _core.PedigreeImportError(f"person {pid!r}: unrecognised lifeStatus {life!r}")
 
     disorders = p.get("disorders") or []
     carrier = str(p.get("carrierstatus", "affected" if disorders else "") or "").lower()
     if carrier not in _CARRIER:
-        raise PedigreeImportError(f"person {pid!r}: unrecognised carrierStatus {carrier!r}")
+        raise _core.PedigreeImportError(f"person {pid!r}: unrecognised carrierStatus {carrier!r}")
     conditions = [pb.Condition(name=str(d), status=_CARRIER[carrier]) for d in disorders]
     if not disorders and carrier in ("carrier", "presymptomatic"):
         conditions.append(pb.Condition(status=_CARRIER[carrier]))
@@ -131,7 +131,7 @@ def _person(p: dict[str, Any], i: int, refs: _Refs) -> Person:
 
     twin_group = p.get("twingroup")
     num = p.get("numpersons")
-    return Person(
+    return _core.Person(
         id=pid,
         father=refs(p["father"], what="father") if p.get("father") not in (None, "") else None,
         mother=refs(p["mother"], what="mother") if p.get("mother") not in (None, "") else None,
@@ -156,12 +156,12 @@ def _person(p: dict[str, Any], i: int, refs: _Refs) -> Person:
     )
 
 
-def _relationship(r: dict[str, Any], refs: _Refs, extras: Extras) -> None:
+def _relationship(r: dict[str, Any], refs: _Refs, extras: _core.Extras) -> None:
     if "partner1" not in r or "partner2" not in r:
-        raise PedigreeImportError("relationship object lacks partner1/partner2")
+        raise _core.PedigreeImportError("relationship object lacks partner1/partner2")
     pair = frozenset({refs(r["partner1"], what="partner1"), refs(r["partner2"], what="partner2")})
     if len(pair) != 2:
-        raise PedigreeImportError("relationship partners must be two distinct people")
+        raise _core.PedigreeImportError("relationship partners must be two distinct people")
     extras.spouses.add(pair)
     if _truthy(r.get("separated")):
         extras.status[pair] = pb.RELATIONSHIP_STATUS_SEPARATED
@@ -173,7 +173,7 @@ def _relationship(r: dict[str, Any], refs: _Refs, extras: Extras) -> None:
     elif childless == "infertile":
         extras.childless[pair] = pb.CHILDLESSNESS_INFERTILITY
     elif childless not in ("", "none"):
-        raise PedigreeImportError(f"unrecognised childlessStatus {childless!r}")
+        raise _core.PedigreeImportError(f"unrecognised childlessStatus {childless!r}")
     if r.get("childlessreason"):
         extras.annotations[pair] = [pb.Annotation(text=str(r["childlessreason"]), type=pb.ANNOTATION_TYPE_OTHER)]
 
@@ -183,17 +183,17 @@ def import_openpedigree(text: str) -> pb.PedigreeSet:
     try:
         doc = json.loads(text)
     except json.JSONDecodeError as e:
-        raise PedigreeImportError(f"not JSON: {e}") from e
+        raise _core.PedigreeImportError(f"not JSON: {e}") from e
     if not isinstance(doc, list):
-        raise PedigreeImportError("expected a JSON array of person / relationship objects")
+        raise _core.PedigreeImportError("expected a JSON array of person / relationship objects")
     objs = [_lower_keys(o) for o in doc if isinstance(o, dict)]
     persons = [o for o in objs if "partner1" not in o and "partner2" not in o]
     relationships = [o for o in objs if o not in persons]
     if not persons:
-        raise PedigreeImportError("no person objects found")
+        raise _core.PedigreeImportError("no person objects found")
     refs = _Refs(persons)
     people = [_person(p, i, refs) for i, p in enumerate(persons)]
-    extras = Extras()
+    extras = _core.Extras()
     for r in relationships:
         _relationship(r, refs, extras)
-    return build_set(people, extras, provenance=pb.Provenance(source_format=FORMAT))
+    return _core.build_set(people, extras, provenance=pb.Provenance(source_format=FORMAT))

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from grus.render import rasterize
+from grus import render
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 _SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><circle cx="20" cy="20" r="15"/></svg>'
@@ -19,7 +19,7 @@ def _rasterize_or_skip(svg: str, **kwargs: float) -> bytes:
     # rasterize lazily imports cairosvg, which raises ImportError if the package is absent (CI default
     # groups omit it) or OSError if the native libcairo is missing. Skip on either — neither is a failure.
     try:
-        return rasterize(svg, **kwargs)
+        return render.rasterize(svg, **kwargs)
     except (ImportError, OSError) as error:
         pytest.skip(f"cairosvg/libcairo unavailable: {error}")
 

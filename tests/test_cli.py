@@ -6,8 +6,7 @@ import pathlib
 
 import pytest
 
-from grus import ir
-from grus.cli import load_ir, main
+from grus import cli, ir
 from grus.models import pedigree_pb2 as pb
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
@@ -20,14 +19,14 @@ def _trio() -> pb.Pedigree:
 def test_load_ir_bare_pedigree_pbtxt(tmp_path: pathlib.Path) -> None:
     f = tmp_path / "p.pbtxt"
     f.write_text(ir.dump_pbtxt(_trio()))
-    assert isinstance(load_ir(f, "pbtxt"), pb.Pedigree)
+    assert isinstance(cli.load_ir(f, "pbtxt"), pb.Pedigree)
 
 
 def test_load_ir_set_json(tmp_path: pathlib.Path) -> None:
     ps = pb.PedigreeSet(pedigrees=[_trio()])
     f = tmp_path / "s.json"
     f.write_text(ir.dump_set_json(ps))
-    loaded = load_ir(f, "json")
+    loaded = cli.load_ir(f, "json")
     assert isinstance(loaded, pb.PedigreeSet) and len(loaded.pedigrees) == 1
 
 
@@ -39,7 +38,7 @@ def test_validate_reports_ok_and_invalid(tmp_path: pathlib.Path, capsys: pytest.
         "individuals { generation: 1 index: 1 gender: GENDER_MAN }\n"
         "matings { partner_a { generation: 9 index: 9 } }\n"  # dangling Position reference
     )
-    assert main(["validate", str(good), str(bad)]) == 1
+    assert cli.main(["validate", str(good), str(bad)]) == 1
     out, err = capsys.readouterr()
     assert "good.pbtxt: ok (1 pedigree)" in out
     assert "bad.pbtxt: INVALID" in err
@@ -51,14 +50,14 @@ def test_render_writes_svg_file_and_matches_library(tmp_path: pathlib.Path) -> N
     src = tmp_path / "p.pbtxt"
     src.write_text(ir.dump_pbtxt(_trio()))
     out = tmp_path / "p.svg"
-    assert main(["render", str(src), "-o", str(out)]) == 0
+    assert cli.main(["render", str(src), "-o", str(out)]) == 0
     assert out.read_text() == render_svg(_trio())
 
 
 def test_render_set_to_stdout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = tmp_path / "s.pbtxt"
     src.write_text(ir.dump_set_pbtxt(pb.PedigreeSet(pedigrees=[_trio()])))
-    assert main(["render", str(src)]) == 0
+    assert cli.main(["render", str(src)]) == 0
     out = capsys.readouterr().out
     assert out.startswith("<svg") and "</svg>" in out
 
@@ -70,23 +69,23 @@ def test_render_carrier_style_option(tmp_path: pathlib.Path) -> None:
     src = tmp_path / "c.pbtxt"
     src.write_text(ir.dump_pbtxt(p))
     out = tmp_path / "c.svg"
-    assert main(["render", str(src), "-o", str(out), "--carrier-style", "partition_fill"]) == 0
+    assert cli.main(["render", str(src), "-o", str(out), "--carrier-style", "partition_fill"]) == 0
     assert out.read_text() == render_svg(p, Geometry(carrier_style=CarrierStyle.PARTITION_FILL))
 
 
 def test_import_writes_ir_and_roundtrips_through_validate(tmp_path: pathlib.Path) -> None:
     fixture = pathlib.Path(__file__).parent / "convert_fixture" / "two_families.fam"
     out = tmp_path / "fam.pbtxt"
-    assert main(["import", str(fixture), "-o", str(out)]) == 0
+    assert cli.main(["import", str(fixture), "-o", str(out)]) == 0
     ps = ir.load_set_pbtxt(out.read_text())
     assert [p.id for p in ps.pedigrees] == ["FAM1", "FAM2"] and ps.provenance.source_format == "ped"
-    assert main(["validate", str(out)]) == 0
+    assert cli.main(["validate", str(out)]) == 0
     svg = tmp_path / "fam.svg"
-    assert main(["render", str(out), "-o", str(svg)]) == 0 and svg.read_text().startswith("<svg")
+    assert cli.main(["render", str(out), "-o", str(svg)]) == 0 and svg.read_text().startswith("<svg")
 
 
 def test_import_json_to_json_sniffed(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
     fixture = pathlib.Path(__file__).parent / "convert_fixture" / "simple.openpedigree.json"
-    assert main(["import", str(fixture), "--to", "json"]) == 0
+    assert cli.main(["import", str(fixture), "--to", "json"]) == 0
     ps = ir.load_set_json(capsys.readouterr().out)
     assert ps.provenance.source_format == "openpedigree"

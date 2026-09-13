@@ -30,7 +30,7 @@ import dataclasses
 import itertools
 from collections import defaultdict
 
-from ._layout import _Graph, _Mating
+from grus.render import _layout
 
 _MAX_ITERS = 24  # dot's mincross pass budget; the contraction settles far inside this on drawable pedigrees
 _EXACT_ATOM_CAP = 7  # a rank with <= this many atoms is ordered by exact enumeration, not the median heuristic
@@ -57,7 +57,7 @@ class Ordering:
 # ``2L``, children on ``2L + 2``); a founder sibship's connector at ``2 * min_child_level - 1`` (children only).
 
 
-def order(g: _Graph, cross: set[int]) -> Ordering:
+def order(g: _layout._Graph, cross: set[int]) -> Ordering:
     """Compute the deterministic within-rank ordering for the prepared graph ``g`` (ranks + level already set).
 
     ``cross`` is v1's cross-lineage mating set (unused as a special case — a cross mating is an ordinary couple
@@ -75,7 +75,7 @@ def order(g: _Graph, cross: set[int]) -> Ordering:
 class _Model:
     """The half-rank layered graph derived from ``g``: nodes, ranks, adjacency, atoms, and routed overflow."""
 
-    def __init__(self, g: _Graph) -> None:
+    def __init__(self, g: _layout._Graph) -> None:
         self.g = g
         self.mat_base = g.n
         self.nlevels = (max(g.level) + 1) if g.level else 0
@@ -107,7 +107,7 @@ class _Model:
             for mr in ms[2:]:
                 self.routed.add(mr.index)
 
-    def _drawn(self, mr: _Mating) -> bool:
+    def _drawn(self, mr: _layout._Mating) -> bool:
         return mr.index not in self.routed
 
     # -- layers: rank of every node, and up/down adjacency across one half-rank --
@@ -187,8 +187,11 @@ class _Model:
         return comp
 
     def _orient(self, comp: set[int], adj: dict[int, set[int]]) -> tuple[int, ...]:
-        """Order a component into its canonical path: pick the lexicographically smallest ``(generation,
-        index)`` sequence so the orientation is stable and reproduces v1's ``partner_a``-left default."""
+        """Order a component into its canonical path.
+
+        Pick the lexicographically smallest ``(generation, index)`` sequence so the orientation is stable and
+        reproduces v1's ``partner_a``-left default.
+        """
         if len(comp) == 1:
             return (next(iter(comp)),)
         ends = sorted((i for i in comp if len(adj[i]) <= 1), key=self.ident)
@@ -216,8 +219,11 @@ class _Model:
 
 
 def _init_order(model: _Model) -> dict[int, list[int]]:
-    """First-appearance order per rank from a DFS: founders in ``(generation, index)`` order, descending into
-    each mating's children in birth (``Mating.offspring``) order. Then regroup so each atom is contiguous."""
+    """First-appearance order per rank from a DFS, regrouped so each atom is contiguous.
+
+    Founders in ``(generation, index)`` order, descending into each mating's children in birth
+    (``Mating.offspring``) order.
+    """
     g = model.g
     seen_i: set[int] = set()
     seen_m: set[int] = set()
@@ -232,7 +238,7 @@ def _init_order(model: _Model) -> dict[int, list[int]]:
             if model._drawn(mr):
                 visit_mat(mr)
 
-    def visit_mat(mr: _Mating) -> None:
+    def visit_mat(mr: _layout._Mating) -> None:
         if mr.index in seen_m:
             return
         seen_m.add(mr.index)
@@ -283,8 +289,11 @@ def _positions(order_map: dict[int, list[int]], r: int) -> dict[int, int]:
 
 
 def _bilayer_crossings(model: _Model, upper: list[int], lower: list[int]) -> int:
-    """Weighted crossings between adjacent ranks given their orders (BJM: count inversions of the lower
-    endpoints when edges are visited in upper-then-lower order, via a Fenwick accumulator tree)."""
+    """Weighted crossings between adjacent ranks given their orders.
+
+    BJM: count inversions of the lower endpoints when edges are visited in upper-then-lower order, via a
+    Fenwick accumulator tree.
+    """
     pos_lo = {node: k for k, node in enumerate(lower)}
     seq: list[int] = []  # lower endpoints, in (upper pos, lower pos) scan order
     for u in upper:
@@ -323,7 +332,7 @@ def _total_crossings(model: _Model, order_map: dict[int, list[int]]) -> int:
     )
 
 
-def count_crossings(g: _Graph, ranks: list[list[int]]) -> int:
+def count_crossings(g: _layout._Graph, ranks: list[list[int]]) -> int:
     """Weighted crossings of a per-rank individual order (any engine's) over the half-rank graph of ``g``.
 
     Connector nodes on each half-rank are positioned at the mean of their partners' (or, for a founder sibship,
@@ -356,8 +365,10 @@ def count_crossings(g: _Graph, ranks: list[list[int]]) -> int:
 
 
 def _median_value(positions: list[int]) -> float:
-    """dot's ``median_value``: the median adjacent position, interpolated for an even count toward the tighter
-    side. ``-1`` means "no fixed neighbours" (leave the node where it is)."""
+    """The median adjacent position (dot's ``median_value``), or ``-1`` for no fixed neighbours.
+
+    An even count is interpolated toward the tighter side; ``-1`` leaves the node where it is.
+    """
     m = len(positions)
     if m == 0:
         return -1.0
@@ -393,8 +404,11 @@ def _rank_units(model: _Model, order_map: dict[int, list[int]], r: int) -> list[
 
 
 def _wmedian(model: _Model, order_map: dict[int, list[int]], down: bool) -> None:
-    """One median sweep: reorder each rank by the median of its already-fixed neighbour rank. Units are atoms
-    (even ranks) or connectors (odd ranks); a unit with no fixed neighbour keeps its slot (stable)."""
+    """One median sweep: reorder each rank by the median of its already-fixed neighbour rank.
+
+    Units are atoms (even ranks) or connectors (odd ranks); a unit with no fixed neighbour keeps its slot
+    (stable).
+    """
     ranks = range(model.min_rank + 1, model.max_rank + 1) if down else range(model.max_rank - 1, model.min_rank - 1, -1)
     for r in ranks:
         adj = model.up if down else model.down
@@ -426,8 +440,11 @@ def _birth(model: _Model) -> dict[int, tuple[int, int]]:
 
 
 def _birth_gain(birth: dict[int, tuple[int, int]], left: tuple[int, ...], right: tuple[int, ...]) -> int:
-    """Birth-order inversions removed by swapping adjacent ``left``/``right``: sibling pairs across the two
-    units that are currently reversed (older drawn right of younger) minus those the swap would reverse."""
+    """Birth-order inversions removed by swapping adjacent ``left``/``right``.
+
+    Sibling pairs across the two units that are currently reversed (older drawn right of younger) minus those
+    the swap would reverse.
+    """
     gain = 0
     for a in left:
         ba = birth.get(a)
@@ -441,8 +458,11 @@ def _birth_gain(birth: dict[int, tuple[int, int]], left: tuple[int, ...], right:
 
 
 def _transpose(model: _Model, order_map: dict[int, list[int]]) -> None:
-    """Adjacent-unit swaps and couple flips (dot's ``transpose``), accepted on a strict crossing decrease or,
-    on a crossing tie, a strict birth-order improvement / a couple's return to canonical order."""
+    """Adjacent-unit swaps and couple flips (dot's ``transpose``).
+
+    A swap is accepted on a strict crossing decrease or, on a crossing tie, a strict birth-order improvement /
+    a couple's return to canonical order.
+    """
     birth = _birth(model)
     changed = True
     while changed:
@@ -458,10 +478,13 @@ def _swap_gain(
     left: tuple[int, ...],
     right: tuple[int, ...],
 ) -> int:
-    """Crossings removed by swapping two adjacent groups ``left``/``right`` on one rank (dot's ``in_cross`` +
-    ``out_cross``). Only edges incident to the two groups can change, so count, on each adjacent rank, the
-    endpoint pairs that cross now (left endpoint right of right endpoint) minus those that would cross after.
-    Equals the exact change in ``_neighbour_cost``, at O(deg(left) * deg(right)) instead of a full recount."""
+    """Crossings removed by swapping two adjacent groups ``left``/``right`` on one rank.
+
+    dot's ``in_cross`` + ``out_cross``. Only edges incident to the two groups can change, so count, on each
+    adjacent rank, the endpoint pairs that cross now (left endpoint right of right endpoint) minus those that
+    would cross after. Equals the exact change in ``_neighbour_cost``, at O(deg(left) * deg(right)) instead of
+    a full recount.
+    """
     before = after = 0
     for adj, pos in adj_pos:
         lt = [pos[v] for n in left for v in adj.get(n, ()) if v in pos]
@@ -510,9 +533,11 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
 
 
 def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
-    """Exact per-rank search on ranks with few atoms: enumerate atom permutations and couple flips, keep the
-    min-crossing order (tie-broken by the smallest identity sequence). Makes small boundary-bridge ranks
-    provably optimal and their choice deterministic."""
+    """Exact per-rank search on ranks with few atoms.
+
+    Enumerate atom permutations and couple flips, keep the min-crossing order (tie-broken by the smallest
+    identity sequence). Makes small boundary-bridge ranks provably optimal and their choice deterministic.
+    """
     for _ in range(2):  # two settling passes; small and convergent
         for r in range(model.min_rank, model.max_rank + 1):
             units = _rank_units(model, order_map, r)
@@ -535,9 +560,11 @@ def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
 
 
 def _edge_length(model: _Model, order_map: dict[int, list[int]]) -> int:
-    """Sum over edges of the index distance between the endpoints' positions on their ranks — the secondary
-    objective. Among equal-crossing orders it prefers parents over their children and partners near their
-    kin (shorter drops, no off-centre descents), which the crossing count alone cannot see."""
+    """Sum over edges of the index distance between the endpoints' positions — the secondary objective.
+
+    Among equal-crossing orders it prefers parents over their children and partners near their kin (shorter
+    drops, no off-centre descents), which the crossing count alone cannot see.
+    """
     pos = {r: _positions(order_map, r) for r in order_map}
     total = 0
     for r in range(model.min_rank, model.max_rank):
@@ -549,7 +576,9 @@ def _edge_length(model: _Model, order_map: dict[int, list[int]]) -> int:
 
 def _birth_order_inversions(model: _Model, order_map: dict[int, list[int]]) -> int:
     """Sibling pairs drawn out of their IR birth order (``Mating.offspring`` order), summed over sibships.
-    Birth order is the weak preference of layout-v2.md: it yields to crossings, but not to edge length."""
+
+    Birth order is the weak preference of layout-v2.md: it yields to crossings, but not to edge length.
+    """
     pos = {r: _positions(order_map, r) for r in order_map}
     total = 0
     for mr in model.g.matings:
@@ -572,10 +601,13 @@ def _objective(model: _Model, order_map: dict[int, list[int]]) -> tuple[int, int
 
 
 def _mincross(model: _Model, init: dict[int, list[int]]) -> dict[int, list[int]]:
-    """dot's mincross loop: alternate ``wmedian`` (down/up) and ``transpose``, keep the best order under the
-    lexicographic objective (crossings, birth-order inversions, edge length) on strict improvement — no drift
-    on ties, so the result is deterministic; stop when a down+up round leaves the order unchanged. Then a tiny
-    exact search settles small ranks and fixes their tie-break."""
+    """Dot's mincross loop, then a tiny exact search on small ranks.
+
+    Alternate ``wmedian`` (down/up) and ``transpose``, keep the best order under the lexicographic objective
+    (crossings, birth-order inversions, edge length) on strict improvement — no drift on ties, so the result is
+    deterministic; stop when a down+up round leaves the order unchanged. The exact search then settles small
+    ranks and fixes their tie-break.
+    """
     best = {r: list(nodes) for r, nodes in init.items()}
     best_key = _objective(model, best)
     cur = {r: list(nodes) for r, nodes in init.items()}
