@@ -1,0 +1,13 @@
+[ { "name": "f11", "sex": "female", "lifeStatus": "deceased" },
+  { "name": "m11", "sex": "male" },
+  { "name": "f12", "sex": "female", "disorders": [603235, "142763", "custom disorder"] },
+  { "name": "m12", "sex": "male" },
+  { "name": "m21", "sex": "male", "mother": "f11", "father": "m11" },
+  { "name": "f21", "sex": "female", "mother": "f12", "father": "m12" },
+  { "name": "ch1", "sex": "female", "mother": "f21", "father": "m21", "disorders": [603235], "proband": true, "evaluated": true },
+  { "name": "ch2", "sex": "male", "mother": "f21", "father": "m21", "twinGroup": 1, "monozygotic": true },
+  { "name": "ch3", "sex": "male", "mother": "f21", "father": "m21", "twinGroup": 1, "monozygotic": true },
+  { "name": "ch4", "sex": "unknown", "mother": "f21", "father": "m21", "lifeStatus": "miscarriage", "gestationAge": 12 },
+  { "name": "ch5", "sex": "female", "mother": "f21", "father": "m21", "adoptedIn": true, "carrierStatus": "carrier", "disorders": ["custom disorder"] },
+  { "name": "m22", "sex": "male" },
+  { "relationshipId": 1, "partner1": "f21", "partner2": "m22", "separated": true, "childlessStatus": "infertile", "childlessReason": "vasectomy", "consanguinity": "N" } ]

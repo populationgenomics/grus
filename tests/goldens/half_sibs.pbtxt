@@ -1,0 +1,9 @@
+id: "half_sibs"
+labels { text: "Half-sibs: one shared parent across two matings" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 1 index: 3 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN consultand: true }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 3 } offspring { child { generation: 2 index: 2 } } }

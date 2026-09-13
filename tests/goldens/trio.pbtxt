@@ -1,0 +1,6 @@
+id: "trio"
+labels { text: "Nuclear family: two parents and one affected child" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN annotations { text: "N/N" type: ANNOTATION_TYPE_GENOTYPE } }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_CARRIER } annotations { text: "N/M" type: ANNOTATION_TYPE_GENOTYPE } }
+individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { status: CONDITION_STATUS_AFFECTED } proband: true annotations { text: "M/M" type: ANNOTATION_TYPE_GENOTYPE } }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } }

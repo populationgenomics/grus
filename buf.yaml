@@ -1,0 +1,23 @@
+# buf module + gates for the hand-authored protos (docs/design/ir.md). The .proto files under
+# schema/proto/ are the source of truth; tools/schema/regen.py runs the export + protoc to emit the
+# committed Python stubs.
+version: v2
+modules:
+  - path: schema/proto
+deps:
+  - buf.build/bufbuild/protovalidate
+lint:
+  # BASIC (structural) + the two enum-canonical rules (UPPER_SNAKE prefixed values, a *_UNSPECIFIED
+  # zero member) + PROTOVALIDATE. The package/directory rules are excepted to allow the
+  # <pkg>.models.<name> convention (package's trailing segment is the file, not a directory) —
+  use:
+    - BASIC
+    - ENUM_VALUE_PREFIX
+    - ENUM_ZERO_VALUE_SUFFIX
+    - PROTOVALIDATE
+  except:
+    - PACKAGE_DIRECTORY_MATCH
+    - DIRECTORY_SAME_PACKAGE
+breaking:
+  use:
+    - FILE

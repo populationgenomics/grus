@@ -1,0 +1,6 @@
+FAM1 dad 0 0 1 1
+FAM1 mum 0 0 2 1
+FAM1 kid1 dad mum 2 2
+FAM1 kid2 dad mum 1 -9
+FAM2 solo_mum 0 0 2 1
+FAM2 child solo_mum 0 0 2

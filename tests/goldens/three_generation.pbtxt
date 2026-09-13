@@ -1,0 +1,10 @@
+id: "three_generation"
+labels { text: "Three generations with a marry-in and a deceased founder" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN deceased: true }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 2 gender: GENDER_MAN }
+individuals { generation: 3 index: 1 gender: GENDER_MAN }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } proband: true }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 2 } offspring { child { generation: 3 index: 1 } } offspring { child { generation: 3 index: 2 } } }

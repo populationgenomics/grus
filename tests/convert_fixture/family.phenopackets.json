@@ -1,0 +1,12 @@
+{ "id": "FAM1",
+  "proband": { "id": "pp-ch1", "subject": { "id": "ch1", "sex": "FEMALE", "vitalStatus": { "status": "ALIVE" } },
+               "diseases": [ { "term": { "id": "OMIM:219700", "label": "cystic fibrosis" }, "onset": { "age": { "iso8601duration": "P2Y" } } } ],
+               "metaData": { } },
+  "relatives": [ { "id": "pp-m11", "subject": { "id": "m11", "sex": "MALE", "vitalStatus": { "status": "DECEASED", "timeOfDeath": { "age": { "iso8601duration": "P72Y" } } } }, "metaData": { } } ],
+  "consanguinousParents": true,
+  "pedigree": { "persons": [
+    { "familyId": "FAM1", "individualId": "m11", "paternalId": "0", "maternalId": "0", "sex": "MALE",   "affectedStatus": "UNAFFECTED" },
+    { "familyId": "FAM1", "individualId": "f11", "paternalId": "0", "maternalId": "0", "sex": "FEMALE", "affectedStatus": "UNAFFECTED" },
+    { "familyId": "FAM1", "individualId": "ch1", "paternalId": "m11", "maternalId": "f11", "sex": "FEMALE", "affectedStatus": "AFFECTED" },
+    { "familyId": "FAM1", "individualId": "ch2", "paternalId": "m11", "maternalId": "f11", "sex": "OTHER_SEX" } ] },
+  "metaData": { } }

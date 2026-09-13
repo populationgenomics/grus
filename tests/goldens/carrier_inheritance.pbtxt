@@ -1,0 +1,5 @@
+id: "carrier-inheritance"
+labels { text: "Carrier glyph by inheritance: AR half-fill vs X-linked dot" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE } }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 1 index: 3 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }

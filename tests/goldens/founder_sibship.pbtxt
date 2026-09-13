@@ -1,0 +1,6 @@
+id: "founder-sibship"
+labels { text: "A founder sibship: three siblings with an undrawn parent couple" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 3 gender: GENDER_UNKNOWN }
+matings { offspring { child { generation: 1 index: 1 } } offspring { child { generation: 1 index: 2 } } offspring { child { generation: 1 index: 3 } } }

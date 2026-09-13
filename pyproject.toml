@@ -1,0 +1,86 @@
+# grus — pedigree figure <-> structured IR <-> SVG. Python-only.
+# uv-managed. The `grus` tree is a PEP 420 namespace on the repo-root pythonpath; committed proto
+# stubs land under grus/models/. This is the public export of the grus monorepo (schema, IR,
+# renderer, importers, CLI); the extraction / evaluation programme is developed privately.
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "grus"
+version = "0.1.0.dev0"
+description = "Pedigree IR (protobuf) + deterministic Bennett-standard SVG renderer + importers."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+# Core: the IR contract (proto runtime + boundary validation). Everything else is a group below,
+# so a consumer installs only the surface it touches.
+# protovalidate >= 1.0 vendors its own buf.validate stubs under protovalidate._gen; older releases
+# expect a top-level buf.validate.validate_pb2 with the pre-1.0 (Constraint, not Rule) message names,
+# which the stubs shipped here no longer match.
+dependencies = [
+  "protobuf>=6,<7",
+  "protovalidate>=1.0",
+]
+
+# PEP 735 dependency groups, installed on demand with `uv sync --group <name>`.
+[dependency-groups]
+# Codegen: grpcio-tools' protoc emits the committed Python stubs (its bundled protoc pins the
+# generated-code version to the protobuf 6.x runtime). buf drives export/lint/breaking.
+codegen = ["grpcio-tools>=1.68"]
+# Lint + test toolchain.
+lint = ["pre-commit>=4", "ruff>=0.15", "pyright>=1.1.390", "pytest>=8", "types-protobuf>=6"]
+
+[project.optional-dependencies]
+# SVG -> PNG (`grus render --png`); cairosvg needs native libcairo.
+raster = ["cairosvg>=2.7"]
+
+[project.scripts]
+grus = "grus.cli:main"
+
+[tool.hatch.build.targets.wheel]
+only-include = [
+  "grus/cli.py",
+  "grus/ir",
+  "grus/render",
+  "grus/convert",
+  "grus/models/pedigree_pb2.py",
+  "grus/models/pedigree_pb2.pyi",
+  "buf/validate",
+]
+exclude = ["**/__pycache__"]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["grus", "buf", "schema", "tests", "docs", "README.md", "LICENSE", "GLOSSARY.md"]
+exclude = ["**/__pycache__"]
+
+[tool.uv]
+# `uv run` / `uv sync` install these by default, so the standard verify commands (`uv run pytest`,
+# `uv run --group lint pyright`) resolve the test toolchain and grpc_tools (pyright type-checks
+# tools/schema/regen.py against it). Core `[project].dependencies` stay
+# lean regardless — a library consumer still installs only `protobuf` + `protovalidate`.
+default-groups = ["lint", "codegen"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+# Generated stubs are committed verbatim; linting them is noise.
+extend-exclude = ["grus/models", "buf"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "PTH", "RUF"]
+
+[tool.pyright]
+pythonVersion = "3.13"
+# Resolve imports from the uv-managed venv, so editor pyright sees installed deps
+# (protovalidate, protobuf, …) the same way `uv run pyright` does.
+venvPath = "."
+venv = ".venv"
+include = ["grus", "tools", "tests"]
+exclude = ["**/__pycache__", "grus/models", "buf", ".venv"]
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests", "grus"]

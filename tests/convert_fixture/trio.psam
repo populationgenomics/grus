@@ -1,0 +1,5 @@
+# generated for grus tests
+#FID IID PAT MAT SEX PHENO1
+T dad 0 0 1 1
+T mum 0 0 2 1
+T kid dad mum 2 2
