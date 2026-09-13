@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "grus"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Pedigree IR (protobuf) + deterministic Bennett-standard SVG renderer + importers."
 readme = "README.md"
 license = "MIT"
