@@ -84,3 +84,6 @@ typeCheckingMode = "standard"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests", "grus"]
+# An unrecognised key in this table is an error, not a warning: a misspelled option would
+# otherwise leave the guard it was meant to set switched off, silently.
+strict_config = true

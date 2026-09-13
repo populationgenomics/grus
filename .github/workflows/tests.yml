@@ -1,0 +1,46 @@
+name: tests
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    # Skips draft PRs.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --python 3.13
+      # No path arg: collect the testpaths configured in pyproject.toml. The raster tests skip
+      # here (no cairosvg); the job below is the one that runs them.
+      - run: uv run pytest
+
+  pytest-raster:
+    # The `raster` extra (cairosvg over native libcairo). Its tests skip when the import fails,
+    # which reads as a pass, so the import is asserted before pytest runs.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      # `update` is the call that reaches the network; the runner image ships lists the install
+      # resolves against, so it runs only after a miss.
+      - timeout-minutes: 6
+        run: |
+          sudo apt-get install -y libcairo2 \
+            || { sudo apt-get update && sudo apt-get install -y libcairo2; }
+      - run: uv sync --locked --python 3.13 --extra raster
+      - run: uv run python -c "import cairosvg"
+      - run: uv run pytest tests/test_render_raster.py
