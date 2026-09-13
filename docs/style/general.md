@@ -1,7 +1,8 @@
 # Code style — language-agnostic
 
-Principles independent of language; the language layer builds on it ([`python.md`](python.md)). On conflict, the language doc wins for its language. Code properties only — behavioral directives (push back,
-resist the minimal fix) live in [`../../CLAUDE.md`](../../CLAUDE.md).
+Principles independent of language; the language layer builds on it ([`python.md`](python.md)). On conflict, the
+language doc wins for its language. Code properties only — behavioral directives (push back, resist the minimal fix)
+live in [`../../CLAUDE.md`](../../CLAUDE.md).
 
 ## Fail loud; never silently degrade
 
@@ -9,8 +10,8 @@ Raise on missing or malformed data; don't paper over it with `x or []`, `x or {}
 case — that turns a missing input into a silent wrong answer. Validate and fail early.
 
 "Unknown" and "not stated" are valid IR *values* — an importer records what the source states and nothing more
-([`../PRODUCT.md`](../PRODUCT.md)) — not a license for code to swallow missing inputs: a source that omits a field yields
-the unknown value; a source that is malformed, or a precondition the code relies on, raises.
+([`../PRODUCT.md`](../PRODUCT.md)) — not a license for code to swallow missing inputs: a source that omits a field
+yields the unknown value; a source that is malformed, or a precondition the code relies on, raises.
 
 ## Comments
 

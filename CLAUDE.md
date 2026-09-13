@@ -52,17 +52,18 @@ type change. Design: [`docs/design/ir.md`](docs/design/ir.md).
 Two audiences, two registers:
 
 - **Instruction files** are prompts and rules — `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`: model-only, only what
-  changes behavior, no maintainer notes, no harness mechanics (which rules load when, where files live). A token there is
-  paid on every run that loads it; human-facing explanation belongs in `docs/` or code.
+  changes behavior, no maintainer notes, no harness mechanics (which rules load when, where files live). A token there
+  is paid on every run that loads it; human-facing explanation belongs in `docs/` or code.
 - **Everything under `docs/`** is written for a human first — a maintainer who has read
   [`docs/PRODUCT.md`](docs/PRODUCT.md) and [`GLOSSARY.md`](GLOSSARY.md) but not this area, and has to get the take-aways
   from one read on GitHub. Explain with the clarity and style of Martin Kleppmann — motivation before mechanism,
   specifics out of the argument's way. Detail that restates code — field lists, paths, env vars, test names — stays in
-  the code and is linked, never transcribed. A model reads what a human reads. Design docs are the durable design record:
-  one living doc per area under `docs/design/`, rewritten in place; no ADRs — rationale lives in the doc, chronology in
-  git. The guide is [`docs/style/design-docs.md`](docs/style/design-docs.md); to write or rewrite one, load the
-  `writing-design-docs` skill. Docstrings and docs may cite design notes that live only in the private grus monorepo
-  (`architecture.md`, `eval.md`, `corpus.md`, `docs/plans/`); don't turn those into links, and don't add new ones.
+  the code and is linked, never transcribed. A model reads what a human reads. Design docs are the durable design
+  record: one living doc per area under `docs/design/`, rewritten in place; no ADRs — rationale lives in the doc,
+  chronology in git. The guide is [`docs/style/design-docs.md`](docs/style/design-docs.md); to write or rewrite one,
+  load the `writing-design-docs` skill. Docstrings and docs may cite design notes that live only in the private grus
+  monorepo (`architecture.md`, `eval.md`, `corpus.md`, `docs/plans/`); don't turn those into links, and don't add new
+  ones.
 
 ## Committing
 
@@ -94,5 +95,5 @@ Worktrees go in `.claude/worktrees/` (gitignored), never `../` siblings.
   publishes one, else the exact latest version (`@v10.1.0`). Verify against the action's releases when adding or bumping
   one.
 - **A change to what the renderer draws ships with renders** in the PR description — the affected golden before and
-  after, or after alone when it is new. A reviewer cannot see geometry in an SVG diff. `grus render <golden>.pbtxt
-  --png` (the `raster` extra) produces the image.
+  after, or after alone when it is new. A reviewer cannot see geometry in an SVG diff.
+  `grus render <golden>.pbtxt --png` (the `raster` extra) produces the image.

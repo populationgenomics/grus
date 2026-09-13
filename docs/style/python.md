@@ -1,8 +1,8 @@
 # Python style
 
-This is the style guide for Python code in grus. It's the high-level / human-judgement layer — the
-mechanical formatting and naming rules are enforced by [ruff] and aren't restated here. If something contradicts what
-ruff is configured to enforce, ruff wins, and this doc should be updated.
+This is the style guide for Python code in grus. It's the high-level / human-judgement layer — the mechanical formatting
+and naming rules are enforced by [ruff] and aren't restated here. If something contradicts what ruff is configured to
+enforce, ruff wins, and this doc should be updated.
 
 The content is largely lifted from the [Google Python Style Guide][pyguide] (CC-BY-3.0), edited for the conventions of
 this repo. Sections we don't enforce or that ruff already covers have been omitted.
@@ -46,14 +46,16 @@ The following symbol imports are allowed:
 
 - Names from the `typing` module (`Any`, `Protocol`, `TypeVar`, `NamedTuple`, etc.). These are language vocabulary;
   fully-qualifying them adds noise without clarity.
+
 - Names from `collections.abc` (`Iterator`, `Iterable`, `Mapping`, `Sequence`, etc.). Same rationale.
+
 - `from __future__ import ...` — required syntax for future statements, not a normal import.
 
 - A package's own surface. A `grus.<pkg>/__init__.py` re-exports its public names from its private sibling modules
   (`from grus.ir._diff import diff`), and a private module imports what it needs from a sibling the same way
-  (`from ._layout import Layout`). These are the package's internal wiring, not a foreign symbol; the reader is
-  already inside the package. The generated stubs are imported as a module (`from grus.models import pedigree_pb2 as
-  pb`), never their messages.
+  (`from ._layout import Layout`). These are the package's internal wiring, not a foreign symbol; the reader is already
+  inside the package. The generated stubs are imported as a module (`from grus.models import pedigree_pb2 as pb`), never
+  their messages.
 
 Anything not on this list — including `pathlib.Path`, `dataclasses.dataclass`, `contextlib.contextmanager`,
 `functools.partial`, third-party classes — should be accessed via its module.
@@ -165,8 +167,8 @@ that instead.
 ## Docstrings
 
 Use Google-style docstrings on public APIs that warrant explanation. Public APIs *should* have docstrings; this is
-policy, not lint — ruff's pydocstyle rules are not selected, so neither presence nor format fails CI. Beyond format,
-the *content* matters:
+policy, not lint — ruff's pydocstyle rules are not selected, so neither presence nor format fails CI. Beyond format, the
+*content* matters:
 
 - **Module docstring**: what the module is for; what to use it for.
 - **Function/method docstring**: what the caller needs to know to call it correctly. Not a paraphrase of the
@@ -206,8 +208,8 @@ Annotations should be present on function and method signatures and should be *s
 (ruff's `ANN` rules are not selected); pyright in `standard` mode checks what is annotated.
 
 - Prefer concrete types over `typing.Any`. If you find yourself needing it, consider whether a `Protocol`, `TypeVar`, or
-  `Union` would carry more signal; where `Any` is the honest type (an optional native dependency bound at call time), say
-  why in a one-line comment.
+  `Union` would carry more signal; where `Any` is the honest type (an optional native dependency bound at call time),
+  say why in a one-line comment.
 - Prefer `list[Dataset]` over bare `list`. The element type carries meaning.
 - Prefer `Iterable[T]` / `Sequence[T]` / `Mapping[K, V]` for function parameters (the most general type the function
   actually uses); use concrete `list` / `dict` for return types.
@@ -257,11 +259,11 @@ Use `pytest` fixtures (`tmp_path`, `monkeypatch`, `capsys`, custom-defined) for 
 Parametrise tests with `@pytest.mark.parametrize` rather than writing N near-identical test functions.
 
 Assert architectural and logical invariants, not the current shape of the code. A test that pins today's values — the
-exact list of committed goldens, a whole serialized payload — is a *change detector*: it fails on every
-legitimate addition, and the extra signal it buys is not worth that. Name the property that has to hold for any valid
-state. Where production code already enforces that property, test the enforcement — hand it a violating input, assert it
-raises — rather than restating its current output: an assertion that production code makes unreachable can never fail.
-Swapping in the invariant replaces the assertion, not the test: it governs what a test asserts, never how many.
+exact list of committed goldens, a whole serialized payload — is a *change detector*: it fails on every legitimate
+addition, and the extra signal it buys is not worth that. Name the property that has to hold for any valid state. Where
+production code already enforces that property, test the enforcement — hand it a violating input, assert it raises —
+rather than restating its current output: an assertion that production code makes unreachable can never fail. Swapping
+in the invariant replaces the assertion, not the test: it governs what a test asserts, never how many.
 
 ```python
 # Good — the property: every committed golden is a valid IR and draws, or defers by name

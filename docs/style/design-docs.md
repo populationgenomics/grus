@@ -7,10 +7,10 @@ the style below apply to every doc under `docs/`; the shape and the policy are f
 ## The reader
 
 A design doc is normally reviewed by a second maintainer who was not in the conversation, and it is what every later
-reader of the area starts from. So
-write for a maintainer who has read [`../PRODUCT.md`](../PRODUCT.md) and [`../../GLOSSARY.md`](../../GLOSSARY.md), knows
-nothing about this area — not its adjacent docs, not its code — and has to make a review decision from one read on
-GitHub: they should come away with the decisions and the reasons for them without having to ask anyone.
+reader of the area starts from. So write for a maintainer who has read [`../PRODUCT.md`](../PRODUCT.md) and
+[`../../GLOSSARY.md`](../../GLOSSARY.md), knows nothing about this area — not its adjacent docs, not its code — and has
+to make a review decision from one read on GitHub: they should come away with the decisions and the reasons for them
+without having to ask anyone.
 
 Writing for that human also serves a model reading the doc as context. Writing for the model does not serve the human:
 compression strips the antecedents, signposts and consequences a person needs to follow an argument they are seeing for
@@ -23,15 +23,15 @@ they are used, a concrete example where it aids understanding, and the trade-off
 than slanted towards the one chosen.
 
 The forms that carry a design here are concrete. Where it has a surface, a mockup of that surface; where it has a flow
-across services, a request diagram; a plain statement of what is stored where; and
-where the doc covers several interfaces, a subsection per interface in one consistent shape — what it takes, what it
-produces, what it refuses — so a reader can compare them. Such a
-subsection is design, not a restatement of code: what a message means in the system belongs in the doc, its field list
-belongs to the proto. A close-to-code sketch — a class or service with method bodies elided to `...` — is a form on the
-same footing where the architecture is easiest to see that way: a guess at writing time, superseded by the contract file
-or the code once that exists. These forms are additive to the prose, not carved out of it: a reader takes in a mockup or
-a diagram in seconds, and it leaves the prose less to say. The length that has to fit a sitting is the argument's; a doc
-that runs long tightens its prose or splits along a seam, and keeps the picture.
+across services, a request diagram; a plain statement of what is stored where; and where the doc covers several
+interfaces, a subsection per interface in one consistent shape — what it takes, what it produces, what it refuses — so a
+reader can compare them. Such a subsection is design, not a restatement of code: what a message means in the system
+belongs in the doc, its field list belongs to the proto. A close-to-code sketch — a class or service with method bodies
+elided to `...` — is a form on the same footing where the architecture is easiest to see that way: a guess at writing
+time, superseded by the contract file or the code once that exists. These forms are additive to the prose, not carved
+out of it: a reader takes in a mockup or a diagram in seconds, and it leaves the prose less to say. The length that has
+to fit a sitting is the argument's; a doc that runs long tightens its prose or splits along a seam, and keeps the
+picture.
 
 The maintainers also prefer a particular presentation, and the reason is again that review decision. Motivation first,
 then what was decided, then the mechanism at the level of concepts and interfaces — the specifics after it, in an
@@ -42,27 +42,27 @@ point worth making gets its own section, with the reason it matters — never an
 something else. A mermaid diagram suits a flow or a set of states, though GitHub renders it in the file view and not in
 the PR diff, so a reviewer has to open the file.
 
-For the style in practice rather than in the abstract, read [`../design/ir.md`](../design/ir.md) — a doc written to
-this guide.
+For the style in practice rather than in the abstract, read [`../design/ir.md`](../design/ir.md) — a doc written to this
+guide.
 
 ## Where the low-level detail goes
 
-The doc names decisions and interfaces — "the `Mating` message", "the `grus.convert` importers" — and where an
-interface has an entry point in code, links it where the interface is introduced: the module, the directory, the proto
-file. Anything beyond that restates code and stays out: a per-field paraphrase of a proto or a schema, env-var names,
-file paths beyond that entry point, function, class or test names, error strings, constants. A paraphrase is a second
-copy of something that already has an authoritative one, and it goes stale the next time the code changes.
+The doc names decisions and interfaces — "the `Mating` message", "the `grus.convert` importers" — and where an interface
+has an entry point in code, links it where the interface is introduced: the module, the directory, the proto file.
+Anything beyond that restates code and stays out: a per-field paraphrase of a proto or a schema, env-var names, file
+paths beyond that entry point, function, class or test names, error strings, constants. A paraphrase is a second copy of
+something that already has an authoritative one, and it goes stale the next time the code changes.
 
 Cutting such a detail is not deleting it — it moves to the code's own documentation surface: the comment on a proto
 field or message, a module or function docstring, a test. What is written there is written for the caller — what the
-field, option or message implies for them, what they must do and what they can rely on — not the mechanism behind it. Not an
-inline comment beside the implementation; those are what the Comments rule in [`general.md`](general.md) governs, and
-its default is no comment. The doc links to that surface instead. A passage that stops making sense once the detail is
-cut was pitched at the wrong altitude: rewrite it higher rather than restoring the detail.
+field, option or message implies for them, what they must do and what they can rely on — not the mechanism behind it.
+Not an inline comment beside the implementation; those are what the Comments rule in [`general.md`](general.md) governs,
+and its default is no comment. The doc links to that surface instead. A passage that stops making sense once the detail
+is cut was pitched at the wrong altitude: rewrite it higher rather than restoring the detail.
 
 The division holds when both surfaces carry the same decision: the doc states the decision and the reason for it, and
-the comment on the field or message states what it implies for the caller — what they must do, what they can rely
-on — and at most a clause of why. Where the doc says `Mating` partners are optional because single parents and founder
+the comment on the field or message states what it implies for the caller — what they must do, what they can rely on —
+and at most a clause of why. Where the doc says `Mating` partners are optional because single parents and founder
 sibships are first-class, the comment on the field says an absent partner means the figure drew none, not that it is
 unknown. Both name the same promise; that is not a second copy, because the argument sits in one place — it is the
 argument, restated in both, that drifts. The pointer runs the other way too: where context helps the code's reader, the
@@ -99,8 +99,8 @@ it. Then:
 No section states what is built, what is planned or what has shipped: that changes with every merge, and the code and
 git already hold it, so a section stating it rots at once. What such a section would carry belongs elsewhere — a
 deliberate deferral and its reason is a design decision (Design, or Alternatives considered), an unresolved gap is an
-Open question, and an accepted transitional cost, a deprecated field kept for one release or a two-step retirement, is stated
-beside the decision that accepts it.
+Open question, and an accepted transitional cost, a deprecated field kept for one release or a two-step retirement, is
+stated beside the decision that accepts it.
 
 ## Policy
 

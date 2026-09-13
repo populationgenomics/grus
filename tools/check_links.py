@@ -48,27 +48,27 @@ class Broken(NamedTuple):
 # A `[text](target)` link; `target` is the first capture. Also matches the
 # `(target)` of an image `![alt](target)`. Link text containing a `]` is not
 # handled (rare in prose), and reference-style `[text][ref]` links are skipped.
-LINK_RE = re.compile(r'\[[^\]]*\]\(\s*([^)]+?)\s*\)')
-INLINE_CODE_RE = re.compile(r'`[^`]*`')
+LINK_RE = re.compile(r"\[[^\]]*\]\(\s*([^)]+?)\s*\)")
+INLINE_CODE_RE = re.compile(r"`[^`]*`")
 # An external scheme (`mailto:`, `https:`, …) or a protocol-relative `//`.
-EXTERNAL_RE = re.compile(r'^(?:[a-z][a-z0-9+.-]*:|//)', re.IGNORECASE)
-HEADING_RE = re.compile(r'^(#{1,6})\s+(.*\S)\s*$')
-FENCE_RE = re.compile(r'^\s*(?:```|~~~)')
+EXTERNAL_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.IGNORECASE)
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
+FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 
 def _run(cmd: list[str]) -> str:
     # All callers pass literal git subcommands; no untrusted input.
-    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout  # noqa: S603
+    return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
 
 
 def tracked_markdown(root: pathlib.Path) -> list[pathlib.Path]:
-    out = _run(['git', '-C', str(root), 'ls-files', '*.md'])
+    out = _run(["git", "-C", str(root), "ls-files", "*.md"])
     return [root / line for line in out.splitlines() if line]
 
 
 def _slugify(heading: str) -> str:
-    text = re.sub(r'[^\w\s-]', '', heading.strip().lower())
-    return re.sub(r'\s', '-', text)
+    text = re.sub(r"[^\w\s-]", "", heading.strip().lower())
+    return re.sub(r"\s", "-", text)
 
 
 def _prose_lines(path: pathlib.Path) -> list[tuple[int, str]]:
@@ -96,7 +96,7 @@ def heading_slugs(path: pathlib.Path) -> set[str]:
 def _target_path(raw: str) -> str:
     """Strip an optional ``<>`` wrapper and a trailing ``"title"`` from a link."""
     inner = raw.strip()
-    if inner.startswith('<') and inner.endswith('>'):
+    if inner.startswith("<") and inner.endswith(">"):
         inner = inner[1:-1]
     return inner.split(' "', 1)[0].strip()
 
@@ -117,29 +117,29 @@ def resolve(source: pathlib.Path, target: str, root: pathlib.Path) -> str | None
     """
     if EXTERNAL_RE.match(target):
         return None
-    path_part, _, fragment = target.partition('#')
+    path_part, _, fragment = target.partition("#")
     if path_part:
-        if path_part.startswith('/'):
+        if path_part.startswith("/"):
             # GitHub treats a leading slash as repo-root-relative, not
             # filesystem-root; resolve against root only (pathlib would
             # otherwise discard the left operand of an absolute join).
-            candidates = [(root / path_part.lstrip('/')).resolve()]
+            candidates = [(root / path_part.lstrip("/")).resolve()]
         else:
             candidates = [(source.parent / path_part).resolve(), (root / path_part).resolve()]
         dest = next((c for c in candidates if c.exists()), None)
         if dest is None:
-            return 'target does not exist'
+            return "target does not exist"
     else:
         dest = source
-    if fragment and dest.suffix == '.md' and dest.exists() and fragment not in heading_slugs(dest):
-        return f'no heading anchor #{fragment}'
+    if fragment and dest.suffix == ".md" and dest.exists() and fragment not in heading_slugs(dest):
+        return f"no heading anchor #{fragment}"
     return None
 
 
 def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Broken]:
     broken: list[Broken] = []
     for n, line in _prose_lines(path):
-        for m in LINK_RE.finditer(INLINE_CODE_RE.sub('', line)):
+        for m in LINK_RE.finditer(INLINE_CODE_RE.sub("", line)):
             target = _target_path(m.group(1))
             reason = resolve(path, target, root)
             if reason:
@@ -148,13 +148,13 @@ def check_file(path: pathlib.Path, root: pathlib.Path) -> list[Broken]:
 
 
 def main() -> int:
-    root = pathlib.Path(_run(['git', 'rev-parse', '--show-toplevel']).strip())
+    root = pathlib.Path(_run(["git", "rev-parse", "--show-toplevel"]).strip())
     broken = [b for md in tracked_markdown(root) for b in check_file(md, root)]
     for b in broken:
-        print(f'{b.source}:{b.line_no} -> {b.target}  ({b.reason})')
-    print(f'\n{len(broken)} broken link(s) across tracked Markdown.')
+        print(f"{b.source}:{b.line_no} -> {b.target}  ({b.reason})")
+    print(f"\n{len(broken)} broken link(s) across tracked Markdown.")
     return 1 if broken else 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
