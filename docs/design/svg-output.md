@@ -53,18 +53,27 @@ what kind of element it is and which drawn states apply; its data attributes car
 selects on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a
 rule can reach the symbol, a status mark or a label line on its own.
 
-For one individual — a deceased, affected woman at II-3 in a single-pedigree render — the emitted markup has this shape
-(coordinates elided):
+For one individual — a woman at II-3 who carries the pedigree's first condition, is deceased and is the proband — the
+emitted markup has this shape (coordinates elided):
 
 ```svg
-<g id="ind-II-3" class="individual affected deceased" data-position="II-3" data-generation="2"
-   data-index="3" data-gender="woman" data-condition-0="affected">
-  <circle class="symbol" … fill="#000000" stroke="#000000"/>
+<g id="ind-II-3" class="individual carrier deceased proband" data-position="II-3" data-generation="2"
+   data-index="3" data-gender="woman" data-condition-0="carrier">
+  <circle class="symbol" … fill="#ffffff" stroke="#000000"/>
+  <clipPath id="clip-II-3"><circle …/></clipPath>
+  <rect class="fill" data-condition="0" … clip-path="url(#clip-II-3)"/>
   <line class="mark deceased" …/>
+  <g class="mark proband"><line …/><line …/><line …/><text …>P</text></g>
   <text class="label" …>II-3</text>
   <text class="label" …>N/M</text>
 </g>
 ```
+
+The same individual, taken apart. Left, the group as drawn; middle, each part in draw order with the selector that
+reaches it; right, three consumer stylesheet rules and what each does to the drawing. Every glyph here is the renderer's
+own output, only regrouped and annotated.
+
+![Construction of one individual's symbol: the group as drawn, its parts with their selectors, and three CSS rules applied](svg-output-symbol.svg)
 
 The groups, and what each promises:
 
