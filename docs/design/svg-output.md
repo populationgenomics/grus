@@ -110,6 +110,23 @@ A composed figure prefixes every id with its tile's prefix, as the clip-path ids
 family 2's II-3 and `[data-position="II-3"]` under a given `pedigree` group is the same cell. A consumer working inside
 one tile selects by position; one working across the figure selects by id.
 
+### A semantic change is a re-render, and nodes stay put
+
+The hooks carry meaning out of the drawing; they are not a way to put new meaning in. To show a phenotype the figure did
+not have — a new condition on some of its individuals — the consumer adds the condition to the IR and renders again.
+That is cheap and exact for a reason worth stating: layout and ordering read only the pedigree's structure and each
+individual's stable position, never clinical status, so a re-render with changed conditions draws every node in the same
+place and regenerates everything that does depend on them — the solid fill, the carrier regions, and the change from a
+two-way split to quadrants once a pedigree has more than two conditions. No stylesheet could do that last step, since it
+is new geometry keyed to the legend index.
+
+The boundary between what a consumer's CSS can derive from the hooks and what needs the drawer is the boundary between
+paint and geometry. Fills are paint: a stylesheet can point `fill` at a paint server in the document's `defs`, and
+hard-stop gradients and object-bounding-box patterns paint a solid, a half, a quadrant or a central dot clipped to the
+symbol for free. Marks that leave the shape — the deceased slash, the proband arrow, the question mark, the
+presymptomatic line — are elements, and CSS cannot create SVG geometry (generated content is undefined on SVG shapes). A
+consumer that wants to change those without a round trip needs a drawer where it runs; see Alternatives.
+
 ### A reservation factor stands in for reflow
 
 `Geometry` gains a **label reservation factor**, defaulting to 1, by which the spacing computation multiplies the label
@@ -138,9 +155,11 @@ consumers that ask for it.
   change into a golden change.
 - **Draw the legend into the SVG.** Rejected as a non-goal above; a consumer that wants one can build it from the
   pedigree group's condition array in a few lines.
-- **Re-draw in the browser for label reflow.** The drawing step is small and the layout arrays are simple, so a port is
-  feasible. Rejected: two drawers to keep in glyph-level agreement, for a feature the reservation factor covers in the
-  cases that matter.
+- **A drawer in the browser.** Re-running the drawing step client-side would give label reflow and let a consumer change
+  marks without a round trip. Deferred, not rejected: the likely shape is a TypeScript port of the renderer, glyphs and
+  layout both, kept in agreement with the Python by the same goldens. Not now — two drawers to hold to glyph-level
+  agreement is a cost to take on when a consumer needs it, and until then the reservation factor covers text and a
+  re-render covers meaning.
 - **Per-condition classes instead of `data-condition-i`.** Classes such as `cond-0-carrier` are shorter to select but
   cannot carry the status as a value, and a condition's name is free text that does not slug safely. The index into the
   pedigree's legend array is stable and the status rides as the attribute value.
