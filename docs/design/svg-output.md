@@ -59,21 +59,47 @@ emitted markup has this shape (coordinates elided):
 ```svg
 <g id="ind-II-3" class="individual carrier deceased proband" data-position="II-3" data-generation="2"
    data-index="3" data-gender="woman" data-condition-0="carrier">
-  <circle class="symbol" … fill="#ffffff" stroke="#000000"/>
+  <circle class="backing" … fill="#ffffff"/>
   <clipPath id="clip-II-3"><circle …/></clipPath>
   <rect class="fill" data-condition="0" … clip-path="url(#clip-II-3)"/>
+  <circle class="symbol" … fill="none" stroke="#000000"/>
   <line class="mark deceased" …/>
   <g class="mark proband"><line …/><line …/><line …/><text …>P</text></g>
   <text class="label" …>II-3</text>
   <text class="label" …>N/M</text>
+  <rect class="hit" … fill="none" pointer-events="all"/>
 </g>
 ```
 
 The same individual, taken apart. Left, the group as drawn; middle, each part in draw order with the selector that
-reaches it; right, three consumer stylesheet rules and what each does to the drawing. Every glyph here is the renderer's
-own output, only regrouped and annotated.
+reaches it; right, consumer stylesheet rules and what each does to the drawing. Every glyph here is the renderer's own
+output, only regrouped and annotated.
 
-![Construction of one individual's symbol: the group as drawn, its parts with their selectors, and three CSS rules applied](svg-output-symbol.svg)
+![Construction of one individual's symbol: the group as drawn, its parts with their selectors, and CSS rules applied](svg-output-symbol.svg)
+
+#### Layering inside an individual
+
+The parts are drawn in a fixed order chosen so that restyling any one of them renders cleanly and pointer behaviour does
+not depend on styling:
+
+1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
+   link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
+1. **`fill`** — status paint, clipped to the shape: the full shape when affected, a legend-indexed region when a
+   carrier. Status is always a `fill` part and never the backing's colour, so one selector reaches all status paint and
+   the multi-condition quadrants (`renderer.md`, not yet drawn) join the same scheme.
+1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: today the
+   region rectangle is drawn last and covers the inner half of the stroke on the filled side, which is invisible while
+   both are black and visibly uneven the moment a consumer colours the stroke. Visually the two orders are identical at
+   the default styling, so the goldens' appearance does not change.
+1. **`mark`** — slash, presymptomatic line, question mark, arrow: over the outline, as they cross it.
+1. **`label`** — the text lines.
+1. **`hit`** — a rectangle covering the symbol and the reserved label box, no fill, `pointer-events="all"`, drawn last.
+   It is the one element a consumer needs for hover and click: it catches the gaps between a thin arrow, the outline and
+   the labels, it does not move when the visible parts are restyled or hidden, and its extent *is* the minimum label box
+   below, so a consumer reads the region it may draw into straight from the geometry. Matings get the same treatment, a
+   wide transparent stroke over the thin line, so a couple's line is as easy to point at as a symbol.
+
+Two shapes per individual instead of one is the cost; both carry the same coordinates, and the clip path is unchanged.
 
 The groups, and what each promises:
 
@@ -110,8 +136,8 @@ highlights everyone with the first condition needs one rule and no renderer supp
 ```
 
 The renderer therefore commits to two things and no more: it keeps setting appearance through presentation attributes,
-never `style`, and it keeps the part classes (`symbol`, `mark`, `fill`, `label`) stable. Hover, selection, dimming and
-theming all live in the consumer.
+never `style`, and it keeps the part classes (`backing`, `fill`, `symbol`, `mark`, `label`, `hit`) stable. Hover,
+selection, dimming and theming all live in the consumer.
 
 ### Ids are unique per document; positions are unique per pedigree
 
