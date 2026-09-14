@@ -1,0 +1,157 @@
+# Design: the SVG output contract (hooks for interactive use)
+
+**Status:** proposed **Related:** [`renderer.md`](renderer.md) (what is drawn and where; this doc is about how the
+drawing is organised in the document), [`ir.md`](ir.md) (the identities and facts the hooks carry).
+
+## Overview
+
+The renderer's SVG gains structure without changing what it draws. Every individual, mating, sibship and generation
+marker becomes a group that names the IR fact it draws — the drawn position such as `II-3`, gender, clinical status per
+condition, deceased, proband — as an id, classes and data attributes. The pedigree itself carries its ordered condition
+legend. Nothing else changes: same geometry, same glyphs, no stylesheet and no script in the file.
+
+That is enough for the interactive figures the output feeds. A legend built outside the SVG can find every individual
+who carries a condition and restyle them with one CSS rule, because the renderer sets appearance through presentation
+attributes, which any stylesheet rule overrides. Two things are deliberately not offered: the renderer does not draw the
+legend, and labels do not reflow. Label extents are an input to the layout, so a bigger font must move nodes; the
+substitute is a geometry knob that reserves room for a larger label than is drawn, so a consumer can scale text up to
+that factor without collisions.
+
+## Background
+
+The SVG today is a flat list of shapes, lines and text in draw order (`renderer.md`, Drawing). Nothing in it says which
+rectangle is `II-3` or that a given text line is her genotype. A consumer that wants to highlight an individual has to
+reconstruct that from coordinates, which is exactly the geometry the IR was designed to keep out of the contract.
+
+Two properties of SVG shape the design. First, the renderer sets colour and stroke with *presentation attributes*
+(`fill="#000000"` on the element), not inline `style`. In the cascade a presentation attribute has lower precedence than
+any author stylesheet rule, so a consumer's CSS wins without the renderer knowing about it. Second, an `id` must be
+unique in the document, and a composed figure holds several pedigrees, each drawn in its own nested `<svg>`; the
+renderer already prefixes each tile's clip-path ids so tiles do not collide.
+
+The renderer is deterministic and its goldens are byte-compared. Any change to the emitted markup changes every golden
+once and is reviewed as a rendering change (`CLAUDE.md`, Committing).
+
+## Non-goals
+
+- **No stylesheet or script in the output.** The renderer describes the drawing; the consumer owns its behaviour and
+  theme. An embedded `<style>` would fight the consumer's stylesheet and would change the goldens with every theme.
+- **No drawn legend.** Where a legend sits, and whether it is a list, a key or a control, is the consumer's layout
+  decision; the round-trip judge does not need one; and a drawn legend would resize every canvas.
+- **No label reflow.** A label's estimated width and the tallest label stack set the column and row pitch
+  (`renderer.md`, Spacing scales with the labels). Redrawing for a new font size without moving nodes would mean
+  re-running the drawing step in the browser — a port of the drawer — for a result SVG text cannot deliver anyway, since
+  it does not wrap.
+- **No change to layout or glyphs.** The pixel geometry of every golden is identical before and after.
+
+## Design
+
+### Every drawn thing belongs to a group that names its IR fact
+
+The document is organised as groups, one per pedigree element, in the existing draw order. Each group's `class` says
+what kind of element it is and which drawn states apply; its data attributes carry the identity and facts a consumer
+selects on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a
+rule can reach the symbol, a status mark or a label line on its own.
+
+For one individual — a deceased, affected woman at II-3 in a single-pedigree render — the emitted markup has this shape
+(coordinates elided):
+
+```svg
+<g id="ind-II-3" class="individual affected deceased" data-position="II-3" data-generation="2"
+   data-index="3" data-gender="woman" data-condition-0="affected">
+  <circle class="symbol" … fill="#000000" stroke="#000000"/>
+  <line class="mark deceased" …/>
+  <text class="label" …>II-3</text>
+  <text class="label" …>N/M</text>
+</g>
+```
+
+The groups, and what each promises:
+
+- **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
+  of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
+  legend**: the same order the drawer uses to pick which region of a divided symbol a carrier fills (`renderer.md`,
+  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it.
+- **`individual`** — one per drawn cell. Identity is the drawn position and its two components; gender; the external id
+  when present; and one `data-condition-i` per condition the individual has, whose value is the status (affected,
+  carrier, presymptomatic, unknown). State classes mirror the marks drawn: `affected`, `carrier`, `presymptomatic`,
+  `deceased`, `proband`, `consultand`. A **ghost** — the duplicated partner of a cross-generation join — is an
+  `individual ghost` group with the *same* data attributes as the real cell and a `ghost-` id, so selecting by position
+  lights both and selecting by id lights one.
+- **`mating`** — the line or double line between an adjacent couple, a routed edge for an overflow mating, or the
+  childless glyph. It names both partners' positions and carries `consanguineous` and the childlessness kind as classes.
+- **`sibship`** — a descent drop, sib bar, child stubs and any twin bar, as one group naming the parent couple's
+  positions (or the single parent's); a founder sibship's hanger is a `sibship founder` group with no parents.
+- **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
+- **`generation`** — each Roman-numeral marker, naming its row.
+
+Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
+each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's
+position matches the IR. The vocabulary is part of the public contract from the first release that ships it and evolves
+additively, like the IR.
+
+### Restyling is the consumer's, through CSS the renderer never sees
+
+Because appearance is set with presentation attributes, a stylesheet rule of any specificity overrides it. A legend that
+highlights everyone with the first condition needs one rule and no renderer support:
+
+```css
+.individual[data-condition-0] .symbol { stroke: #c0392b; stroke-width: 4; }
+.individual:not([data-condition-0]) { opacity: 0.3; }
+```
+
+The renderer therefore commits to two things and no more: it keeps setting appearance through presentation attributes,
+never `style`, and it keeps the part classes (`symbol`, `mark`, `fill`, `label`) stable. Hover, selection, dimming and
+theming all live in the consumer.
+
+### Ids are unique per document; positions are unique per pedigree
+
+A composed figure prefixes every id with its tile's prefix, as the clip-path ids already are, so `#p1-ind-II-3` is
+family 2's II-3 and `[data-position="II-3"]` under a given `pedigree` group is the same cell. A consumer working inside
+one tile selects by position; one working across the figure selects by id.
+
+### A reservation factor stands in for reflow
+
+`Geometry` gains a **label reservation factor**, defaulting to 1, by which the spacing computation multiplies the label
+size while the drawn text keeps the true size. At 1 the output is byte-identical to today. At 1.5 the figure is spaced
+as if every label were half again as large, so a consumer may raise `font-size` on `.label` by up to that factor and no
+label reaches a neighbour or the row below. The cost is a wider, taller figure for the same content, paid only by
+consumers that ask for it.
+
+### Consequences
+
+- Every golden SVG changes once, in one reviewed commit, with renders before and after in the PR to show the drawing did
+  not move.
+- The output is larger by the group wrappers and attributes, which does not matter for figures and is the price of a
+  self-describing file.
+- `render_svgs`, which returns one document per pedigree for a carousel, carries the same groups with an empty prefix.
+- A deferred pedigree's placeholder is a `pedigree deferred` group, so a consumer can tell a missing family from an
+  empty one.
+
+## Alternatives considered
+
+- **Ids only, no data attributes.** Enough for a consumer that also holds the IR and can map ids back to facts.
+  Rejected: the legend use case wants the SVG to be self-describing so a static page can drive it, and data attributes
+  cost nothing at render time.
+- **A `<style>` block with a class vocabulary for theming.** Tempting for a consistent look across consumers. Rejected:
+  it makes the renderer own presentation it has no opinion on, fights the consumer's cascade, and turns every theme
+  change into a golden change.
+- **Draw the legend into the SVG.** Rejected as a non-goal above; a consumer that wants one can build it from the
+  pedigree group's condition array in a few lines.
+- **Re-draw in the browser for label reflow.** The drawing step is small and the layout arrays are simple, so a port is
+  feasible. Rejected: two drawers to keep in glyph-level agreement, for a feature the reservation factor covers in the
+  cases that matter.
+- **Per-condition classes instead of `data-condition-i`.** Classes such as `cond-0-carrier` are shorter to select but
+  cannot carry the status as a value, and a condition's name is free text that does not slug safely. The index into the
+  pedigree's legend array is stable and the status rides as the attribute value.
+
+## Open questions
+
+- **Accessibility.** A `<title>` child on each individual group gives native hover tooltips and a screen-reader name for
+  free, but an interactive consumer usually supplies its own and may not want the browser tooltip. Emit it, or leave it
+  to the consumer?
+- **Which annotations to expose.** Each annotation is already drawn as a label line, so exposing its type as a class on
+  that line (`label genotype`) costs nothing and lets a consumer hide or restyle a category. Worth doing in the first
+  cut, or wait for a use?
+- **Mating status.** Separation and divorce are in the IR but not yet drawn (`renderer.md`, Drawing). Should the mating
+  group carry the status as a class ahead of the glyph, so a consumer can show it, or wait until the renderer draws it?

@@ -1,7 +1,8 @@
 # Design: the renderer (IR → SVG)
 
-**Status:** current **Related:** [`ir.md`](ir.md) (input contract), `architecture.md` (why deterministic). Implementable
-spec: `../plans/03-renderer-tier1.md`.
+**Status:** current **Related:** [`ir.md`](ir.md) (input contract), [`svg-output.md`](svg-output.md) (how the drawing is
+organised in the document: groups, ids and data attributes for interactive use), `architecture.md` (why deterministic).
+Implementable spec: `../plans/03-renderer-tier1.md`.
 
 ## Overview
 
@@ -21,7 +22,8 @@ so we control glyph-level convention fidelity — the thing the eval judge score
 
 ## Non-goals
 
-- No interactivity, animation, or theming. One conventional, stable, reproducible layout per IR.
+- No interactivity, animation, or theming in the output itself. One conventional, stable, reproducible layout per IR;
+  the hooks a consumer builds interaction on are the separate contract of [`svg-output.md`](svg-output.md).
 - Not a general graph-drawing engine; the algorithm assumes pedigree structure.
 
 ## Design
