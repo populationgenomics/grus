@@ -13,19 +13,19 @@
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1">
 <line x1="134" y1="66" x2="134" y2="138" stroke="#000000" stroke-width="2"/>
 </g>
-<g class="individual" id="ind-I-1" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
+<g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="88" y="48" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="88" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="106" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
 <rect class="hit" x="88" y="48" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
-<g class="individual" id="ind-I-2" data-position="I-2" data-generation="1" data-index="2" data-gender="woman">
+<g id="ind-I-2" class="individual" data-position="I-2" data-generation="1" data-index="2" data-gender="woman">
 <circle class="backing" cx="162" cy="66" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="162" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="162" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="144" y="48" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
-<g class="individual affected carrier" id="ind-II-1" data-position="II-1" data-generation="2" data-index="1" data-gender="unknown" data-condition-0="carrier">
+<g id="ind-II-1" class="individual affected carrier" data-position="II-1" data-generation="2" data-index="1" data-gender="unknown" data-condition-0="affected carrier">
 <polygon class="backing" points="134,138 152,156 134,174 116,156" fill="#ffffff"/>
 <polygon class="fill" data-condition="0" points="134,138 152,156 134,174 116,156" fill="#000000"/>
 <polygon class="symbol" points="134,138 152,156 134,174 116,156" fill="none" stroke="#000000" stroke-width="2"/>

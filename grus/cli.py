@@ -75,11 +75,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
-    svg = (
-        render.render_set_svg(loaded, geom, id_prefix=args.id_prefix)
-        if isinstance(loaded, pb.PedigreeSet)
-        else render.render_svg(loaded, geom, id_prefix=args.id_prefix)
-    )
+    try:
+        svg = (
+            render.render_set_svg(loaded, geom, id_prefix=args.id_prefix)
+            if isinstance(loaded, pb.PedigreeSet)
+            else render.render_svg(loaded, geom, id_prefix=args.id_prefix)
+        )
+    except ValueError as e:  # the renderer's argument checks (id_prefix), reported as a usage error
+        print(f"grus render: error: {e}", file=sys.stderr)
+        return 2
     out: pathlib.Path | None = args.output
     if args.png:
         png = render.rasterize(svg, scale=args.scale)
@@ -105,17 +109,6 @@ def _cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
-def _id_prefix(value: str) -> str:
-    """Argparse type for ``--id-prefix``: the renderer's id-safe token rule, reported as a usage error."""
-    try:
-        render.render_svg(
-            pb.Pedigree(individuals=[pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN)]), id_prefix=value
-        )
-    except ValueError as e:
-        raise argparse.ArgumentTypeError(str(e)) from e
-    return value
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``grus`` argument parser with its validate / render / import subcommands."""
     parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, import.")
@@ -135,7 +128,6 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument(
         "--id-prefix",
         default="",
-        type=_id_prefix,
         help="namespace for every id in the SVG, for a page that inlines several figures (default: none)",
     )
     render_cmd.add_argument(

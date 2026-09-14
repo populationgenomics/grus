@@ -15,26 +15,26 @@
 <line x1="148" y1="116" x2="190" y2="138" stroke="#000000" stroke-width="2"/>
 <line x1="124.9" y1="128.1" x2="171.1" y2="128.1" stroke="#000000" stroke-width="2"/>
 </g>
-<g class="individual" id="ind-I-1" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
+<g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="102" y="48" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="102" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="120" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
 <rect class="hit" x="102" y="48" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
-<g class="individual" id="ind-I-2" data-position="I-2" data-generation="1" data-index="2" data-gender="woman">
+<g id="ind-I-2" class="individual" data-position="I-2" data-generation="1" data-index="2" data-gender="woman">
 <circle class="backing" cx="176" cy="66" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="176" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="176" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="158" y="48" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
-<g class="individual affected" id="ind-II-1" data-position="II-1" data-generation="2" data-index="1" data-gender="man" data-condition-0="affected">
+<g id="ind-II-1" class="individual affected" data-position="II-1" data-generation="2" data-index="1" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="88" y="138" width="36" height="36" fill="#ffffff"/>
 <rect class="fill" data-condition="0" x="88" y="138" width="36" height="36" fill="#000000"/>
 <rect class="symbol" x="88" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="106" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
 <rect class="hit" x="88" y="138" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
-<g class="individual affected" id="ind-II-2" data-position="II-2" data-generation="2" data-index="2" data-gender="man" data-condition-0="affected">
+<g id="ind-II-2" class="individual affected" data-position="II-2" data-generation="2" data-index="2" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="172" y="138" width="36" height="36" fill="#ffffff"/>
 <rect class="fill" data-condition="0" x="172" y="138" width="36" height="36" fill="#000000"/>
 <rect class="symbol" x="172" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>

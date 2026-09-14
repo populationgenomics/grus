@@ -49,9 +49,9 @@ once and is reviewed as a rendering change (`CLAUDE.md`, Committing).
 ### Every drawn thing belongs to a group that names its IR fact
 
 The document is organised as groups, one per pedigree element, in the existing draw order. Each group's `class` says
-what kind of element it is and which drawn states apply; its data attributes carry the identity and facts a consumer
-selects on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a
-rule can reach the symbol, a status mark or a label line on its own.
+what kind of element it is and which states apply; its data attributes carry the identity and facts a consumer selects
+on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a rule can
+reach the symbol, a status mark or a label line on its own.
 
 For one individual — a woman at II-3 who carries the pedigree's first condition, is deceased and is the proband — the
 emitted markup has this shape (coordinates elided):
@@ -108,7 +108,9 @@ The groups, and what each promises:
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
   legend**: the same order the drawer uses to pick which region of a divided symbol a carrier fills (`renderer.md`,
-  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it.
+  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it. When any
+  individual has an unnamed condition (the figure's sole, unlabelled one) the array ends with an empty string, so every
+  condition has an index.
 - **`individual`** — one per drawn cell. Identity is the drawn position and its two components; gender; the external id
   when present; and one `data-condition-i` per condition the individual has, whose value is the status (affected,
   carrier, presymptomatic, unknown). State classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`,
@@ -118,7 +120,8 @@ The groups, and what each promises:
   individual is ghosted more than once), so selecting by position lights both, selecting by id lights one, and
   `.individual:not(.ghost)` counts people.
 - **`mating`** — the line or double line between an adjacent couple, a routed edge for an overflow mating, or the
-  childless glyph. It names both partners' positions and carries `consanguineous` and the childlessness kind as classes.
+  childless glyph. It names both partners' positions and carries `consanguineous`, `routed` and the childlessness kind
+  as classes.
 - **`sibship`** — a descent drop, sib bar, child stubs and any twin bar, as one group naming the parent couple's
   positions (or the single parent's); a founder sibship's hanger is a `sibship founder` group with no parents.
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.

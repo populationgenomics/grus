@@ -304,9 +304,9 @@ def test_text_and_attributes_are_escaped() -> None:
     ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, external_id='ext "1" & <2>')
     ind.conditions.add(name='A & "B" <C>', status=pb.CONDITION_STATUS_AFFECTED)
     ind.annotations.add(text="c.1<2>&", type=pb.ANNOTATION_TYPE_VARIANT)
-    p = pb.Pedigree(individuals=[ind], labels=[pb.Label(text='Fam "Q" <&>', kind=pb.LABEL_KIND_FAMILY)])
+    p = pb.Pedigree(individuals=[ind], labels=[pb.Label(text='Fam "Q"\t<&>\nline 2', kind=pb.LABEL_KIND_FAMILY)])
     root = _parse(render.render_svg(p))  # well-formed, or this raises
-    assert root.get("data-title") == 'Fam "Q" <&>'
+    assert root.get("data-title") == 'Fam "Q"\t<&>\nline 2', "tabs and newlines survive attribute normalisation"
     assert json.loads(root.get("data-conditions", "null")) == ['A & "B" <C>']
     (g,) = _groups(root, "individual")
     assert g.get("data-external-id") == 'ext "1" & <2>'
@@ -338,7 +338,7 @@ def test_hit_rect_covers_the_proband_arrow() -> None:
                 assert x <= float(el.get(ax, "0")) <= x + w and y <= float(el.get(ay, "0")) <= y + h
 
 
-@pytest.mark.parametrize("bad", ['fig"', "fig 1-", "1fig-", "a)b"])
+@pytest.mark.parametrize("bad", ['fig"', "fig 1-", "1fig-", "a)b", "fig-\n"])
 def test_id_prefix_must_be_an_id_safe_token(bad: str) -> None:
     p = _load("trio")
     with pytest.raises(ValueError, match="id_prefix"):
@@ -347,3 +347,30 @@ def test_id_prefix_must_be_an_id_safe_token(bad: str) -> None:
         render.render_set_svg(pb.PedigreeSet(pedigrees=[p]), id_prefix=bad)
     with pytest.raises(ValueError, match="id_prefix"):
         render.render_svgs(pb.PedigreeSet(pedigrees=[p]), id_prefix=bad)
+
+
+def test_same_named_conditions_share_a_slot_with_joined_statuses() -> None:
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN)
+    ind.conditions.add(status=pb.CONDITION_STATUS_CARRIER)
+    ind.conditions.add(status=pb.CONDITION_STATUS_PRESYMPTOMATIC)
+    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind]))), "individual")
+    assert g.get("data-condition-0") == "carrier presymptomatic"
+
+
+def test_ghost_hit_rect_has_no_arrow_extension_and_links_follow_layout_order() -> None:
+    p = _avuncular(second_niece=True)
+    p.individuals[2].proband = True  # II-1, the ghosted uncle
+    root = _parse(render.render_svg(p))
+    for g in _groups(root, "individual"):
+        if "ghost" not in _classes(g):
+            continue
+        hit = next(c for c in g if "hit" in _classes(c))
+        symbol = next(c for c in g if "symbol" in _classes(c))
+        assert float(hit.get("x", "0")) == float(symbol.get("x", "0")), "a ghost draws no arrow, so its hit is the box"
+    svg = render.render_svg(p)
+    for _ in range(3):
+        shuffled = pb.Pedigree()
+        shuffled.CopyFrom(p)
+        del shuffled.individuals[:]
+        shuffled.individuals.extend(reversed(list(p.individuals)))
+        assert render.render_svg(shuffled) == svg, "ghost links and ordinals follow layout order, not input order"

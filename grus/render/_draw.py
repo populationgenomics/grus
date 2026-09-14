@@ -20,11 +20,13 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
 * ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
   ``data-generation``, ``data-index``, ``data-gender`` (man / woman / nonbinary / unknown),
   ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
-  (affected / carrier / presymptomatic / unknown / …). State classes mirror the IR, not the subset of marks
-  the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``, ``deceased``, ``proband``,
-  ``consultand``. A cross-generation duplicate is ``individual ghost`` with the same classes and data
-  attributes as its real cell and id ``{prefix}ghost-{position}`` (``-2``, ``-3``, … when one individual is
-  ghosted more than once), so ``[data-position]`` lights both and ``.individual:not(.ghost)`` counts people.
+  (affected / carrier / presymptomatic / unknown / …; same-named conditions share a slot and their statuses
+  join space-separated, so select one with ``[data-condition-0~="carrier"]``). State classes mirror the IR,
+  not the subset of marks the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``,
+  ``deceased``, ``proband``, ``consultand``. A cross-generation duplicate is ``individual ghost`` with the
+  same classes and data attributes as its real cell and id ``{prefix}ghost-{position}`` (``-2``, ``-3``, …
+  when one individual is ghosted more than once), so ``[data-position]`` lights both and
+  ``.individual:not(.ghost)`` counts people.
   Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape —
   the whole shape when affected, a legend-keyed region or the X-linked ``dot`` when a carrier — each with
   ``data-condition`` naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …``
@@ -52,8 +54,7 @@ import itertools
 import json
 import math
 import re
-
-from google.protobuf.internal import enum_type_wrapper
+from typing import Protocol
 
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry, _layout, _layout2
@@ -68,6 +69,10 @@ _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
+# The proband's 'P': font size, and its offset left of and below the arrow tail (_arrow, _arrow_bottom, _hit_rect).
+_ARROW_LABEL_SIZE = 15.0
+_ARROW_LABEL_DX = 8.0
+_ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 
 # One stacked pedigree in a figure render: (title, width, height, body-elements, root-attributes).
@@ -134,7 +139,7 @@ def render_svgs(
 
 def _check_prefix(id_prefix: str) -> None:
     """Reject an ``id_prefix`` that could not start an XML id or would break a ``url(#…)`` reference."""
-    if id_prefix and not _ID_PREFIX_RE.match(id_prefix):
+    if id_prefix and not _ID_PREFIX_RE.fullmatch(id_prefix):
         raise ValueError(f"id_prefix must be empty or match {_ID_PREFIX_RE.pattern}, got {id_prefix!r}")
 
 
@@ -165,7 +170,7 @@ def _data_legend(p: pb.Pedigree) -> list[str]:
     return [*_condition_legend(p), *([""] if unnamed else [])]
 
 
-def _pedigree_attrs(p: pb.Pedigree, deferred: bool = False) -> str:
+def _pedigree_attrs(p: pb.Pedigree, *, deferred: bool = False) -> str:
     """The ``pedigree`` group's attributes, for the root ``<svg>``, a composed figure's tile, or a placeholder."""
     legend = json.dumps(_data_legend(p), ensure_ascii=False)
     cls = "pedigree deferred" if deferred else "pedigree"
@@ -256,8 +261,12 @@ def _escape(s: str) -> str:
 
 
 def _attr(s: str) -> str:
-    """Escape ``s`` for a double-quoted attribute value."""
-    return _escape(s).replace('"', "&quot;")
+    """Escape ``s`` for a double-quoted attribute value.
+
+    Newlines and tabs become character references: attribute-value normalisation would otherwise turn them
+    into spaces on the way back out of a parser.
+    """
+    return _escape(s).replace('"', "&quot;").replace("\n", "&#10;").replace("\r", "&#13;").replace("\t", "&#9;")
 
 
 def _position(ind: pb.Individual) -> str:
@@ -265,13 +274,22 @@ def _position(ind: pb.Individual) -> str:
     return f"{_roman(ind.generation)}-{ind.index}"
 
 
-def _enum_word(enum: enum_type_wrapper.EnumTypeWrapper, value: int, prefix: str) -> str:
+class _EnumNames(Protocol):
+    """The one method of a generated protobuf enum wrapper the drawer uses."""
+
+    def Name(self, number: int) -> str: ...  # noqa: N802  # protobuf's spelling
+
+
+def _enum_word(enum: _EnumNames, value: int, prefix: str) -> str:
     """``GENDER_WOMAN`` -> ``woman``: an enum value as the lower-case word a data attribute carries."""
     return enum.Name(value).removeprefix(prefix).lower()
 
 
 def _open_g(classes: list[str], attrs: dict[str, str]) -> str:
-    parts = [f'class="{" ".join(classes)}"'] + [f'{k}="{_attr(v)}"' for k, v in attrs.items()]
+    """A group's opening tag: ``id`` (when given) first, then ``class``, then the data attributes."""
+    parts = [f'id="{_attr(attrs["id"])}"'] if "id" in attrs else []
+    parts.append(f'class="{" ".join(classes)}"')
+    parts += [f'{k}="{_attr(v)}"' for k, v in attrs.items() if k != "id"]
     return f"<g {' '.join(parts)}>"
 
 
@@ -318,13 +336,16 @@ class _Draw:
         self.gen_height = max(geom.gen_height, geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub)
         self._legend = _condition_legend(p)  # ordered condition names -> carrier fill region (which half)
         self._data_legend = _data_legend(p)  # the same plus the unnamed slot, indexing `data-condition-{i}`
-        # A real individual may be ghosted more than once; each ghost cell gets an ordinal for a unique id.
+        # A real individual may be ghosted more than once; each ghost cell gets an ordinal for a unique id. Both
+        # the ordinal and the ghost-link order follow layout cell order, which is shuffle-invariant.
+        self._ghost_cell: dict[int, tuple[int, int]] = {}
         self._ghost_ordinal: dict[int, int] = {}
         seen: collections.Counter[int] = collections.Counter()
         for level in range(len(lay.nid)):
             for k in range(lay.n[level]):
                 idx = lay.nid[level][k]
                 if idx in lay.ghost_of:
+                    self._ghost_cell[idx] = (level, k)
                     seen[lay.ghost_of[idx]] += 1
                     self._ghost_ordinal[idx] = seen[lay.ghost_of[idx]]
         self._px = self._build_px_map()
@@ -340,7 +361,7 @@ class _Draw:
             return 0.0
         reach = self.geom.symbol_size / math.sqrt(2)  # the arrow tail
         if ind.proband:
-            reach += 4 + 15 / 2  # the 'P' label sits just below the tail (font 15, centred)
+            reach += _ARROW_LABEL_DY + _ARROW_LABEL_SIZE / 2  # the 'P' sits just below the tail, centred
         return reach
 
     def _line_ys(self, ind: pb.Individual) -> list[float]:
@@ -486,6 +507,9 @@ class _Draw:
             out.append(_text(x, self.py(level), _roman(level + 1), _GEN_MARKER_SIZE))
             out.append("</g>")
         return out
+
+    def _ghost_ordinal_key(self, ghost: int) -> tuple[int, int]:
+        return self._ghost_cell[ghost]
 
     def _cell_position(self, level: int, k: int) -> str:
         """The position id of the individual drawn in cell ``(level, k)`` (a ghost resolves to its real)."""
@@ -724,7 +748,7 @@ class _Draw:
         lines, ys = _label_lines(ind), self._line_ys(ind)
         if lines:
             out.append(_text(cx, cy + self.half + ys[0], _escape(lines[0]), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy))
+        out.append(self._hit_rect(ind, cx, cy, arrow=False))
         out.append("</g>")
         return out
 
@@ -757,10 +781,14 @@ class _Draw:
         }
         if ind.HasField("external_id"):
             attrs["data-external-id"] = ind.external_id
+        # Same-named conditions share a legend slot; their statuses join space-separated (CSS ``~=`` selects one).
+        statuses_by_slot: dict[str, list[str]] = {}
         for c in ind.conditions:
-            attrs[f"data-condition-{self._data_legend.index(c.name)}"] = _enum_word(
-                pb.ConditionStatus, c.status, "CONDITION_STATUS_"
-            )
+            key = f"data-condition-{self._data_legend.index(c.name)}"
+            word = _enum_word(pb.ConditionStatus, c.status, "CONDITION_STATUS_")
+            if word not in statuses_by_slot.setdefault(key, []):
+                statuses_by_slot[key].append(word)
+        attrs.update({key: " ".join(words) for key, words in statuses_by_slot.items()})
         return _open_g(classes, attrs)
 
     def _affected_fill(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
@@ -771,16 +799,19 @@ class _Draw:
         idx = self._data_legend.index(affected[0].name)
         return [self._shape(ind.gender, cx, cy, _STROKE, stroke=False, cls="fill", extra=f'data-condition="{idx}"')]
 
-    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float) -> str:
-        """The invisible pointer target: the symbol, its reserved label box, and the arrow when one is drawn."""
+    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool) -> str:
+        """The invisible pointer target: the symbol, its reserved label box, and the arrow when one is drawn.
+
+        ``arrow`` is whether this cell draws the proband/consultand arrow (a ghost never does).
+        """
         w = max(self.geom.symbol_size, self._label_w(ind))
         left, right = cx - w / 2, cx + w / 2
         bottom = cy + self.half + self.label_band
-        if ind.proband or ind.consultand:
+        if arrow and (ind.proband or ind.consultand):
             # The arrow's tail sits symbol_size/sqrt(2) beyond the lower-left corner; a proband's 'P' hangs
-            # 8 px left of and below the tail (_arrow), so extend to the tail plus the letter's half-width.
+            # left of and below the tail (_arrow), so extend to the tail plus the letter's half-width.
             tail_x = cx - self.half - self.geom.symbol_size / math.sqrt(2)
-            left = min(left, tail_x - (8 + 0.6 * 15 / 2 if ind.proband else 0))
+            left = min(left, tail_x - (_ARROW_LABEL_DX + 0.6 * _ARROW_LABEL_SIZE / 2 if ind.proband else 0))
             bottom = max(bottom, cy + self.half + self._arrow_bottom(ind))
         return (
             f'<rect class="hit" x="{_num(left)}" y="{_num(cy - self.half)}" width="{_num(right - left)}" '
@@ -796,7 +827,9 @@ class _Draw:
             for k in range(self.lay.n[level]):
                 centre[self.lay.nid[level][k]] = (self.px(self.lay.pos[level][k]), self.py(level))
         out: list[str] = []
-        for ghost, real in sorted(self.lay.ghost_of.items()):
+        ghosts_in_cell_order = sorted(self.lay.ghost_of, key=self._ghost_ordinal_key)
+        for ghost in ghosts_in_cell_order:
+            real = self.lay.ghost_of[ghost]
             gx, gy = centre[ghost]
             rx, ry = centre[real]
             out.append(_open_g(["ghost-link"], {"data-position": _position(self.p.individuals[real])}))
@@ -831,7 +864,7 @@ class _Draw:
         base_y = cy + self.half
         for line, off in zip(_label_lines(ind), self._line_ys(ind), strict=True):
             out.append(_text(cx, base_y + off, _escape(line), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy))
+        out.append(self._hit_rect(ind, cx, cy, arrow=True))
         out.append("</g>")
         return out
 
@@ -920,7 +953,7 @@ class _Draw:
             ca, sa = math.cos(ang), math.sin(ang)
             out.append(_line(hx, hy, hx + 9 * (ux * ca - uy * sa), hy + 9 * (ux * sa + uy * ca)))
         if label:
-            out.append(_text(tx - 8, ty + 4, label, 15.0))
+            out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
 
 

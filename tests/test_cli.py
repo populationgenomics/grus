@@ -102,6 +102,6 @@ def test_render_id_prefix_namespaces_ids(tmp_path: pathlib.Path) -> None:
 
 def test_render_rejects_an_unsafe_id_prefix(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = pathlib.Path(__file__).parent / "goldens" / "trio.pbtxt"
-    with pytest.raises(SystemExit) as exc:
-        cli.main(["render", str(src), "--id-prefix", 'bad"prefix', "-o", str(tmp_path / "out.svg")])
-    assert exc.value.code == 2 and "id_prefix" in capsys.readouterr().err
+    out = tmp_path / "out.svg"
+    assert cli.main(["render", str(src), "--id-prefix", 'bad"prefix', "-o", str(out)]) == 2
+    assert "id_prefix" in capsys.readouterr().err and not out.exists()
