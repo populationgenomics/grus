@@ -14,8 +14,8 @@ That is enough for the interactive figures the output feeds. A legend built outs
 who carries a condition and restyle them with one CSS rule, because the renderer sets appearance through presentation
 attributes, which any stylesheet rule overrides. Two things are deliberately not offered: the renderer does not draw the
 legend, and labels do not reflow. Label extents are an input to the layout, so a bigger font must move nodes; the
-substitute is a geometry knob that reserves room for a larger label than is drawn, so a consumer can scale text up to
-that factor without collisions.
+substitute is a minimum label box — "every label fits in 20em by 3em" — that the spacing reserves whether or not the
+drawn labels need it, so a consumer can replace or enlarge label text within that box without collisions.
 
 ## Background
 
@@ -136,13 +136,19 @@ symbol for free. Marks that leave the shape — the deceased slash, the proband 
 presymptomatic line — are elements, and CSS cannot create SVG geometry (generated content is undefined on SVG shapes). A
 consumer that wants to change those without a round trip needs a drawer where it runs; see Alternatives.
 
-### A reservation factor stands in for reflow
+### A minimum label box stands in for reflow
 
-`Geometry` gains a **label reservation factor**, defaulting to 1, by which the spacing computation multiplies the label
-size while the drawn text keeps the true size. At 1 the output is byte-identical to today. At 1.5 the figure is spaced
-as if every label were half again as large, so a consumer may raise `font-size` on `.label` by up to that factor and no
-label reaches a neighbour or the row below. The cost is a wider, taller figure for the same content, paid only by
-consumers that ask for it.
+`Geometry` gains a **minimum label box**: a width and a height, in em of the label size, that the spacing reserves under
+every symbol regardless of what the labels contain. The spacing already works as floors under estimates — a column pitch
+under the estimated width of each label line, a row pitch under the tallest stack (`renderer.md`, Spacing scales with
+the labels) — so the box is one more floor: the reserved width per cell becomes the larger of the estimate and the box,
+and the reserved band the larger of the tallest stack and the box. Unset, the output is byte-identical to today.
+
+The promise to a consumer is a box, not a ratio, because a box is something to design against. Told that every label
+fits in 20em by 3em, a consumer can set its own font size, swap a genotype for a variant string or add a second line
+client-side and know it stays clear of the neighbours and the row below. A ratio makes the same guarantee only relative
+to whatever the longest label in *this* pedigree happened to be, which the consumer cannot see and the next re-render
+may change. The cost is a wider, taller figure than the content needs, paid only by consumers that set the box.
 
 ### Consequences
 
@@ -167,8 +173,12 @@ consumers that ask for it.
 - **A drawer in the browser.** Re-running the drawing step client-side would give label reflow and let a consumer change
   marks without a round trip. Deferred, not rejected: the likely shape is a TypeScript port of the renderer, glyphs and
   layout both, kept in agreement with the Python by the same goldens. Not now — two drawers to hold to glyph-level
-  agreement is a cost to take on when a consumer needs it, and until then the reservation factor covers text and a
+  agreement is a cost to take on when a consumer needs it, and until then the minimum label box covers text and a
   re-render covers meaning.
+- **A reservation factor instead of a box.** Multiply the label size by a factor in the spacing computation and let a
+  consumer scale text by up to that factor. Simpler to implement, and it needs no new unit. Rejected: the guarantee it
+  gives is data-dependent — spaced for 1.5 times the longest label in this pedigree — so a consumer cannot reason about
+  it without the data, and two pedigrees rendered with the same factor offer different room.
 - **Per-condition classes instead of `data-condition-i`.** Classes such as `cond-0-carrier` are shorter to select but
   cannot carry the status as a value, and a condition's name is free text that does not slug safely. The index into the
   pedigree's legend array is stable and the status rides as the attribute value.
