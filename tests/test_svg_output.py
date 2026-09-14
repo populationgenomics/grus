@@ -106,6 +106,7 @@ def test_golden_hit_rect_covers_symbol_and_label_band(name: str) -> None:
 def test_pedigree_group_carries_title_and_condition_legend() -> None:
     p = _load("carrier_inheritance")
     root = _parse(render.render_svg(p))
+    assert root.get("data-title") == _draw._display_title(p)
     legend = json.loads(root.get("data-conditions", "null"))
     names = {c.name for i in p.individuals for c in i.conditions}
     assert set(legend) == names, "every condition an individual has appears in the legend, unnamed as an empty string"
@@ -159,7 +160,7 @@ def test_consanguineous_and_childless_ride_on_the_mating_group() -> None:
     assert any("consanguineous" in _classes(g) for g in _groups(root, "mating"))
     root = _parse(render.render_svg(_load("childless")))
     kinds = {c for g in _groups(root, "mating") for c in _classes(g) if c.startswith("childless-")}
-    assert kinds, "the childless glyph's kind is a class on its mating group"
+    assert kinds == {"childless-by-choice", "childless-infertility"}, "each glyph's kind is a class on its mating"
 
 
 def test_founder_sibship_group_has_children_but_no_parents() -> None:
@@ -242,5 +243,107 @@ def test_label_box_widens_reserved_space_without_moving_the_layout() -> None:
     assert float(boxed.get("height", "0")) > float(base.get("height", "0"))
     for g in _groups(boxed, "individual"):
         hit = next(c for c in g if "hit" in _classes(c))
+        if "proband" in _classes(g) or "consultand" in _classes(g):
+            continue  # the arrow widens the hit beyond the box; see test_hit_rect_covers_the_proband_arrow
         assert float(hit.get("width", "0")) == 20.0 * geom.label_size
         assert float(hit.get("height", "0")) == geom.symbol_size + 3.0 * geom.label_size
+
+
+# --- ghosts, escaping, validation --------------------------------------------------------------------------
+
+
+def _ind(g: int, i: int) -> pb.Individual:
+    return pb.Individual(generation=g, index=i, gender=pb.GENDER_MAN if i % 2 else pb.GENDER_WOMAN)
+
+
+def _mating(a: tuple[int, int], b: tuple[int, int], *kids: tuple[int, int], consang: bool = False) -> pb.Mating:
+    return pb.Mating(
+        partner_a=pb.Position(generation=a[0], index=a[1]),
+        partner_b=pb.Position(generation=b[0], index=b[1]),
+        consanguineous=consang,
+        offspring=[pb.Offspring(child=pb.Position(generation=g, index=i)) for g, i in kids],
+    )
+
+
+def _avuncular(second_niece: bool = False) -> pb.Pedigree:
+    """Uncle II-1 marries his niece III-1 (and, optionally, a second niece III-2): one or two ghosts of II-1."""
+    kids = [(3, 1), (3, 2)] if second_niece else [(3, 1)]
+    people = [_ind(1, 1), _ind(1, 2), _ind(2, 1), _ind(2, 2), _ind(2, 3), _ind(4, 1)] + [_ind(g, i) for g, i in kids]
+    matings = [
+        _mating((1, 1), (1, 2), (2, 1), (2, 2)),
+        _mating((2, 2), (2, 3), *kids),
+        _mating((2, 1), (3, 1), (4, 1), consang=True),
+    ]
+    if second_niece:
+        people.append(_ind(4, 2))
+        matings.append(_mating((2, 1), (3, 2), (4, 2), consang=True))
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+def test_ghost_carries_its_real_cells_identity() -> None:
+    root = _parse(render.render_svg(_avuncular()))
+    ghosts = [g for g in _groups(root, "individual") if "ghost" in _classes(g)]
+    assert [g.get("id") for g in ghosts] == ["ghost-II-1"]
+    (ghost,) = ghosts
+    real = next(g for g in _groups(root, "individual") if g.get("id") == "ind-II-1")
+    assert ghost.get("data-position") == real.get("data-position") == "II-1"
+    assert set(_classes(ghost)) - {"ghost"} == set(_classes(real)), "same state classes as the real cell"
+    assert [g.get("data-position") for g in _groups(root, "ghost-link")] == ["II-1"]
+    partners = {g.get("data-partners") for g in _groups(root, "mating")}
+    assert any(p and set(p.split()) == {"II-1", "III-1"} for p in partners), "the mating names the real, not the ghost"
+
+
+def test_two_ghosts_of_one_individual_get_distinct_ids() -> None:
+    svg = render.render_svg(_avuncular(second_niece=True))
+    ids = re.findall(r'\bid="([^"]+)"', svg)
+    assert len(ids) == len(set(ids)), "ids are unique even when one individual is ghosted twice"
+    assert {"ghost-II-1", "ghost-II-1-2"} <= set(ids)
+
+
+def test_text_and_attributes_are_escaped() -> None:
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, external_id='ext "1" & <2>')
+    ind.conditions.add(name='A & "B" <C>', status=pb.CONDITION_STATUS_AFFECTED)
+    ind.annotations.add(text="c.1<2>&", type=pb.ANNOTATION_TYPE_VARIANT)
+    p = pb.Pedigree(individuals=[ind], labels=[pb.Label(text='Fam "Q" <&>', kind=pb.LABEL_KIND_FAMILY)])
+    root = _parse(render.render_svg(p))  # well-formed, or this raises
+    assert root.get("data-title") == 'Fam "Q" <&>'
+    assert json.loads(root.get("data-conditions", "null")) == ['A & "B" <C>']
+    (g,) = _groups(root, "individual")
+    assert g.get("data-external-id") == 'ext "1" & <2>'
+    assert [t.text for t in g if "label" in _classes(t)] == ["I-1", "c.1<2>&"]
+
+
+def test_deferred_document_still_carries_the_legend() -> None:
+    # A child of two matings is a shape the layout defers (docs/design/renderer.md, Deferred).
+    p = pb.Pedigree(
+        individuals=[_ind(1, 1), _ind(1, 2), _ind(1, 3), _ind(2, 1)],
+        matings=[_mating((1, 1), (1, 2), (2, 1)), _mating((1, 2), (1, 3), (2, 1))],
+    )
+    p.individuals[3].conditions.add(name="cond", status=pb.CONDITION_STATUS_AFFECTED)
+    ((_title, doc),) = render.render_svgs(pb.PedigreeSet(pedigrees=[p]))
+    root = _parse(doc)
+    assert "deferred" in _classes(root) and json.loads(root.get("data-conditions", "null")) == ["cond"]
+
+
+def test_hit_rect_covers_the_proband_arrow() -> None:
+    p = _load("trio")  # II-1 is the proband
+    root = _parse(render.render_svg(p))
+    g = next(g for g in _groups(root, "individual") if "proband" in _classes(g))
+    hit = next(c for c in g if "hit" in _classes(c))
+    x, y, w, h = (float(hit.get(a, "0")) for a in ("x", "y", "width", "height"))
+    arrow = next(c for c in g if "proband" in _classes(c))
+    for el in arrow.iter():
+        for ax, ay in (("x1", "y1"), ("x2", "y2"), ("x", "y")):
+            if el.get(ax) is not None:
+                assert x <= float(el.get(ax, "0")) <= x + w and y <= float(el.get(ay, "0")) <= y + h
+
+
+@pytest.mark.parametrize("bad", ['fig"', "fig 1-", "1fig-", "a)b"])
+def test_id_prefix_must_be_an_id_safe_token(bad: str) -> None:
+    p = _load("trio")
+    with pytest.raises(ValueError, match="id_prefix"):
+        render.render_svg(p, id_prefix=bad)
+    with pytest.raises(ValueError, match="id_prefix"):
+        render.render_set_svg(pb.PedigreeSet(pedigrees=[p]), id_prefix=bad)
+    with pytest.raises(ValueError, match="id_prefix"):
+        render.render_svgs(pb.PedigreeSet(pedigrees=[p]), id_prefix=bad)

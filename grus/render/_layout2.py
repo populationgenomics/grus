@@ -24,8 +24,8 @@ extraction. Design: docs/design/layout-v2.md; plan: docs/plans/28.
 
 from __future__ import annotations
 
+import collections
 import dataclasses
-from collections import defaultdict
 from collections.abc import Callable, Iterable
 
 from grus import ir
@@ -184,7 +184,7 @@ def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> bool:
     anything an order somehow tears (an interlocking loop/multi-mate shape).
     """
     xof = {i: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, i in enumerate(row)}
-    spans: dict[int, list[tuple[float, float]]] = defaultdict(list)
+    spans: dict[int, list[tuple[float, float]]] = collections.defaultdict(list)
     for mr in g.matings:
         kids = [k for k in mr.kids if k in xof]
         if not kids:
@@ -209,7 +209,7 @@ def _relations(lay: _layout.Layout) -> list[_Sibship]:
     """
     out: list[_Sibship] = []
     for level in range(1, len(lay.nid)):
-        groups: dict[int, list[int]] = defaultdict(list)  # parent column on level-1 -> child columns
+        groups: dict[int, list[int]] = collections.defaultdict(list)  # parent column on level-1 -> child columns
         for k in range(lay.n[level]):
             pc = lay.fam[level][k]
             if pc >= 0:
@@ -274,7 +274,7 @@ def _assign_x(
                 acc += seps[level][k - 1]
             x[c] = acc
     as_child = {c: s for s in sibships for c in s.children}  # a cell is a child of <=1 drawn mating (_derive guard)
-    as_parent: dict[int, list[_Sibship]] = defaultdict(list)
+    as_parent: dict[int, list[_Sibship]] = collections.defaultdict(list)
     for s in sibships:
         for pcell in s.parents:
             as_parent[pcell].append(s)
@@ -315,7 +315,7 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
     along. Every column lands in exactly one block (a lone cell is a size-1 block).
     """
     anchored = {p for s in sibships for p in s.parents}  # a cell heading a drawn descent group is anchored
-    mates: dict[int, int] = defaultdict(int)
+    mates: dict[int, int] = collections.defaultdict(int)
     for left, right in _couples(lay):
         mates[left] += 1
         mates[right] += 1

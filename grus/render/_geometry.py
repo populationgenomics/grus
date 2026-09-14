@@ -9,8 +9,8 @@ picks a consistent set; the default reproduces the committed goldens.
 
 from __future__ import annotations
 
+import dataclasses
 import enum
-from dataclasses import dataclass
 
 
 class CarrierStyle(enum.Enum):
@@ -24,7 +24,7 @@ class CarrierStyle(enum.Enum):
     PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5: legend-keyed divided fill, dot retired, any inheritance
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class Geometry:
     """Layout + drawing spacing. Defaults are the golden-producing values.
 

@@ -53,6 +53,6 @@
 <line x1="214" y1="174" x2="205.307" y2="176.329" stroke="#000000" stroke-width="2"/>
 </g>
 <text class="label" x="232" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
-<rect class="hit" x="214" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+<rect class="hit" x="188.544" y="138" width="61.456" height="61.456" fill="none" pointer-events="all"/>
 </g>
 </svg>
