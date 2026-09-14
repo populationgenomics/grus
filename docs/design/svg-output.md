@@ -139,11 +139,23 @@ The renderer therefore commits to two things and no more: it keeps setting appea
 never `style`, and it keeps the part classes (`backing`, `fill`, `symbol`, `mark`, `label`, `hit`) stable. Hover,
 selection, dimming and theming all live in the consumer.
 
-### Ids are unique per document; positions are unique per pedigree
+### Positions are unique per pedigree; ids are unique per page, so the caller names the namespace
 
-A composed figure prefixes every id with its tile's prefix, as the clip-path ids already are, so `#p1-ind-II-3` is
-family 2's II-3 and `[data-position="II-3"]` under a given `pedigree` group is the same cell. A consumer working inside
-one tile selects by position; one working across the figure selects by id.
+Three scopes nest here. A position such as `II-3` is unique within one pedigree, so `[data-position="II-3"]` under a
+`pedigree` group is one cell. A composed figure holds several pedigrees, so ids inside it carry the tile's prefix, as
+the clip-path ids already do: `#p1-ind-II-3` is family 2's II-3. And a page can inline more than one figure — two sets
+side by side, or the same set before and after an edit — and inline SVG shares the page's single id space, so two
+figures that each contain `#p0-ind-II-3` collide. That last collision is not hypothetical: the clip paths are already
+referenced by id (`url(#…)`), so two grus figures inlined on one page today resolve the second figure's carrier regions
+against the first figure's clip geometry.
+
+Only the caller knows what else its page holds, so the namespace is a **render argument**: every function that produces
+a document (`render_svg`, `render_set_svg`, `render_svgs`) and the `render` command take an id prefix that goes in front
+of every id and every id reference in the output — individuals, ghosts, clip paths, and the tile prefix composed under
+it, so `#fig2-p1-ind-II-3` is figure 2, family 2, II-3. The default is empty, which leaves single-figure output and the
+goldens as they are. Data attributes and classes need no namespace: a consumer scopes them under the root or a
+`pedigree` group, and that is the selector to prefer inside one figure; the id is for reaching across figures and for
+the document's own references.
 
 ### A semantic change is a re-render, and nodes stay put
 
@@ -183,6 +195,8 @@ may change. The cost is a wider, taller figure than the content needs, paid only
 - The output is larger by the group wrappers and attributes, which does not matter for figures and is the price of a
   self-describing file.
 - `render_svgs`, which returns one document per pedigree for a carousel, carries the same groups with an empty prefix.
+- The `render` command gains a flag for the id prefix; a caller inlining several figures passes a distinct prefix per
+  figure. A figure embedded as an image (`<img>`, `<object>`) has its own document and needs none.
 - A deferred pedigree's placeholder is a `pedigree deferred` group, so a consumer can tell a missing family from an
   empty one.
 
@@ -205,6 +219,10 @@ may change. The cost is a wider, taller figure than the content needs, paid only
   consumer scale text by up to that factor. Simpler to implement, and it needs no new unit. Rejected: the guarantee it
   gives is data-dependent — spaced for 1.5 times the longest label in this pedigree — so a consumer cannot reason about
   it without the data, and two pedigrees rendered with the same factor offer different room.
+- **Derive the namespace from the content.** A hash of the IR as the default prefix would keep two *different* figures
+  apart with no caller action. Rejected as the default: the same IR rendered twice on one page — before and after an
+  edit, the common interactive case — would still collide, every id would carry an opaque token, and the goldens would
+  change with any IR edit. A caller that wants a content-derived prefix can pass one.
 - **Per-condition classes instead of `data-condition-i`.** Classes such as `cond-0-carrier` are shorter to select but
   cannot carry the status as a value, and a condition's name is free text that does not slug safely. The index into the
   pedigree's legend array is stable and the status rides as the attribute value.
