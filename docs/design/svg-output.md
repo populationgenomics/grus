@@ -1,6 +1,6 @@
 # Design: the SVG output contract (hooks for interactive use)
 
-**Status:** proposed **Related:** [`renderer.md`](renderer.md) (what is drawn and where; this doc is about how the
+**Status:** current **Related:** [`renderer.md`](renderer.md) (what is drawn and where; this doc is about how the
 drawing is organised in the document), [`ir.md`](ir.md) (the identities and facts the hooks carry).
 
 ## Overview
