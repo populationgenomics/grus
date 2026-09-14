@@ -8,11 +8,43 @@ arrow. Connectors: mating line (doubled for consanguinity; a lone single parent 
 sibship bar with per-child stubs, a founder sibship's implied hanger stub (a bar with no parents, for
 siblings via an undrawn couple), and twin convergence (MZ joining bar). A generation marker (Roman
 numeral) is drawn once per row in a reserved left gutter.
+
+**Document structure** (docs/design/svg-output.md). Every drawn element belongs to a group that names the IR
+fact it draws, so a consumer can select and restyle parts without reading coordinates:
+
+* The root ``<svg>`` (or, in a composed figure, each tile's nested ``<svg>``) is ``class="pedigree"`` with
+  ``data-title`` and ``data-conditions``, a JSON array of the pedigree's condition names in legend order —
+  the same order that keys a carrier's fill region — with ``""`` appended when any individual has an
+  unnamed condition, so every condition has an index. A deferred pedigree's placeholder is ``pedigree
+  deferred``.
+* ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
+  ``data-generation``, ``data-index``, ``data-gender`` (man / woman / nonbinary / unknown),
+  ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
+  (affected / carrier / presymptomatic / unknown / …). State classes mirror the IR: ``affected``, ``carrier``,
+  ``presymptomatic``, ``unknown``, ``deceased``, ``proband``, ``consultand``. A cross-generation duplicate is
+  ``individual ghost`` with id ``{prefix}ghost-{position}`` and the same data attributes. Parts, in draw
+  order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint clipped to the shape, with
+  ``data-condition`` naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …``
+  (``deceased``, ``presymptomatic``, ``unknown``, ``carrier`` dot, ``proband`` / ``consultand`` arrow group),
+  ``label`` (one ``<text>`` per line), then ``hit`` — an invisible ``pointer-events="all"`` rectangle over
+  the symbol and its reserved label box, the one element a consumer needs for hover and click.
+* ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``, ``routed``,
+  ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
+  and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
+  (``sibship founder`` for a parentless hanger). ``<g class="ghost-link" data-position=…>`` per dashed
+  same-individual connector. ``<g class="generation" data-generation=…>`` per Roman-numeral marker.
+* ``id_prefix`` goes in front of every id and id reference (clip paths included). A composed figure
+  prefixes its tiles ``p0-``, ``p1-``, … under the caller's prefix; a caller inlining several figures on
+  one page passes a distinct prefix per figure, since inline SVG shares the page's id space.
+
+Appearance is set only through presentation attributes (never ``style``), so any consumer stylesheet rule
+overrides it.
 """
 
 from __future__ import annotations
 
 import itertools
+import json
 import math
 from collections import defaultdict
 
@@ -28,40 +60,46 @@ _GEN_MARKER_SIZE = 16.0
 _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
+_HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
 
-# One stacked pedigree in a figure render: (title, width, height, body-elements).
-_Tile = tuple[str, float, float, list[str]]
+# One stacked pedigree in a figure render: (title, width, height, body-elements, root-attributes).
+_Tile = tuple[str, float, float, list[str], str]
 
 
-def render_svg(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> str:
+def render_svg(p: pb.Pedigree, geometry: _geometry.Geometry | None = None, *, id_prefix: str = "") -> str:
     """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string."""
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     lay = _layout2.layout(p, geom)
-    return _Draw(p, lay, geom).svg()
+    return _Draw(p, lay, geom, id_prefix=id_prefix).svg()
 
 
-def render_set_svg(pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None) -> str:
+def render_set_svg(
+    pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None, *, id_prefix: str = ""
+) -> str:
     """Render a whole figure's ``PedigreeSet`` as one SVG (docs/design/renderer.md).
 
     Each pedigree is laid out and drawn exactly as ``render_svg`` does, then the tiles are stacked
     vertically and titled by their display label (``_display_title`` — the FAMILY label if any, else the
     first). A pedigree the tier-1 layout defers becomes a labelled placeholder box so the rest of the
-    figure still renders. An empty set yields a minimal empty canvas.
+    figure still renders. An empty set yields a minimal empty canvas. ``id_prefix`` namespaces every id in
+    the document (each tile adds its own ``p{n}-`` under it) for a page that inlines several figures.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     tiles: list[_Tile] = []
     for ped in pedigree_set.pedigrees:
         title = _display_title(ped)
         try:
-            draw = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=f"p{len(tiles)}-")
+            draw = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=f"{id_prefix}p{len(tiles)}-")
             width, height = draw.dimensions()
-            tiles.append((title, width, height, draw.body()))
+            tiles.append((title, width, height, draw.body(), draw.root_attrs()))
         except _layout.DeferredFeatureError as deferred:
             tiles.append(_placeholder_tile(title, str(deferred)))
     return _compose_tiles(tiles, geom)
 
 
-def render_svgs(pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None) -> list[tuple[str, str]]:
+def render_svgs(
+    pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None, *, id_prefix: str = ""
+) -> list[tuple[str, str]]:
     """Render each pedigree in a set to its **own** standalone SVG document — one per family.
 
     Unlike ``render_set_svg`` (which stacks the families into a single composed canvas), this returns a
@@ -75,10 +113,10 @@ def render_svgs(pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | Non
     for ped in pedigree_set.pedigrees:
         title = _display_title(ped)
         try:
-            svg = _Draw(ped, _layout2.layout(ped, geom), geom).svg()
+            svg = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=id_prefix).svg()
         except _layout.DeferredFeatureError as deferred:
-            _, width, height, body = _placeholder_tile(title, str(deferred))
-            svg = _svg_root(width, height, body)
+            _, width, height, body, attrs = _placeholder_tile(title, str(deferred))
+            svg = _svg_root(width, height, body, attrs)
         out.append((title, svg))
     return out
 
@@ -97,16 +135,17 @@ def _compose_tiles(tiles: list[_Tile], geom: _geometry.Geometry) -> str:
     if not tiles:
         side = margin * 2
         return _svg_root(side, side, [])
-    content_w = max(w for _, w, _, _ in tiles)
+    content_w = max(w for _, w, _, _, _ in tiles)
     body: list[str] = []
     y = margin
-    for title, w, h, tile_body in tiles:
+    for title, w, h, tile_body, attrs in tiles:
         if title:
-            body.append(_text(margin + content_w / 2, y + _TITLE_SIZE / 2, _escape(title), _TITLE_SIZE))
+            body.append(_text(margin + content_w / 2, y + _TITLE_SIZE / 2, _escape(title), _TITLE_SIZE, cls="title"))
             y += _TITLE_SIZE + _TITLE_GAP
         x = margin + (content_w - w) / 2  # centre a narrower pedigree in the figure column
         body.append(
-            f'<svg x="{_num(x)}" y="{_num(y)}" width="{_num(w)}" height="{_num(h)}" viewBox="0 0 {_num(w)} {_num(h)}">'
+            f'<svg x="{_num(x)}" y="{_num(y)}" width="{_num(w)}" height="{_num(h)}" '
+            f'viewBox="0 0 {_num(w)} {_num(h)}" {attrs}>'
         )
         body += tile_body
         body.append("</svg>")
@@ -114,10 +153,10 @@ def _compose_tiles(tiles: list[_Tile], geom: _geometry.Geometry) -> str:
     return _svg_root(margin * 2 + content_w, y - _SET_GAP + margin, body)
 
 
-def _svg_root(width: float, height: float, body: list[str]) -> str:
+def _svg_root(width: float, height: float, body: list[str], attrs: str = "") -> str:
     out = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{_num(width)}" height="{_num(height)}" '
-        f'viewBox="0 0 {_num(width)} {_num(height)}">',
+        f'viewBox="0 0 {_num(width)} {_num(height)}"{" " + attrs if attrs else ""}>',
         *body,
         "</svg>",
     ]
@@ -142,7 +181,7 @@ def _placeholder_tile(title: str, reason: str) -> _Tile:
     for line in lines:
         body.append(_text(width / 2, y, _escape(line), 12.0))
         y += line_h
-    return (title, width, height, body)
+    return (title, width, height, body, f'class="pedigree deferred" data-title="{_attr(title)}"')
 
 
 def _wrap_words(text: str, width: int) -> list[str]:
@@ -165,6 +204,26 @@ def _escape(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _attr(s: str) -> str:
+    """Escape ``s`` for a double-quoted attribute value."""
+    return _escape(s).replace('"', "&quot;")
+
+
+def _position(ind: pb.Individual) -> str:
+    """The drawn position id, ``"II-3"`` — the individual's identity in the IR and in the document."""
+    return f"{_roman(ind.generation)}-{ind.index}"
+
+
+def _enum_word(enum: object, value: int, prefix: str) -> str:
+    """``GENDER_WOMAN`` -> ``woman``: an enum value as the lower-case word a data attribute carries."""
+    return enum.Name(value).removeprefix(prefix).lower()  # type: ignore[attr-defined]
+
+
+def _open_g(classes: list[str], attrs: dict[str, str]) -> str:
+    parts = [f'class="{" ".join(classes)}"'] + [f'{k}="{_attr(v)}"' for k, v in attrs.items()]
+    return f"<g {' '.join(parts)}>"
+
+
 def _num(v: float) -> str:
     """Format a coordinate compactly and deterministically (3 dp, trailing zeros stripped, no -0)."""
     r = round(v, 3)
@@ -180,7 +239,7 @@ def _label_lines(ind: pb.Individual) -> list[str]:
     ``Annotation``'s verbatim text. Blanks and duplicates are dropped (first occurrence wins).
     """
     out: list[str] = []
-    lines = [f"{_roman(ind.generation)}-{ind.index}"]
+    lines = [_position(ind)]
     lines += [a.text for a in ind.annotations]
     for line in lines:
         if line and line not in out:
@@ -203,8 +262,14 @@ class _Draw:
             (self._stack_bottom(ind) for ind in p.individuals),
             default=geom.label_gap + geom.label_size,
         )
+        # The minimum label box (docs/design/svg-output.md) is a floor under the band, as under each width.
+        self.label_band = max(self.label_band, geom.label_box_height * geom.label_size)
         self.gen_height = max(geom.gen_height, geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub)
         self._legend = self._condition_legend()  # ordered condition names -> carrier fill region (which half)
+        # The data-attribute legend: the fill legend plus a slot for the unnamed sole condition, so every
+        # condition an individual has maps to an index in `data-conditions`.
+        unnamed = any(not c.name for ind in p.individuals for c in ind.conditions)
+        self._data_legend = [*self._legend, *([""] if unnamed else [])]
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
 
@@ -254,8 +319,12 @@ class _Draw:
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
     def _label_w(self, ind: pb.Individual) -> float:
-        """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here)."""
-        return 0.6 * self.geom.label_size * max((len(line) for line in _label_lines(ind)), default=1)
+        """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
+
+        Floored by the minimum label box width, so a consumer may substitute label text up to that wide.
+        """
+        estimate = 0.6 * self.geom.label_size * max((len(line) for line in _label_lines(ind)), default=1)
+        return max(estimate, self.geom.label_box_width * self.geom.label_size)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset, widening only the gaps where wide labels would collide.
@@ -336,37 +405,54 @@ class _Draw:
             *self._matings(),
             *self._routed_matings(),
             *self._descents(),
-            *self._childless(),
             *self._founder_sibships(),
             *self._ghost_links(),
             *self._symbols(),
         ]
 
+    def root_attrs(self) -> str:
+        """The ``pedigree`` group's attributes, for the root ``<svg>`` or a composed figure's tile."""
+        legend = json.dumps(self._data_legend, ensure_ascii=False)
+        return f'class="pedigree" data-title="{_attr(_display_title(self.p))}" data-conditions="{_attr(legend)}"'
+
     def svg(self) -> str:
         width, height = self.dimensions()
-        out = [
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{_num(width)}" height="{_num(height)}" '
-            f'viewBox="0 0 {_num(width)} {_num(height)}">',
-            *self.body(),
-            "</svg>",
-        ]
-        return "\n".join(out) + "\n"
+        return _svg_root(width, height, self.body(), self.root_attrs())
 
     def _gen_markers(self) -> list[str]:
         """One Roman-numeral generation marker per row, centred in the reserved left gutter."""
         x = self.geom.gen_marker_gutter / 2
-        return [_text(x, self.py(level), _roman(level + 1), _GEN_MARKER_SIZE) for level in range(len(self.lay.nid))]
+        out: list[str] = []
+        for level in range(len(self.lay.nid)):
+            out.append(_open_g(["generation"], {"data-generation": str(level + 1)}))
+            out.append(_text(x, self.py(level), _roman(level + 1), _GEN_MARKER_SIZE))
+            out.append("</g>")
+        return out
+
+    def _cell_position(self, level: int, k: int) -> str:
+        """The position id of the individual drawn in cell ``(level, k)`` (a ghost resolves to its real)."""
+        return _position(self._ind_at(self.lay.nid[level][k]))
 
     # --- connectors -------------------------------------------------------------------------------
 
     def _matings(self) -> list[str]:
-        """Horizontal mating line between each adjacent couple; a double line for consanguinity."""
+        """One ``mating`` group per adjacent couple: the line(s), any childless glyph, and a hit stroke."""
         out: list[str] = []
         for level in range(len(self.lay.nid)):
             for k in range(self.lay.n[level] - 1):
                 kind = self.lay.spouse[level][k]
                 if not kind:
                     continue
+                childless = self.lay.childless[level][k] if level < len(self.lay.childless) else 0
+                classes = ["mating"]
+                if kind == 2:
+                    classes.append("consanguineous")
+                if childless == int(pb.CHILDLESSNESS_BY_CHOICE):
+                    classes.append("childless-by-choice")
+                elif childless == int(pb.CHILDLESSNESS_INFERTILITY):
+                    classes.append("childless-infertility")
+                partners = f"{self._cell_position(level, k)} {self._cell_position(level, k + 1)}"
+                out.append(_open_g(classes, {"data-partners": partners}))
                 y = self.py(level)
                 x1 = self.px(self.lay.pos[level][k]) + self.half
                 x2 = self.px(self.lay.pos[level][k + 1]) - self.half
@@ -376,6 +462,10 @@ class _Draw:
                     out.append(_line(x1, y + off, x2, y + off))
                 else:
                     out.append(_line(x1, y, x2, y))
+                if childless:
+                    out += self._childless_glyph(level, k, childless)
+                out.append(_hit_line(x1, y, x2, y))
+                out.append("</g>")
         return out
 
     def _routed_matings(self) -> list[str]:
@@ -397,7 +487,11 @@ class _Draw:
         for level in sorted(by_row):
             ordered = sorted(by_row[level], key=lambda rm: (min(rm.a[1], rm.b[1]), max(rm.a[1], rm.b[1])))
             for track, rm in enumerate(ordered):
+                classes = ["mating", "routed"] + (["consanguineous"] if rm.consanguineous else [])
+                partners = f"{self._cell_position(*rm.a)} {self._cell_position(*rm.b)}"
+                out.append(_open_g(classes, {"data-partners": partners}))
                 out += self._routed_edge(rm, track)
+                out.append("</g>")
         return out
 
     def _routed_edge(self, rm: _layout.RoutedMating, track: int) -> list[str]:
@@ -411,33 +505,27 @@ class _Draw:
             # s offsets the whole orthogonal path outward (double line): legs out by s, track up by s.
             return _polyline([(xl - s, y_top), (xl - s, track_y - s), (xr + s, track_y - s), (xr + s, y_top)])
 
+        hit = _hit_polyline([(xl, y_top), (xl, track_y), (xr, track_y), (xr, y_top)])
         if rm.consanguineous:
             d = self.geom.double_line_offset / 2
-            return [path(d), path(-d)]
-        return [path(0.0)]
+            return [path(d), path(-d), hit]
+        return [path(0.0), hit]
 
-    def _childless(self) -> list[str]:
-        """Bennett childless glyph under a couple with no children.
+    def _childless_glyph(self, level: int, k: int, kind: int) -> list[str]:
+        """Bennett childless glyph under the couple at cells ``k, k+1``.
 
         A vertical stub from the mating-line midpoint down to a short horizontal bar — one bar for
         childlessness by choice, two parallel bars for infertility. Drawn instead of a descent (the couple
         has no offspring).
         """
-        out: list[str] = []
-        for level in range(len(self.lay.childless)):
-            for k in range(self.lay.n[level] - 1):
-                kind = self.lay.childless[level][k]
-                if not kind:
-                    continue
-                y = self.py(level)
-                mid_x = (self.px(self.lay.pos[level][k]) + self.px(self.lay.pos[level][k + 1])) / 2
-                bar_y = y + self.geom.childless_stub
-                half = self.geom.childless_bar
-                out.append(_line(mid_x, y, mid_x, bar_y))
-                out.append(_line(mid_x - half, bar_y, mid_x + half, bar_y))
-                if kind == int(pb.CHILDLESSNESS_INFERTILITY):
-                    bar2 = bar_y + self.geom.childless_bar_gap
-                    out.append(_line(mid_x - half, bar2, mid_x + half, bar2))
+        y = self.py(level)
+        mid_x = (self.px(self.lay.pos[level][k]) + self.px(self.lay.pos[level][k + 1])) / 2
+        bar_y = y + self.geom.childless_stub
+        half = self.geom.childless_bar
+        out = [_line(mid_x, y, mid_x, bar_y), _line(mid_x - half, bar_y, mid_x + half, bar_y)]
+        if kind == int(pb.CHILDLESSNESS_INFERTILITY):
+            bar2 = bar_y + self.geom.childless_bar_gap
+            out.append(_line(mid_x - half, bar2, mid_x + half, bar2))
         return out
 
     def _descents(self) -> list[str]:
@@ -450,7 +538,13 @@ class _Draw:
                 if pc >= 0:
                     groups.setdefault(pc, []).append(k)
             for pc in sorted(groups):
+                parents = [self._cell_position(level - 1, pc)]
+                if self.lay.spouse[level - 1][pc]:
+                    parents.append(self._cell_position(level - 1, pc + 1))
+                children = " ".join(self._cell_position(level, k) for k in groups[pc])
+                out.append(_open_g(["sibship"], {"data-parents": " ".join(parents), "data-children": children}))
                 out += self._sibship(level, pc, groups[pc])
+                out.append("</g>")
         return out
 
     def _sibship(self, level: int, pc: int, cols: list[int]) -> list[str]:
@@ -494,7 +588,10 @@ class _Draw:
         """
         out: list[str] = []
         for level, cols in self.lay.founder_sibships:
+            children = " ".join(self._cell_position(level, k) for k in cols)
+            out.append(_open_g(["sibship", "founder"], {"data-children": children}))
             out += self._founder_sibship(level, list(cols))
+            out.append("</g>")
         return out
 
     def _founder_sibship(self, level: int, cols: list[int]) -> list[str]:
@@ -562,12 +659,64 @@ class _Draw:
         The same shape/affection and id label as the real one, but no arrow, annotations, or status marks —
         those belong to the primary instance. The dashed link (``_ghost_links``) ties it back to that instance.
         """
-        affected = pb.CONDITION_STATUS_AFFECTED in {c.status for c in ind.conditions}
-        out = [self._shape(ind.gender, cx, cy, _STROKE if affected else "#ffffff")]
+        out = [self._open_individual(ind, ghost=True)]
+        out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
+        out += self._affected_fill(ind, cx, cy)
+        out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
         lines, ys = _label_lines(ind), self._line_ys(ind)
         if lines:
-            out.append(_text(cx, cy + self.half + ys[0], lines[0], self.geom.label_size))
+            out.append(_text(cx, cy + self.half + ys[0], lines[0], self.geom.label_size, cls="label"))
+        out.append(self._hit_rect(ind, cx, cy))
+        out.append("</g>")
         return out
+
+    def _open_individual(self, ind: pb.Individual, *, ghost: bool) -> str:
+        """The ``individual`` group's opening tag: state classes and the data attributes a consumer selects on."""
+        statuses = {c.status for c in ind.conditions}
+        classes = ["individual"] + (["ghost"] if ghost else [])
+        for status, word in (
+            (pb.CONDITION_STATUS_AFFECTED, "affected"),
+            (pb.CONDITION_STATUS_CARRIER, "carrier"),
+            (pb.CONDITION_STATUS_PRESYMPTOMATIC, "presymptomatic"),
+            (pb.CONDITION_STATUS_UNKNOWN, "unknown"),
+        ):
+            if status in statuses:
+                classes.append(word)
+        for flag, word in ((ind.deceased, "deceased"), (ind.proband, "proband"), (ind.consultand, "consultand")):
+            if flag:
+                classes.append(word)
+        position = _position(ind)
+        attrs = {
+            "id": f"{self.id_prefix}{'ghost' if ghost else 'ind'}-{position}",
+            "data-position": position,
+            "data-generation": str(ind.generation),
+            "data-index": str(ind.index),
+            "data-gender": _enum_word(pb.Gender, ind.gender, "GENDER_"),
+        }
+        if ind.HasField("external_id"):
+            attrs["data-external-id"] = ind.external_id
+        for c in ind.conditions:
+            attrs[f"data-condition-{self._data_legend.index(c.name)}"] = _enum_word(
+                pb.ConditionStatus, c.status, "CONDITION_STATUS_"
+            )
+        return _open_g(classes, attrs)
+
+    def _affected_fill(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
+        """The solid ``fill`` part of an affected individual: the whole shape, naming the first affected condition."""
+        affected = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED]
+        if not affected:
+            return []
+        idx = self._data_legend.index(affected[0].name)
+        return [self._shape(ind.gender, cx, cy, _STROKE, stroke=False, cls="fill", extra=f'data-condition="{idx}"')]
+
+    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float) -> str:
+        """The invisible pointer target: the symbol plus its reserved label box (docs/design/svg-output.md)."""
+        w = max(self.geom.symbol_size, self._label_w(ind))
+        h = self.geom.symbol_size + self.label_band
+        return (
+            f'<rect class="hit" x="{_num(cx - w / 2)}" y="{_num(cy - self.half)}" width="{_num(w)}" '
+            f'height="{_num(h)}" fill="none" pointer-events="all"/>'
+        )
 
     def _ghost_links(self) -> list[str]:
         """A dashed "same individual" connector from each ghost cell to the real individual's cell."""
@@ -581,33 +730,43 @@ class _Draw:
         for ghost, real in sorted(self.lay.ghost_of.items()):
             gx, gy = centre[ghost]
             rx, ry = centre[real]
+            out.append(_open_g(["ghost-link"], {"data-position": _position(self.p.individuals[real])}))
             out.append(
                 f'<line x1="{_num(gx)}" y1="{_num(gy)}" x2="{_num(rx)}" y2="{_num(ry)}" '
                 f'stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}" stroke-dasharray="4 3"/>'
             )
+            out.append("</g>")
         return out
 
     def _symbol(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
+        """One ``individual`` group: backing, status fill, outline, marks, label lines, hit — in that order."""
         statuses = {c.status for c in ind.conditions}
         affected = pb.CONDITION_STATUS_AFFECTED in statuses
-        fill = _STROKE if affected else "#ffffff"
-        out = [self._shape(ind.gender, cx, cy, fill)]
+        out = [self._open_individual(ind, ghost=False)]
+        out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
+        out += self._affected_fill(ind, cx, cy)
+        carrier_fills, carrier_marks = (
+            self._carrier_glyph(ind, cx, cy) if not affected and pb.CONDITION_STATUS_CARRIER in statuses else ([], [])
+        )
+        out += carrier_fills
+        out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
+        out += carrier_marks
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
-            out.append(_text(cx, cy, "?", 20.0, fill=_STROKE if fill != _STROKE else "#ffffff"))
-        if not affected and pb.CONDITION_STATUS_CARRIER in statuses:
-            out += self._carrier_glyph(ind, cx, cy)
+            out.append(_text(cx, cy, "?", 20.0, cls="mark unknown"))
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
-            out.append(_line(cx, cy - self.half, cx, cy + self.half))  # vertical line — presymptomatic carrier
+            out.append(_line(cx, cy - self.half, cx, cy + self.half, cls="mark presymptomatic"))
         if ind.deceased:
             d = self.half * 1.4
-            out.append(_line(cx - d, cy + d, cx + d, cy - d))
+            out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
         if ind.proband:
-            out += self._arrow(cx, cy, label="P")
+            out += ['<g class="mark proband">', *self._arrow(cx, cy, label="P"), "</g>"]
         elif ind.consultand:
-            out += self._arrow(cx, cy, label=None)
+            out += ['<g class="mark consultand">', *self._arrow(cx, cy, label=None), "</g>"]
         base_y = cy + self.half
         for line, off in zip(_label_lines(ind), self._line_ys(ind), strict=True):
-            out.append(_text(cx, base_y + off, line, self.geom.label_size))
+            out.append(_text(cx, base_y + off, line, self.geom.label_size, cls="label"))
+        out.append(self._hit_rect(ind, cx, cy))
+        out.append("</g>")
         return out
 
     def _condition_legend(self) -> list[str]:
@@ -630,19 +789,23 @@ class _Draw:
                     order.append(c.name)
         return order
 
-    def _carrier_glyph(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
-        """The carrier mark.
+    def _carrier_glyph(self, ind: pb.Individual, cx: float, cy: float) -> tuple[list[str], list[str]]:
+        """The carrier glyph as ``(fill parts under the outline, mark parts over it)``.
 
         Under ``CarrierStyle.INHERITANCE_GLYPH`` (default, matching existing literature) an X-linked carrier is
-        a central dot and everything else a region fill; under ``PARTITION_FILL`` (NSGC 2022, dot retired) every
-        carrier is a region fill regardless of inheritance.
+        a central dot (a mark) and everything else a region fill; under ``PARTITION_FILL`` (NSGC 2022, dot
+        retired) every carrier is a region fill regardless of inheritance.
         """
         carriers = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_CARRIER]
         if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH:
             x_linked = {pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT}
             if {c.inheritance for c in carriers} & x_linked:
-                return [f'<circle cx="{_num(cx)}" cy="{_num(cy)}" r="{_num(self.half * 0.26)}" fill="{_STROKE}"/>']
-        return self._carrier_fill(ind, cx, cy, carriers)
+                dot = (
+                    f'<circle class="mark carrier" cx="{_num(cx)}" cy="{_num(cy)}" r="{_num(self.half * 0.26)}" '
+                    f'fill="{_STROKE}"/>'
+                )
+                return [], [dot]
+        return self._carrier_fill(ind, cx, cy, carriers), []
 
     def _carrier_fill(self, ind: pb.Individual, cx: float, cy: float, carriers: list[pb.Condition]) -> list[str]:
         """Shade the region(s) keyed to the carrier's condition, clipped to the symbol's shape.
@@ -654,19 +817,23 @@ class _Draw:
         fill over the black outline leaves the border crisp.
         """
         n = len(self._legend)
-        indices = sorted({self._legend.index(c.name) for c in carriers if c.name and c.name in self._legend})
-        if not indices or n > 4:
-            indices, slots = [0], 2  # unnamed / unkeyable / too many conditions -> plain left half
+        keyed = {self._legend.index(c.name): c for c in carriers if c.name and c.name in self._legend}
+        if not keyed or n > 4:
+            # unnamed / unkeyable / too many conditions -> plain left half, naming the first carried condition
+            regions = [(0, self._data_legend.index(carriers[0].name))]
+            slots = 2
         else:
+            regions = [(i, self._data_legend.index(keyed[i].name)) for i in sorted(keyed)]
             slots = 2 if n <= 2 else 4
-        clip_id = f"{self.id_prefix}c{ind.generation}-{ind.index}"
-        clip = f'<clipPath id="{clip_id}">{self._shape(ind.gender, cx, cy, "none")}</clipPath>'
-        return [clip, *(self._region_rect(cx, cy, i, slots, clip_id) for i in indices)]
+        clip_id = f"{self.id_prefix}clip-{_position(ind)}"
+        clip = f'<clipPath id="{clip_id}">{self._shape(ind.gender, cx, cy, "none", stroke=False)}</clipPath>'
+        return [clip, *(self._region_rect(cx, cy, i, slots, clip_id, cond) for i, cond in regions)]
 
-    def _region_rect(self, cx: float, cy: float, index: int, slots: int, clip_id: str) -> str:
-        """A fill rectangle for region ``index`` of a ``slots``-way split, clipped to the symbol shape.
+    def _region_rect(self, cx: float, cy: float, index: int, slots: int, clip_id: str, condition: int) -> str:
+        """A ``fill`` rectangle for region ``index`` of a ``slots``-way split, clipped to the symbol shape.
 
-        ``slots`` is 2 (left/right halves) or 4 (quadrants TL/TR/BL/BR).
+        ``slots`` is 2 (left/right halves) or 4 (quadrants TL/TR/BL/BR); ``condition`` is the data-legend
+        index of the condition the region paints.
         """
         h = self.half
         if slots == 2:
@@ -676,19 +843,24 @@ class _Draw:
             ry = cy - h if index in (0, 1) else cy
             rw = rh = h
         return (
-            f'<rect x="{_num(rx)}" y="{_num(ry)}" width="{_num(rw)}" height="{_num(rh)}" '
-            f'fill="{_STROKE}" clip-path="url(#{clip_id})"/>'
+            f'<rect class="fill" data-condition="{condition}" x="{_num(rx)}" y="{_num(ry)}" width="{_num(rw)}" '
+            f'height="{_num(rh)}" fill="{_STROKE}" clip-path="url(#{clip_id})"/>'
         )
 
-    def _shape(self, gender: pb.Gender, cx: float, cy: float, fill: str) -> str:
+    def _shape(
+        self, gender: pb.Gender, cx: float, cy: float, fill: str, *, stroke: bool = True, cls: str = "", extra: str = ""
+    ) -> str:
+        """The gender shape at ``(cx, cy)``: ``fill`` paint, optionally stroked, with a part class."""
         h = self.half
-        attrs = f'fill="{fill}" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"'
+        head = "".join(f"{part} " for part in (f'class="{cls}"' if cls else "", extra) if part)
+        paint = f'fill="{fill}"' + (f' stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"' if stroke else "")
         if gender == pb.GENDER_MAN:
-            return f'<rect x="{_num(cx - h)}" y="{_num(cy - h)}" width="{_num(2 * h)}" height="{_num(2 * h)}" {attrs}/>'
+            geometry = f'x="{_num(cx - h)}" y="{_num(cy - h)}" width="{_num(2 * h)}" height="{_num(2 * h)}"'
+            return f"<rect {head}{geometry} {paint}/>"
         if gender == pb.GENDER_WOMAN:
-            return f'<circle cx="{_num(cx)}" cy="{_num(cy)}" r="{_num(h)}" {attrs}/>'
+            return f'<circle {head}cx="{_num(cx)}" cy="{_num(cy)}" r="{_num(h)}" {paint}/>'
         pts = f"{_num(cx)},{_num(cy - h)} {_num(cx + h)},{_num(cy)} {_num(cx)},{_num(cy + h)} {_num(cx - h)},{_num(cy)}"
-        return f'<polygon points="{pts}" {attrs}/>'
+        return f'<polygon {head}points="{pts}" {paint}/>'
 
     def _arrow(self, cx: float, cy: float, label: str | None) -> list[str]:
         """Proband/consultand arrow into the symbol's lower-left corner; ``P`` label for a proband."""
@@ -734,10 +906,22 @@ def _roman(n: int) -> str:
     return "".join(out)
 
 
-def _line(x1: float, y1: float, x2: float, y2: float) -> str:
+def _cls(cls: str) -> str:
+    return f'class="{cls}" ' if cls else ""
+
+
+def _line(x1: float, y1: float, x2: float, y2: float, cls: str = "") -> str:
     return (
-        f'<line x1="{_num(x1)}" y1="{_num(y1)}" x2="{_num(x2)}" y2="{_num(y2)}" '
+        f'<line {_cls(cls)}x1="{_num(x1)}" y1="{_num(y1)}" x2="{_num(x2)}" y2="{_num(y2)}" '
         f'stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"/>'
+    )
+
+
+def _hit_line(x1: float, y1: float, x2: float, y2: float) -> str:
+    """An invisible wide stroke over a line, so a consumer can point at it (``pointer-events="stroke"``)."""
+    return (
+        f'<line class="hit" x1="{_num(x1)}" y1="{_num(y1)}" x2="{_num(x2)}" y2="{_num(y2)}" '
+        f'stroke="none" stroke-width="{_num(_HIT_STROKE)}" pointer-events="stroke"/>'
     )
 
 
@@ -746,8 +930,16 @@ def _polyline(points: list[tuple[float, float]]) -> str:
     return f'<polyline points="{pts}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"/>'
 
 
-def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE) -> str:
+def _hit_polyline(points: list[tuple[float, float]]) -> str:
+    pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in points)
     return (
-        f'<text x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(size)}" '
+        f'<polyline class="hit" points="{pts}" fill="none" stroke="none" stroke-width="{_num(_HIT_STROKE)}" '
+        f'pointer-events="stroke"/>'
+    )
+
+
+def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "") -> str:
+    return (
+        f'<text {_cls(cls)}x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(size)}" '
         f'fill="{fill}" text-anchor="middle" dominant-baseline="central">{s}</text>'
     )

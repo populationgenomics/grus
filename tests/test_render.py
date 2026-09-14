@@ -59,8 +59,17 @@ def _ind(g: int, i: int) -> pb.Individual:
 
 
 _TEXT_RE = re.compile(
-    r'<text x="([-0-9.]+)" y="([-0-9.]+)" font-family="[^"]*" font-size="([-0-9.]+)"[^>]*>([^<]*)</text>'
+    r'<text (?:class="[^"]*" )?x="([-0-9.]+)" y="([-0-9.]+)" font-family="[^"]*" '
+    r'font-size="([-0-9.]+)"[^>]*>([^<]*)</text>'
 )
+# The symbol outline (one per drawn individual); the backing, fill and hit parts share its geometry.
+_SYMBOL_CIRCLE_RE = re.compile(r'<circle class="symbol" cx="([-0-9.]+)" cy="([-0-9.]+)" r="([-0-9.]+)"')
+_SYMBOL_RECT_RE = re.compile(r'<rect class="symbol" x="([-0-9.]+)" y="([-0-9.]+)"')
+# Drawn (non-hit) elements: the invisible pointer targets carry class="hit" and are not glyphs.
+_GLYPH_LINE_RE = re.compile(r'<line (?!class="hit")(?:class="[^"]*" )?x1="([-0-9.]+)" y1="[-0-9.]+" x2="([-0-9.]+)"')
+_GLYPH_RECT_RE = re.compile(r'<rect (?!class="hit")(?:class="[^"]*" )?(?:data-condition="\d+" )?x="([-0-9.]+)"')
+_GLYPH_CIRCLE_RE = re.compile(r'<circle (?:class="[^"]*" )?cx="([-0-9.]+)" cy="[-0-9.]+" r="([-0-9.]+)"')
+_GLYPH_POLYGON_RE = re.compile(r'<polygon (?:class="[^"]*" )?points="([^"]+)"')
 _WIDTH_RE = re.compile(r'<svg [^>]*\bwidth="([-0-9.]+)"')
 
 
@@ -86,20 +95,20 @@ def _markers(svg: str) -> list[tuple[float, float, float, str]]:
 def _symbol_center_ys(svg: str) -> set[float]:
     """Distinct y of each symbol's centre (circle ``cy``; rect top + half)."""
     half = render.DEFAULT_GEOMETRY.symbol_size / 2
-    ys = {round(float(cy), 3) for cy in re.findall(r'<circle cx="[-0-9.]+" cy="([-0-9.]+)"', svg)}
-    ys |= {round(float(y) + half, 3) for _x, y in re.findall(r'<rect x="([-0-9.]+)" y="([-0-9.]+)"', svg)}
+    ys = {round(float(cy), 3) for _cx, cy, _r in _SYMBOL_CIRCLE_RE.findall(svg)}
+    ys |= {round(float(y) + half, 3) for _x, y in _SYMBOL_RECT_RE.findall(svg)}
     return ys
 
 
 def _min_glyph_x(svg: str) -> float:
     """Leftmost x touched by any symbol / connector / arrow (every non-``<text>`` element)."""
     xs: list[float] = []
-    for x1, x2 in re.findall(r'<line x1="([-0-9.]+)" y1="[-0-9.]+" x2="([-0-9.]+)"', svg):
+    for x1, x2 in _GLYPH_LINE_RE.findall(svg):
         xs += [float(x1), float(x2)]
-    xs += [float(x) for x in re.findall(r'<rect x="([-0-9.]+)"', svg)]
-    for cx, r in re.findall(r'<circle cx="([-0-9.]+)" cy="[-0-9.]+" r="([-0-9.]+)"', svg):
+    xs += [float(x) for x in _GLYPH_RECT_RE.findall(svg)]
+    for cx, r in _GLYPH_CIRCLE_RE.findall(svg):
         xs.append(float(cx) - float(r))
-    for pts in re.findall(r'<polygon points="([^"]+)"', svg):
+    for pts in _GLYPH_POLYGON_RE.findall(svg):
         xs += [float(p.split(",")[0]) for p in pts.split()]
     return min(xs)
 
@@ -232,7 +241,7 @@ def test_wide_label_widens_only_adjacent_columns() -> None:
         matings=[pb.Mating(offspring=[pb.Offspring(child=pb.Position(generation=1, index=i)) for i in (1, 2, 3, 4)])],
     )
     svg = render.render_svg(p)
-    xs = sorted(float(x) for x in re.findall(r'<rect x="([-0-9.]+)"', svg))  # men -> squares, left to right
+    xs = sorted(float(x) for x, _y in _SYMBOL_RECT_RE.findall(svg))  # men -> squares, left to right
     a, b, c, d = xs
     assert abs((d - c) - floor) < _EPS, "columns away from the wide label keep the geometric sib pitch"
     assert b - a > floor + _EPS and c - b > floor + _EPS, "the gaps beside the wide label widen to clear it"
@@ -327,7 +336,7 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
         return pb.Pedigree(individuals=[c(1, name_a), c(2, name_b)])
 
     def rect_xs(svg: str) -> list[float]:
-        return sorted(float(x) for x in re.findall(r'<rect x="([-0-9.]+)"[^>]*clip-path=', svg))
+        return sorted(float(x) for x in re.findall(r'<rect class="fill" data-condition="\d+" x="([-0-9.]+)"', svg))
 
     different = rect_xs(render.render_svg(two("varA", "varB")))
     same = rect_xs(render.render_svg(two("varA", "varA")))

@@ -49,6 +49,13 @@ class Geometry:
             marker (a Roman numeral). Drawing shifts right by this much; the gutter sits left of the
             ``margin``, so the margin still absorbs the leftmost symbol's arrow/slash overhang and keeps
             it clear of the gutter.
+        label_box_width: minimum reserved label width per individual, in em of ``label_size`` (0 = none).
+            A floor under the estimated width of the widest label line, so a consumer may replace label
+            text client-side with anything up to this wide and stay clear of the neighbours
+            (docs/design/svg-output.md).
+        label_box_height: minimum reserved label band below each symbol, in em of ``label_size`` (0 =
+            none). A floor under the tallest label stack, so a consumer may add lines up to this tall and
+            stay clear of the row below.
 
     ``gen_height`` and ``x_unit`` are floors: drawing opens the row pitch and column pitch further
     when a pedigree's label stacks need it (see ``_draw``). The label stack under each symbol lists the
@@ -71,6 +78,8 @@ class Geometry:
     label_size: float = 11.0
     label_gap: float = 6.0
     label_line_gap: float = 2.0
+    label_box_width: float = 0.0
+    label_box_height: float = 0.0
     margin: float = 48.0
     gen_marker_gutter: float = 40.0
     # default matches the existing literature (dot for X-linked carriers), so re-renders line up with the
