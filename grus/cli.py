@@ -75,7 +75,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
-    svg = render.render_set_svg(loaded, geom) if isinstance(loaded, pb.PedigreeSet) else render.render_svg(loaded, geom)
+    try:
+        svg = (
+            render.render_set_svg(loaded, geom, id_prefix=args.id_prefix)
+            if isinstance(loaded, pb.PedigreeSet)
+            else render.render_svg(loaded, geom, id_prefix=args.id_prefix)
+        )
+    except ValueError as e:  # the renderer's argument checks (id_prefix), reported as a usage error
+        print(f"grus render: error: {e}", file=sys.stderr)
+        return 2
     out: pathlib.Path | None = args.output
     if args.png:
         png = render.rasterize(svg, scale=args.scale)
@@ -117,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
     render_cmd.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra + libcairo)")
     render_cmd.add_argument("--scale", type=float, default=2.0, help="PNG scale factor (default 2.0)")
+    render_cmd.add_argument(
+        "--id-prefix",
+        default="",
+        help="namespace for every id in the SVG, for a page that inlines several figures (default: none)",
+    )
     render_cmd.add_argument(
         "--carrier-style",
         choices=[s.value for s in render.CarrierStyle],
