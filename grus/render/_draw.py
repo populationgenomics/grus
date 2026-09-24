@@ -52,16 +52,18 @@ overrides it.
 from __future__ import annotations
 
 import collections
-import itertools
 import json
 import math
 import re
 from typing import Protocol
 
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _layout, _layout2
+from grus.render import _geometry, _labels, _layout, _layout2
 
-_X_EPS = 1e-9  # float slack when clustering near-equal layout-x into one column
+_position = _labels.position
+_label_lines = _labels.label_lines
+_roman = _labels.roman
+
 
 _STROKE = "#000000"
 _WIDTH = 2.0
@@ -271,11 +273,6 @@ def _attr(s: str) -> str:
     return _escape(s).replace('"', "&quot;").replace("\n", "&#10;").replace("\r", "&#13;").replace("\t", "&#9;")
 
 
-def _position(ind: pb.Individual) -> str:
-    """The drawn position id, ``"II-3"`` — the individual's identity in the IR and in the document."""
-    return f"{_roman(ind.generation)}-{ind.index}"
-
-
 class _EnumNames(Protocol):
     """The one method of a generated protobuf enum wrapper the drawer uses."""
 
@@ -301,21 +298,6 @@ def _num(v: float) -> str:
     if r == 0:
         r = 0.0
     return f"{r:.3f}".rstrip("0").rstrip(".")
-
-
-def _label_lines(ind: pb.Individual) -> list[str]:
-    """Label stack for ``ind``: the as-drawn position id first, then each annotation's text.
-
-    Line 1 is the reconstructed position ``"II-2"`` (Roman ``generation`` + ``index``); then each
-    ``Annotation``'s verbatim text. Blanks and duplicates are dropped (first occurrence wins).
-    """
-    out: list[str] = []
-    lines = [_position(ind)]
-    lines += [a.text for a in ind.annotations]
-    for line in lines:
-        if line and line not in out:
-            out.append(line)
-    return out
 
 
 class _Draw:
@@ -405,51 +387,16 @@ class _Draw:
         return self._label_w(self._ind_at(idx))
 
     def _label_w(self, ind: pb.Individual) -> float:
-        """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
-
-        Floored by the minimum label box width, so a consumer may substitute label text up to that wide.
-        """
-        estimate = 0.6 * self.geom.label_size * max((len(line) for line in _label_lines(ind)), default=1)
-        return max(estimate, self.geom.label_box_width * self.geom.label_size)
+        return _labels.label_width(ind, self.geom)
 
     def _build_px_map(self) -> dict[float, float]:
-        """Map each layout-x to a pixel offset, widening only the gaps where wide labels would collide.
+        """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
 
-        A single global column pitch (``x_unit`` scaled to the widest label *anywhere*) spreads every
-        column to fit one wide annotation — the dominant source of horizontal whitespace. Instead keep
-        the geometric pitch (``x_unit`` per layout unit) as a floor and add width only across the gaps
-        whose two adjacent same-row labels would otherwise overlap. The result is a longest-path over
-        left-to-right constraints — the geometric floor between consecutive columns, plus a per-row
-        label-clearance between each adjacent pair — so it is monotonic and equal layout-x map to equal
-        pixel-x, keeping every descent drop and mating line vertical.
+        The layout already separates neighbours whose labels would collide (``_layout2._row_seps``), so no gap
+        needs widening here. A per-gap widening would keep lines vertical but move every midpoint off the one
+        the x-solve centred, which is why the clearance lives in the solve and this map is only a scale.
         """
-        xs = sorted({v for row in self.lay.pos for v in row})
-        if not xs:
-            return {}
-        cols: list[float] = [xs[0]]  # cluster near-equal x (float slack) into one column each
-        col_of: dict[float, int] = {xs[0]: 0}
-        for v in xs[1:]:
-            if v - cols[-1] > _X_EPS:
-                cols.append(v)
-            col_of[v] = len(cols) - 1
-        clearances: dict[int, list[tuple[int, float]]] = collections.defaultdict(
-            list
-        )  # right col -> [(left col, min gap px)]
-        for level, row in enumerate(self.lay.pos):
-            order = sorted(range(len(row)), key=lambda k: row[k])
-            for left, right in itertools.pairwise(order):
-                cl, cr = col_of[row[left]], col_of[row[right]]
-                if cl == cr:
-                    continue
-                wi = self._cell_w(self.lay.nid[level][left])
-                wj = self._cell_w(self.lay.nid[level][right])
-                clearances[cr].append((cl, (wi + wj) / 2 + self.geom.label_size))
-        offset = [0.0] * len(cols)
-        for c in range(1, len(cols)):
-            offset[c] = offset[c - 1] + (cols[c] - cols[c - 1]) * self.geom.x_unit
-            for cl, gap in clearances[c]:
-                offset[c] = max(offset[c], offset[cl] + gap)
-        return {v: offset[col_of[v]] for v in xs}
+        return {v: v * self.geom.x_unit for row in self.lay.pos for v in row}
 
     def _content_bounds(self) -> tuple[float, float]:
         """Leftmost / rightmost pixel offset touched by any symbol *or* its centred label stack.
@@ -1000,35 +947,6 @@ class _Draw:
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
-
-
-_ROMAN = (
-    (1000, "M"),
-    (900, "CM"),
-    (500, "D"),
-    (400, "CD"),
-    (100, "C"),
-    (90, "XC"),
-    (50, "L"),
-    (40, "XL"),
-    (10, "X"),
-    (9, "IX"),
-    (5, "V"),
-    (4, "IV"),
-    (1, "I"),
-)
-
-
-def _roman(n: int) -> str:
-    """Roman numeral for a positive generation number ``n`` (deterministic; ``n`` is small)."""
-    if n < 1:
-        raise ValueError(f"generation number must be >= 1, got {n}")
-    out: list[str] = []
-    for value, sym in _ROMAN:
-        while n >= value:
-            out.append(sym)
-            n -= value
-    return "".join(out)
 
 
 def _cls(cls: str) -> str:

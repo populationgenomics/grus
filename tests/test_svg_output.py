@@ -8,6 +8,7 @@ ids are unique and prefixable, and the minimum label box is a floor the layout h
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import json
 import pathlib
 import re
@@ -233,11 +234,15 @@ def test_label_box_smaller_than_content_changes_nothing() -> None:
     assert render.render_svg(p, geom) == render.render_svg(p)
 
 
-def test_label_box_widens_reserved_space_without_moving_the_layout() -> None:
+def test_label_box_widens_reserved_space() -> None:
     p = _load("trio")
     geom = render.DEFAULT_GEOMETRY
     wide = dataclasses.replace(geom, label_box_width=20.0, label_box_height=3.0)
-    assert render.layout(p, wide).pos == render.layout(p, geom).pos, "the box is a drawing floor, not a layout input"
+    # The box is a floor under each label's width, and label widths separate neighbours in the solve: every pair
+    # on a row sits at least a box plus the label gap apart.
+    floor = (20.0 * geom.label_size + geom.label_size) / geom.x_unit
+    for row in render.layout(p, wide).pos:
+        assert all(b - a >= floor - 1e-6 for a, b in itertools.pairwise(row))
     base, boxed = _parse(render.render_svg(p, geom)), _parse(render.render_svg(p, wide))
     assert float(boxed.get("width", "0")) > float(base.get("width", "0"))
     assert float(boxed.get("height", "0")) > float(base.get("height", "0"))

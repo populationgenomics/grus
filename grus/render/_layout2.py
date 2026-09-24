@@ -21,7 +21,7 @@ import itertools
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _layout, _ordering, _xsolve
+from grus.render import _geometry, _labels, _layout, _ordering, _xsolve
 
 _POS_QUANTUM = 6  # decimal places the final x is rounded to, so a floating backend's residual can't tip a
 # rounding boundary — the goldens are byte-compared, so pos must be bit-stable across arch/compiler
@@ -95,7 +95,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
 
     routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
-    seps = _row_seps(built, geom.couple_gap, geom.sib_gap)
+    seps = _row_seps(built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom))
     blocks = _blocks(built, seps, sibships)
     x = _xsolve.solve(_x_model(built, seps, sibships, blocks, geom), geom.x_solver)
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
@@ -234,14 +234,44 @@ def _couples(lay: _layout.Layout) -> list[tuple[int, int]]:
     ]
 
 
-def _row_seps(lay: _layout.Layout, couple_gap: float, sib_gap: float) -> list[list[float]]:
-    """Hard min-separation between each adjacent pair on a row: ``couple_gap`` within a couple, else ``sib_gap``.
+def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
+    """Each cell's half-label reach in layout units: half its label width plus half the gap between labels.
 
-    Both are >= ``couple_gap``, so the non-overlap invariant holds; the tighter couple gap realises the soft
-    couple-adjacency preference as a separation floor (couples read tighter than sibships, as in v1).
+    Two neighbours need ``(w_left + w_right) / 2 + label_size`` pixels between centres for their label stacks not to
+    touch; that is the sum of the two cells' values. A pass-through or phantom draws no label and needs none; a ghost
+    reserves its real individual's label.
     """
+    out: dict[int, float] = {}
+    for row in lay.nid:
+        for c in row:
+            if c in lay.passthrough or c in lay.phantom:
+                out[c] = 0.0
+                continue
+            ind = p.individuals[lay.ghost_of.get(c, c)]
+            out[c] = (_labels.label_width(ind, geom) + geom.label_size) / 2 / geom.x_unit
+    return out
+
+
+def _row_seps(
+    lay: _layout.Layout, couple_gap: float, sib_gap: float, clearance: dict[int, float] | None = None
+) -> list[list[float]]:
+    """Hard min-separation between each adjacent pair on a row.
+
+    ``couple_gap`` within a couple, else ``sib_gap``, raised where the two cells' labels would otherwise collide
+    (``clearance``, in layout units). Both floors are >= ``couple_gap``, so the non-overlap invariant holds; the
+    tighter couple gap realises the soft couple-adjacency preference as a separation floor (couples read tighter
+    than sibships, as in v1). The label clearance is a separation, not a drawing-time widening, so the solve's
+    centring holds in pixels.
+    """
+    reach = clearance or {}
     return [
-        [couple_gap if lay.spouse[level][k] else sib_gap for k in range(lay.n[level] - 1)]
+        [
+            max(
+                couple_gap if lay.spouse[level][k] else sib_gap,
+                reach.get(lay.nid[level][k], 0.0) + reach.get(lay.nid[level][k + 1], 0.0),
+            )
+            for k in range(lay.n[level] - 1)
+        ]
         for level in range(len(lay.nid))
     ]
 
