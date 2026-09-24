@@ -17,7 +17,6 @@ These cover the properties specific to the v2 model, beyond the golden bytes and
 
 from __future__ import annotations
 
-import collections
 import itertools
 import pathlib
 import random
@@ -332,23 +331,25 @@ def test_review_set_deferral_count_is_zero() -> None:
 
 
 def _couple_gaps(lay: render.Layout) -> list[float]:
-    """Every ordinary drawn couple's x-distance (any mating flagged ``spouse``, childless included).
+    """Every rigid drawn couple's x-distance (any mating flagged ``spouse``, childless included).
 
-    A hinge's couples (either partner mates more than once) are excluded: they are deliberately not rigid, and
-    their spread is whatever centres each of the hinge's families, which the rows can make wider than
-    ``sib_gap`` (``hinge_offcentre``). Their property is centring, tested directly
-    (``test_half_sibs_hinge_centres_over_both_sibships``).
+    The couples the layout leaves free are excluded: a hinge's (either partner mates more than once), whose spread
+    centres each of its families and can exceed ``sib_gap`` (``hinge_offcentre``), and a couple with a partner
+    bonded to a co-twin, which stretches so each drop in the twins' chain reaches its own children
+    (``twins_marry_chain_stretches``). Their properties are centring and each drop on its own bar, tested directly.
     """
+    g = render.DEFAULT_GEOMETRY
+    seps = _layout2_mod._row_seps(lay, g.couple_gap, g.sib_gap)
+    blocks = _layout2_mod._blocks(lay, seps, _layout2_mod._relations(lay))
+    bonded = {(lay.nid[level][a], lay.nid[level][b]) for level, a, b in _layout2_mod._block_pairs(blocks)}
     xof = {c: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, c in enumerate(row)}
-    couples = _layout2_mod._couples(lay)
-    mates = collections.Counter(c for couple in couples for c in couple)
-    return [abs(xof[a] - xof[b]) for a, b in couples if mates[a] == 1 and mates[b] == 1]
+    return [abs(xof[a] - xof[b]) for a, b in _layout2_mod._couples(lay) if (a, b) in bonded]
 
 
 @pytest.mark.parametrize("name", [*_DRAWABLE, "c05"])
 def test_drawn_couples_stay_tight(name: str) -> None:
     # Couples-stay-tight invariant: no ordinary drawn couple stretches past sib_gap — anything wider is a torn
-    # contiguity block. (A hinge's couples spread to centre its families; see _couple_gaps.)
+    # contiguity block. (The couples the layout leaves free stretch by design; see _couple_gaps.)
     lay = render.layout(test_render._load(name) if name in _DRAWABLE else _load_pair(name))
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"
@@ -624,9 +625,9 @@ def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple
 
 
 def test_meeting_sib_bars_defer() -> None:
-    # A fuzzed pedigree, minimised. Twins II-1 and II-2 and their spouses lock row II, so II-2 x II-6's drop falls
-    # beside its twins and their bar runs into II-3 x II-4's: the row read as one family with several sets of
-    # parents. The layout defers on bars that meet, the drop's extension included.
+    # A fuzzed pedigree, minimised. The order puts II-2 x II-6 left of II-3 x II-4 but its twins right of their
+    # children, so the two descents cross, and the crossing drop's jog ran along II-3 x II-4's bar: the row read as
+    # one family with several sets of parents. The layout defers on bars that meet, the drop's extension included.
     p = ir.load_pbtxt((pathlib.Path(__file__).parent / "deferrals" / "sib_bars_meet.pbtxt").read_text())
     with pytest.raises(render.DeferredFeatureError, match="sib bars would meet"):
         render.layout(p)

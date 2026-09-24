@@ -290,10 +290,12 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
 
     A block is a maximal run of adjacent columns joined by a **cohesion bond**. Three relations bond:
 
-    * an **ordinary couple** (``spouse`` flag) — but only when both partners mate exactly once. A multi-mate
-      individual (a half-sib hinge, an overflow) is excluded, so its couples stay free and it spreads to centre
-      over each of its sibships (``half_sibs``); this is the ordinary-vs-hinge distinction kept from the couple
-      cohesion this generalizes.
+    * an **ordinary couple** (``spouse`` flag) — but only when both partners mate exactly once and neither is
+      bonded to anyone else. A multi-mate individual (a half-sib hinge, an overflow) is excluded, so its couples
+      stay free and it spreads to centre over each of its sibships (``half_sibs``). So is a couple a partner of
+      which is a co-twin or a founder-sib floater: bonded, the couple would join that group into one rigid chain
+      (twins who both marry lock spouse, twin, twin, spouse together), and the chain's drops could not spread to
+      reach their own children, whose bars then met. Free, it stretches at the hinge couples' cost.
     * **co-twins** (``twins`` flag) — a twin group never separates.
     * a **founder-sib floater**: a member of a partnerless mating's sibship that heads no descent (no drawn
       children) has no anchor of its own, so centring alone would not keep it beside an anchored sibling pulled
@@ -319,10 +321,6 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
         ncols = lay.n[level]
         bond = [False] * max(ncols - 1, 0)  # bond[k]: columns k and k+1 share a block
         for k in range(ncols - 1):
-            if lay.spouse[level][k]:
-                left, right = lay.nid[level][k], lay.nid[level][k + 1]
-                if mates[left] == 1 and mates[right] == 1:
-                    bond[k] = True
             if lay.twins[level][k]:
                 bond[k] = True
         for k in range(ncols):
@@ -333,6 +331,13 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
                 bond[k - 1] = True
             elif k + 1 < ncols and fs_group.get((level, k + 1)) == gid:
                 bond[k] = True
+        other = list(bond)  # the twin and floater bonds, before any couple joins them
+        for k in range(ncols - 1):
+            if lay.spouse[level][k] and not other[k]:
+                left, right = lay.nid[level][k], lay.nid[level][k + 1]
+                alone = not (k > 0 and other[k - 1]) and not (k + 1 < ncols - 1 and other[k + 1])
+                if mates[left] == 1 and mates[right] == 1 and alone:
+                    bond[k] = True
         out.append(_row_blocks(bond, ncols))
     return out
 

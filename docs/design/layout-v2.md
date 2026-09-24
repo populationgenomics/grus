@@ -89,14 +89,17 @@ stages:
    the routed consanguineous marriage (below), not reordering. Crossing minimization is the *weak*-strength tie-breaker
    among orders the stronger constraints leave free — never overriding contiguity or adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
-   program** (`_xsolve.py`), subject to the row separations and block rigidity. Its objectives, each minimised among the
-   optima of those before it: (0) every descent lands on its own sib bar — the parents' midpoint within the children's
-   span; (1) centring — each midpoint over its children's centroid, plus a stretch cost on a half-sibling hinge's
-   couples, cheap up to `sib_gap` and steep beyond, so a hinge spreads that far to centre its families and a descent
-   drops to the end of its bar rather than a couple line crossing the figure; (2) the largest excess gap, so slack
-   spreads evenly; (3) the total excess gap; (4) a fixed tie-break, so the optimum is one point. The default backend
-   (z3) solves over exact rationals; HiGHS is an optional floating-point alternative. A relaxed (routed) mating exerts
-   no couple-adjacency pull here, so each parent-anchored partner settles under its own parents.
+   program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a twin group, a founder-sib
+   floater with its sibling, or a couple whose partners mate once and are bonded to no one else; a hinge's couples and a
+   couple joined to a co-twin stay free (a rigid spouse-twin-twin-spouse chain could not spread its drops to reach their
+   own children). Its objectives, each minimised among the optima of those before it: (0) every descent lands on its own
+   sib bar — the parents' midpoint within the children's span; (1) centring — each midpoint over its children's
+   centroid, plus a stretch cost on each free couple, cheap up to `sib_gap` and steep beyond, so a hinge spreads that
+   far to centre its families and a descent drops to the end of its bar rather than a couple line crossing the figure;
+   (2) the largest excess gap, so slack spreads evenly; (3) the total excess gap; (4) a fixed tie-break, so the optimum
+   is one point. The default backend (z3) solves over exact rationals; HiGHS is an optional floating-point alternative.
+   A relaxed (routed) mating exerts no couple-adjacency pull here, so each parent-anchored partner settles under its own
+   parents.
 1. **Edge routing** — draw each relationship (see below).
 
 ### Hard constraints
