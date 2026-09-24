@@ -5,8 +5,8 @@ Two layers, split by what protobuf can express (docs/design/ir.md, "Validation")
 * field-local / single-message rules are protovalidate CEL options on the `.proto` (``Position``
   components >= 1, ``gender`` and ``Condition.status`` are real values not the zero sentinel,
   ``twin_type`` set iff ``twin_group``); and
-* cross-message graph invariants — referential integrity, ``Position`` uniqueness,
-  and acyclicity — cannot be expressed field-locally and live here.
+* cross-message graph invariants — referential integrity, ``Position`` uniqueness, and generation order
+  (each child below its parents, siblings on one row) — cannot be expressed field-locally and live here.
 
 `validate` runs both and fails loud. Identity and the cross-message reference key are the ``Position``
 ``(generation, index)`` pair; a ``Mating`` may have one partner (a single drawn parent) or two.
@@ -27,9 +27,10 @@ class IntegrityError(Exception):
 
     Distinct from ``protovalidate.ValidationError`` (a field-local rule): this covers a dangling
     ``Position`` reference (a mating partner or an offspring child), a duplicate ``(generation, index)``,
-    non-distinct mating partners, or an ancestry cycle (an individual that is its own ancestor — the
-    tier-1 renderer requires an acyclic graph). Several probands are allowed: a family ascertained through
-    more than one member has more than one (Bennett), and figures draw each arrow.
+    non-distinct mating partners, or a generation-order violation (a child not below one of its parents, or
+    one mating's offspring on different generations — which also rules out an ancestry cycle). Several
+    probands are allowed: a family ascertained through more than one member has more than one (Bennett), and
+    figures draw each arrow.
     """
 
 
@@ -56,7 +57,7 @@ def validate(p: pb.Pedigree) -> None:
 
     Runs protovalidate (which recurses into every nested message) for the field-local rules, then the
     graph invariants below. Order matters: uniqueness is checked before references so the position set is
-    known, and references before acyclicity so every edge endpoint is a real node.
+    known, and references before generation order so every edge endpoint is a real node.
 
     Raises:
         protovalidate.ValidationError: a field-local / single-message rule failed.
@@ -67,7 +68,7 @@ def validate(p: pb.Pedigree) -> None:
     positions = _check_unique_positions(p)
     _check_references(p, positions)
     _check_reproductive_outcome_terminal(p)
-    _check_acyclic(p)
+    _check_generation_order(p)
 
 
 def validate_set(ps: pb.PedigreeSet) -> None:
@@ -166,36 +167,25 @@ def _check_reproductive_outcome_terminal(p: pb.Pedigree) -> None:
             )
 
 
-def _check_acyclic(p: pb.Pedigree) -> None:
-    """No individual may be its own ancestor (the parent->child graph must be a DAG).
+def _check_generation_order(p: pb.Pedigree) -> None:
+    """Each child is below each of its parents, and one mating's offspring share a generation.
 
-    Kahn's algorithm: if a topological pass cannot consume every node, the residue lies on one or more
-    ancestry cycles. Covers the self-loop case (an individual listed as offspring of its own mating).
+    ``generation`` is the drawn row, numbered top-down, so a child's generation exceeds every partner's — by
+    one ordinarily, by more when the figure draws the child lower (beside half-siblings whose other parent is a
+    generation down, or across omitted generations) — and a sibship hangs from one sibling line on one row.
+    Because generation strictly increases along every parent -> child edge, no individual can be its own
+    ancestor: this subsumes an acyclicity check.
     """
-    children: dict[Key, list[Key]] = {(ind.generation, ind.index): [] for ind in p.individuals}
-    indegree: dict[Key, int] = {(ind.generation, ind.index): 0 for ind in p.individuals}
-    edges: set[tuple[Key, Key]] = set()
-    for m in p.matings:
-        for off in m.offspring:
-            child = _key(off.child)
-            for parent in _partners(m):
-                edge = (_key(parent), child)
-                if edge in edges:
-                    continue
-                edges.add(edge)
-                children[_key(parent)].append(child)
-                indegree[child] += 1
-
-    stack = [node for node, deg in indegree.items() if deg == 0]
-    consumed = 0
-    while stack:
-        node = stack.pop()
-        consumed += 1
-        for child in children[node]:
-            indegree[child] -= 1
-            if indegree[child] == 0:
-                stack.append(child)
-
-    if consumed != len(indegree):
-        cyclic = sorted(node for node, deg in indegree.items() if deg > 0)
-        raise IntegrityError(f"ancestry cycle: individual(s) are their own ancestor: {cyclic}")
+    for i, m in enumerate(p.matings):
+        generations = sorted({off.child.generation for off in m.offspring})
+        if len(generations) > 1:
+            raise IntegrityError(
+                f"matings[{i}] offspring span generations {generations}; one mating's children share a generation"
+            )
+        for role, ref in zip(("partner_a", "partner_b"), _partners(m), strict=False):
+            for off in m.offspring:
+                if off.child.generation <= ref.generation:
+                    raise IntegrityError(
+                        f"matings[{i}] offspring {_key(off.child)} is not below its parent {role} {_key(ref)}; "
+                        "a child's generation must exceed each parent's"
+                    )
