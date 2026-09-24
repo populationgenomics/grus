@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 
@@ -89,3 +90,18 @@ def test_import_json_to_json_sniffed(tmp_path: pathlib.Path, capsys: pytest.Capt
     assert cli.main(["import", str(fixture), "--to", "json"]) == 0
     ps = ir.load_set_json(capsys.readouterr().out)
     assert ps.provenance.source_format == "openpedigree"
+
+
+def test_render_id_prefix_namespaces_ids(tmp_path: pathlib.Path) -> None:
+    src = pathlib.Path(__file__).parent / "goldens" / "carrier_inheritance.pbtxt"  # has clip-path ids
+    out = tmp_path / "out.svg"
+    assert cli.main(["render", str(src), "--id-prefix", "fig3-", "-o", str(out)]) == 0
+    ids = re.findall(r'\bid="([^"]+)"', out.read_text())
+    assert ids and all(i.startswith("fig3-") for i in ids)
+
+
+def test_render_rejects_an_unsafe_id_prefix(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    src = pathlib.Path(__file__).parent / "goldens" / "trio.pbtxt"
+    out = tmp_path / "out.svg"
+    assert cli.main(["render", str(src), "--id-prefix", 'bad"prefix', "-o", str(out)]) == 2
+    assert "id_prefix" in capsys.readouterr().err and not out.exists()

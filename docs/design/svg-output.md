@@ -1,6 +1,6 @@
 # Design: the SVG output contract (hooks for interactive use)
 
-**Status:** proposed **Related:** [`renderer.md`](renderer.md) (what is drawn and where; this doc is about how the
+**Status:** current **Related:** [`renderer.md`](renderer.md) (what is drawn and where; this doc is about how the
 drawing is organised in the document), [`ir.md`](ir.md) (the identities and facts the hooks carry).
 
 ## Overview
@@ -49,9 +49,9 @@ once and is reviewed as a rendering change (`CLAUDE.md`, Committing).
 ### Every drawn thing belongs to a group that names its IR fact
 
 The document is organised as groups, one per pedigree element, in the existing draw order. Each group's `class` says
-what kind of element it is and which drawn states apply; its data attributes carry the identity and facts a consumer
-selects on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a
-rule can reach the symbol, a status mark or a label line on its own.
+what kind of element it is and which states apply; its data attributes carry the identity and facts a consumer selects
+on; its `id` is the drawn position under the tile's prefix. Inside a group the parts keep their own class so a rule can
+reach the symbol, a status mark or a label line on its own.
 
 For one individual — a woman at II-3 who carries the pedigree's first condition, is deceased and is the proband — the
 emitted markup has this shape (coordinates elided):
@@ -84,20 +84,22 @@ not depend on styling:
 
 1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
    link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
-1. **`fill`** — status paint, clipped to the shape: the full shape when affected, a legend-indexed region when a
-   carrier. Status is always a `fill` part and never the backing's colour, so one selector reaches all status paint and
-   the multi-condition quadrants (`renderer.md`, not yet drawn) join the same scheme.
+1. **`fill`** — status paint inside the shape: the full shape when affected, a legend-indexed region when a carrier, or
+   the central dot an X-linked carrier gets under the inheritance-glyph style. Status is always a `fill` part naming its
+   condition and never the backing's colour, so one selector reaches all status paint and the multi-condition quadrants
+   (`renderer.md`, not yet drawn) join the same scheme.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: today the
    region rectangle is drawn last and covers the inner half of the stroke on the filled side, which is invisible while
    both are black and visibly uneven the moment a consumer colours the stroke. Visually the two orders are identical at
    the default styling, so the goldens' appearance does not change.
-1. **`mark`** — slash, presymptomatic line, question mark, arrow: over the outline, as they cross it.
+1. **`mark`** — slash, presymptomatic line, question mark, arrow: over the outline, as they cross or leave it.
 1. **`label`** — the text lines.
-1. **`hit`** — a rectangle covering the symbol and the reserved label box, no fill, `pointer-events="all"`, drawn last.
-   It is the one element a consumer needs for hover and click: it catches the gaps between a thin arrow, the outline and
-   the labels, it does not move when the visible parts are restyled or hidden, and its extent *is* the minimum label box
-   below, so a consumer reads the region it may draw into straight from the geometry. Matings get the same treatment, a
-   wide transparent stroke over the thin line, so a couple's line is as easy to point at as a symbol.
+1. **`hit`** — a rectangle covering the symbol, the reserved label box and, for a proband or consultand, the arrow; no
+   fill, `pointer-events="all"`, drawn last. It is the one element a consumer needs for hover and click: it catches the
+   gaps between a thin arrow, the outline and the labels, and it does not move when the visible parts are restyled or
+   hidden. For an individual without an arrow its extent *is* the reserved label box below, so a consumer reads the
+   region it may draw into straight from the geometry. Matings get the same treatment, a wide transparent stroke over
+   the thin line, so a couple's line is as easy to point at as a symbol.
 
 Two shapes per individual instead of one is the cost; both carry the same coordinates, and the clip path is unchanged.
 
@@ -106,15 +108,20 @@ The groups, and what each promises:
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
   legend**: the same order the drawer uses to pick which region of a divided symbol a carrier fills (`renderer.md`,
-  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it.
+  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it. When any
+  individual has an unnamed condition (the figure's sole, unlabelled one) the array ends with an empty string, so every
+  condition has an index.
 - **`individual`** — one per drawn cell. Identity is the drawn position and its two components; gender; the external id
   when present; and one `data-condition-i` per condition the individual has, whose value is the status (affected,
-  carrier, presymptomatic, unknown). State classes mirror the marks drawn: `affected`, `carrier`, `presymptomatic`,
-  `deceased`, `proband`, `consultand`. A **ghost** — the duplicated partner of a cross-generation join — is an
-  `individual ghost` group with the *same* data attributes as the real cell and a `ghost-` id, so selecting by position
-  lights both and selecting by id lights one.
+  carrier, presymptomatic, unknown). State classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`,
+  `deceased`, `proband`, `consultand` — not the subset of marks the drawer chose to draw, so a consumer selects on what
+  is true of the person. A **ghost** — the duplicated partner of a cross-generation join — is an `individual ghost`
+  group with the *same* classes and data attributes as the real cell and a `ghost-` id (with an ordinal suffix when one
+  individual is ghosted more than once), so selecting by position lights both, selecting by id lights one, and
+  `.individual:not(.ghost)` counts people.
 - **`mating`** — the line or double line between an adjacent couple, a routed edge for an overflow mating, or the
-  childless glyph. It names both partners' positions and carries `consanguineous` and the childlessness kind as classes.
+  childless glyph. It names both partners' positions and carries `consanguineous`, `routed` and the childlessness kind
+  as classes.
 - **`sibship`** — a descent drop, sib bar, child stubs and any twin bar, as one group naming the parent couple's
   positions (or the single parent's); a founder sibship's hanger is a `sibship founder` group with no parents.
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
@@ -152,10 +159,11 @@ against the first figure's clip geometry.
 Only the caller knows what else its page holds, so the namespace is a **render argument**: every function that produces
 a document (`render_svg`, `render_set_svg`, `render_svgs`) and the `render` command take an id prefix that goes in front
 of every id and every id reference in the output — individuals, ghosts, clip paths, and the tile prefix composed under
-it, so `#fig2-p1-ind-II-3` is figure 2, family 2, II-3. The default is empty, which leaves single-figure output and the
-goldens as they are. Data attributes and classes need no namespace: a consumer scopes them under the root or a
-`pedigree` group, and that is the selector to prefer inside one figure; the id is for reaching across figures and for
-the document's own references.
+it, so `#fig2-p1-ind-II-3` is figure 2, family 2, II-3. A prefix must be an id-safe token (it starts an XML id and sits
+inside a `url(#…)` reference), and the renderer refuses anything else rather than emit a document that is not
+well-formed. The default is empty, which leaves single-figure output and the goldens as they are. Data attributes and
+classes need no namespace: a consumer scopes them under the root or a `pedigree` group, and that is the selector to
+prefer inside one figure; the id is for reaching across figures and for the document's own references.
 
 ### A semantic change is a re-render, and nodes stay put
 
