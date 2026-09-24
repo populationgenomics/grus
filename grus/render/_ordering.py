@@ -399,8 +399,8 @@ def _rank_units(model: _Model, order_map: dict[int, list[int]], r: int) -> list[
         if i in placed:
             continue
         atom = model.atom_of[i]
-        # Members in their current order (a flipped couple reads back flipped); ``model.atom_of`` holds the
-        # canonical (IR partner) order that ``_transpose_rank`` prefers on ties.
+        # Members in their current order (a reversed atom reads back reversed); ``model.atom_of`` holds the
+        # canonical orientation (fewest birth-order inversions, then identity) that ``_transpose_rank`` prefers.
         units.append(tuple(n for n in current if n in atom))
         placed.update(atom)
     return units
@@ -475,10 +475,10 @@ def _birth_gain(birth: dict[int, tuple[int, int]], left: tuple[int, ...], right:
 
 
 def _transpose(model: _Model, order_map: dict[int, list[int]]) -> None:
-    """Adjacent-unit swaps and couple flips (dot's ``transpose``).
+    """Adjacent-unit swaps and atom reversals (dot's ``transpose``).
 
-    A swap is accepted on a strict crossing decrease or, on a crossing tie, a strict birth-order improvement /
-    a couple's return to canonical order.
+    A move is accepted on a strict crossing decrease or, on a crossing tie, a strict birth-order improvement /
+    an atom's return to its canonical orientation.
     """
     birth = model.birth
     changed = True
@@ -516,14 +516,15 @@ def _swap_gain(
 
 
 def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birth: dict[int, tuple[int, int]]) -> bool:
-    """One transpose pass over rank ``r``: couple flips, then adjacent-unit swaps (dot's ``transpose``).
+    """One transpose pass over rank ``r``: atom reversals, then adjacent-unit swaps (dot's ``transpose``).
 
-    Every move is priced by the local ``_swap_gain`` — the exact change in ``_neighbour_cost`` — and accepted
-    on a strict crossing decrease. On a crossing tie, an adjacent swap is taken when it strictly reduces
-    birth-order inversions (``_birth_gain``), and a couple standing in non-canonical order (reversed from the
-    IR's partner order) is restored. So among equal-crossing orders birth order, then the IR's partner order,
-    are the weak preferences. Terminates: each accepted move strictly decreases (crossings, inversions) except
-    a canonical restore, which fires at most once per couple between such moves.
+    Every move is priced by the local ``_swap_gain`` — the exact change in ``_neighbour_cost``; a reversal's is
+    the sum over its member pairs — and accepted on a strict crossing decrease. On a crossing tie, a move is
+    taken when it strictly reduces birth-order inversions, and an atom standing reversed from its canonical
+    orientation (fewest inversions, then identity) is restored. So among equal-crossing orders birth order,
+    then identity, are the weak preferences. Terminates: each accepted move strictly decreases (crossings,
+    inversions, atoms out of canonical orientation), and a canonical atom never has more inversions than its
+    reverse, so a birth repair and a canonical restore cannot undo each other.
     """
     improved = False
     units = _rank_units(model, order_map, r)
@@ -560,8 +561,10 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
 def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
     """Exact per-rank search on ranks with few atoms.
 
-    Enumerate atom permutations and couple flips, keep the min-crossing order (tie-broken by the smallest
-    identity sequence). Makes small boundary-bridge ranks provably optimal and their choice deterministic.
+    Enumerate atom permutations and reversals, keep the min-crossing order (tie-broken by fewer birth-order
+    inversions, then the smallest identity sequence — the objective's order, so the settled map is not thrown
+    away for trading birth order for identity). Makes small boundary-bridge ranks provably optimal and their
+    choice deterministic.
     """
     for _ in range(2):  # two settling passes; small and convergent
         for r in range(model.min_rank, model.max_rank + 1):
@@ -570,14 +573,14 @@ def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
                 continue
             variants = [[unit, tuple(reversed(unit))] if len(unit) >= 2 else [unit] for unit in units]
             best_order: list[int] | None = None
-            best_key: tuple[int, tuple[tuple[int, int], ...]] | None = None
+            best_key: tuple[int, int, tuple[tuple[int, int], ...]] | None = None
             for perm in itertools.permutations(range(len(units))):
                 for choice in itertools.product(*(range(len(v)) for v in variants)):
                     seq = [i for u in perm for i in variants[u][choice[u]]]
                     order_map[r] = seq
                     cost = _neighbour_cost(model, order_map, r)
                     ident = tuple(model.ident(i) for i in seq if not model.is_mating(i))
-                    key = (cost, ident)
+                    key = (cost, _inversions(model.birth, seq), ident)
                     if best_key is None or key < best_key:
                         best_key, best_order = key, list(seq)
             assert best_order is not None
