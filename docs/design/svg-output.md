@@ -111,21 +111,24 @@ The groups, and what each promises:
   Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it. When any
   individual has an unnamed condition (the figure's sole, unlabelled one) the array ends with an empty string, so every
   condition has an index.
-- **`individual`** — one per drawn cell. Identity is the drawn position and its two components; gender; the external id
-  when present; and one `data-condition-i` per condition the individual has, whose value is the status (affected,
-  carrier, presymptomatic, unknown). State classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`,
-  `deceased`, `proband`, `consultand` — not the subset of marks the drawer chose to draw, so a consumer selects on what
-  is true of the person. A **ghost** — the duplicated partner of a cross-generation join — is an `individual ghost`
-  group with the *same* classes and data attributes as the real cell and a `ghost-` id (with an ordinal suffix when one
-  individual is ghosted more than once), so selecting by position lights both, selecting by id lights one, and
-  `.individual:not(.ghost)` counts people.
+- **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
+  Identity is the drawn position and its two components; gender; the external id when present; and one
+  `data-condition-i` per condition the individual has, whose value is the status (affected, carrier, presymptomatic,
+  unknown). State classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`, `deceased`, `proband`,
+  `consultand` — not the subset of marks the drawer chose to draw, so a consumer selects on what is true of the person.
+  A **ghost** — the duplicated partner of a cross-generation join — is an `individual ghost` group with the *same*
+  classes and data attributes as the real cell and a `ghost-` id (with an ordinal suffix when one individual is ghosted
+  more than once), so selecting by position lights both, selecting by id lights one, and `.individual:not(.ghost)`
+  counts people.
 - **`mating`** — the line or double line between an adjacent couple, a routed edge for an overflow mating, or the
   childless glyph. It names both partners' positions and carries `consanguineous`, `routed` and the childlessness kind
   as classes.
 - **`sibship`** — a descent drop, sib bar, child stubs and any twin bar, as one group naming the parent couple's
-  positions (or the single parent's); a founder sibship's hanger is a `sibship founder` group with no parents.
+  positions (or the single parent's); a founder sibship's hanger is a `sibship founder` group with no parents. When the
+  children are drawn more than one row below their parents, the one group also holds the line through every row between,
+  so its parents and children can be several rows apart.
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
-- **`generation`** — each Roman-numeral marker, naming its row.
+- **`generation`** — each Roman-numeral marker, naming its row by IR generation.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's

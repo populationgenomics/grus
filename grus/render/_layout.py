@@ -192,12 +192,16 @@ class _Graph:
     partnerless: list[_Mating] = field(default_factory=list)  # founder sibships (matings with no drawn partner)
     foundersib_members: set[int] = field(default_factory=set)  # individuals grouped by a partnerless mating
     level: list[int] = field(default_factory=list)
+    passthrough_to: dict[int, int] = field(default_factory=dict)  # pass-through -> first real child it leads to
 
     @property
     def n(self) -> int:
         return len(self.individuals)
 
     def label(self, i: int) -> str:
+        """The drawn position of ``i``; a pass-through names the descent it carries, which is in the input."""
+        if i in self.passthrough_to:
+            return f"descent to {self.label(self.passthrough_to[i])}"
         ind = self.individuals[i]
         return f"{ind.generation}-{ind.index}"
 
@@ -423,9 +427,9 @@ def _insert_passthroughs(g: _Graph) -> frozenset[int]:
     sibship's), the mating's offspring become one pass-through on the next row; each pass-through is the lone
     parent of the next; the last is the lone parent of the real children, keeping their birth order and twin
     groups. After this every parent -> child edge joins adjacent rows, which is all the ordering, x-solve and
-    ``_build`` handle. A pass-through's identity is ``(row generation, 1_000_000 * child generation + child
-    index)`` of the sibship's first child: stable under a shuffle of the input and distinct from every real
-    individual, so the ordering's tie-break stays deterministic.
+    ``_build`` handle. A pass-through's identity is ``(row generation, -(1_000_000 * child generation + child
+    index))`` from the sibship's first child: stable under a shuffle of the input, and negative, so it can never
+    equal a real individual's (indexes are >= 1) and the ordering's tie-break stays deterministic.
 
     Mutates ``g`` in place (appends the pass-through individuals and their lone-parent matings, rewrites the
     spanning mating's offspring and the parent pointers); returns the pass-through indices.
@@ -445,11 +449,12 @@ def _insert_passthroughs(g: _Graph) -> frozenset[int]:
             g.individuals.append(
                 pb.Individual(
                     generation=first_child.generation - (top + gap - row),
-                    index=1_000_000 * first_child.generation + first_child.index,
+                    index=-(1_000_000 * first_child.generation + first_child.index),
                 )
             )
             g.level.append(row)
             g.matings_of[cell] = []
+            g.passthrough_to[cell] = mr.offspring[0].child
             chain.append(cell)
             passthrough.add(cell)
         head = _Mating(
@@ -484,8 +489,8 @@ def _build(
     ghost_of: dict[int, int],
     foundersib_groups: list[tuple[int, ...]],
     *,
-    first_generation: int = 1,
-    passthrough: frozenset[int] = frozenset(),
+    first_generation: int,
+    passthrough: frozenset[int],
 ) -> Layout:
     """Bucket placed individuals into per-level arrays and derive fam / spouse / twins / founder sibships."""
     base_x = min(xpos.values()) if xpos else 0.0

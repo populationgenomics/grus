@@ -508,3 +508,26 @@ def test_couple_across_generations_defers() -> None:
     )
     with pytest.raises(render.DeferredFeatureError, match="spans generations 1 and 2"):
         render.layout(p)
+
+
+def test_deferral_names_the_descent_not_a_passthrough() -> None:
+    # I-1's third mating overflows (routed), and its child is drawn a row lower: the deferral names the real
+    # child, not the synthetic pass-through carrying its descent.
+    i = test_render._ind
+    p = pb.Pedigree(
+        individuals=[i(1, 1), i(1, 2), i(1, 3), i(1, 4), i(2, 1), i(2, 2), i(3, 1)],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=1, index=1),
+                partner_b=pb.Position(generation=1, index=k),
+                offspring=[pb.Offspring(child=child)],
+            )
+            for k, child in (
+                (2, pb.Position(generation=2, index=1)),
+                (3, pb.Position(generation=2, index=2)),
+                (4, pb.Position(generation=3, index=1)),
+            )
+        ],
+    )
+    with pytest.raises(render.DeferredFeatureError, match="'descent to 3-1'"):
+        render.layout(p)
