@@ -182,12 +182,23 @@ def test_couples_are_adjacent(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
+    # Except a sibship holding a partner of a cross-lineage marriage: that child is pulled to stand beside its mate
+    # (cousins_across_family), and the drawing routes its descent down, across and down.
     p = _load(name)
     at = _coords(render.layout(p))
     idx = _index(p)
+    has_parents = {_pos(o.child) for m in p.matings if m.HasField("partner_a") for o in m.offspring}
+    cross = {
+        _pos(x)
+        for m in p.matings
+        if m.HasField("partner_b") and _pos(m.partner_a) in has_parents and _pos(m.partner_b) in has_parents
+        for x in (m.partner_a, m.partner_b)
+    }
     for m in p.matings:
         if not m.offspring or not m.HasField("partner_a"):
             continue  # a founder sibship centres under an implied hanger, not drawn parents
+        if any(_pos(o.child) in cross for o in m.offspring):
+            continue  # a cross-lineage partner stands beside its mate (see above)
         parent_x = [at[idx[_pos(m.partner_a)]][2]]
         if m.HasField("partner_b"):
             parent_x.append(at[idx[_pos(m.partner_b)]][2])

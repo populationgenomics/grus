@@ -63,8 +63,8 @@ stages:
    sees the surviving (blockable) matings plus the `routed` set.
 1. **Ordering** — the left→right order within each rank, over the surviving blocks. Deterministic heuristic
    (weighted-median + transposition sweeps, as in `dot`); a small exact search only where the pruned space is tiny. The
-   objective is lexicographic — **crossings, then birth-order inversions, then total edge length** — and the loop keeps
-   the best iterate under it on strict improvement, stopping when a down+up round changes nothing (not at the first
+   objective is lexicographic — **torn sibships, then crossings, then birth-order inversions, then total edge length** —
+   and the loop keeps the best iterate under it on strict improvement, stopping when a down+up round changes nothing (not at the first
    zero-crossing order: the settling pass is what puts a parent over its child among equal-crossing orders). Each
    transposition move is priced locally (the two swapped units' endpoint pairs, `dot`'s in/out-cross) and accepted on a
    strict crossing decrease, or on a tie when it strictly repairs birth order or returns an atom to its canonical

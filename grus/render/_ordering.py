@@ -84,6 +84,11 @@ class _Model:
         self._resolve_overflow()
         self._build_layers()
         self._build_atoms()
+        # Each drawn sibship's children, grouped by the rank they sit on: what sibship contiguity is measured over.
+        self.sibships_on: dict[int, list[tuple[int, ...]]] = defaultdict(list)
+        for mr in g.matings:
+            if self._drawn(mr) and mr.kids:
+                self.sibships_on[self.rank[mr.kids[0]]].append(mr.kids)
 
     # -- node helpers --
     def mnode(self, mi: int) -> int:
@@ -533,9 +538,17 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
         adj_pos.append((model.up, _positions(order_map, r - 1)))
     if r < model.max_rank:
         adj_pos.append((model.down, _positions(order_map, r + 1)))
+    torn = model.sibships_on.get(r) is not None
+
+    def overlaps(trial: list[tuple[int, ...]]) -> int:
+        return _rank_overlaps(model, r, [i for a in trial for i in a]) if torn else 0
+
+    current = overlaps(units)
     for u, unit in enumerate(units):  # atom reversals (a couple flip is the two-member case)
         if len(unit) < 2:
             continue
+        flipped = tuple(reversed(unit))
+        after = overlaps([*units[:u], flipped, *units[u + 1 :]])
         # Reversing a unit flips the relative order of every pair in it, and a crossing depends only on relative
         # order, so the reversal's crossing change is the sum of its pairwise swap gains.
         gain = sum(
@@ -543,16 +556,23 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
             for a in range(len(unit))
             for b in range(a + 1, len(unit))
         )
-        flipped = tuple(reversed(unit))
         canonical = unit == model.atom_of[unit[0]]
         birth_gain = _inversions(birth, unit) - _inversions(birth, flipped)
-        if gain > 0 or (gain == 0 and (birth_gain > 0 or (birth_gain == 0 and not canonical))):
+        if after < current or (
+            after == current and (gain > 0 or (gain == 0 and (birth_gain > 0 or (birth_gain == 0 and not canonical))))
+        ):
             units[u] = flipped
+            current = after
             improved = True
     for k in range(len(units) - 1):  # adjacent-unit swaps
+        trial = [*units[:k], units[k + 1], units[k], *units[k + 2 :]]
+        after = overlaps(trial)
         gain = _swap_gain(model, adj_pos, units[k], units[k + 1])
-        if gain > 0 or (gain == 0 and _birth_gain(birth, units[k], units[k + 1]) > 0):
+        if after < current or (
+            after == current and (gain > 0 or (gain == 0 and _birth_gain(birth, units[k], units[k + 1]) > 0))
+        ):
             units[k], units[k + 1] = units[k + 1], units[k]
+            current = after
             improved = True
     order_map[r] = [i for a in units for i in a]
     return improved
@@ -573,14 +593,14 @@ def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
                 continue
             variants = [[unit, tuple(reversed(unit))] if len(unit) >= 2 else [unit] for unit in units]
             best_order: list[int] | None = None
-            best_key: tuple[int, int, tuple[tuple[int, int], ...]] | None = None
+            best_key: tuple[int, int, int, tuple[tuple[int, int], ...]] | None = None
             for perm in itertools.permutations(range(len(units))):
                 for choice in itertools.product(*(range(len(v)) for v in variants)):
                     seq = [i for u in perm for i in variants[u][choice[u]]]
                     order_map[r] = seq
                     cost = _neighbour_cost(model, order_map, r)
                     ident = tuple(model.ident(i) for i in seq if not model.is_mating(i))
-                    key = (cost, _inversions(model.birth, seq), ident)
+                    key = (_rank_overlaps(model, r, seq), cost, _inversions(model.birth, seq), ident)
                     if best_key is None or key < best_key:
                         best_key, best_order = key, list(seq)
             assert best_order is not None
@@ -619,9 +639,39 @@ def _birth_order_inversions(model: _Model, order_map: dict[int, list[int]]) -> i
     return total
 
 
-def _objective(model: _Model, order_map: dict[int, list[int]]) -> tuple[int, int, int]:
-    """Lexicographic: crossings, then birth-order inversions, then edge length."""
+def _rank_overlaps(model: _Model, r: int, order: list[int]) -> int:
+    """Pairs of sibships on rank ``r`` whose child spans overlap under ``order`` — a torn sibship.
+
+    A sibship is torn when another sibship's child stands between its first and last child, so their sib bars
+    would overlap and a child read as issue of several matings. A spouse standing among siblings is not a child
+    of another sibship there and tears nothing (published figures draw spouses inside sibships routinely).
+    """
+    pos = {node: k for k, node in enumerate(order)}
+    spans = sorted(
+        (min(pos[c] for c in kids), max(pos[c] for c in kids))
+        for kids in model.sibships_on.get(r, ())
+        if all(c in pos for c in kids)
+    )
+    overlaps = 0
+    for a in range(len(spans)):
+        for b in range(a + 1, len(spans)):
+            if spans[b][0] > spans[a][1]:
+                break
+            overlaps += 1
+    return overlaps
+
+
+def _total_overlaps(model: _Model, order_map: dict[int, list[int]]) -> int:
+    return sum(_rank_overlaps(model, r, order_map.get(r, [])) for r in model.sibships_on)
+
+
+def _objective(model: _Model, order_map: dict[int, list[int]]) -> tuple[int, int, int, int]:
+    """Lexicographic: torn sibships, then crossings, then birth-order inversions, then edge length.
+
+    Sibship contiguity is strong and crossings weak (layout-v2.md), so no number of crossings buys a torn sibship.
+    """
     return (
+        _total_overlaps(model, order_map),
         _total_crossings(model, order_map),
         _birth_order_inversions(model, order_map),
         _edge_length(model, order_map),
