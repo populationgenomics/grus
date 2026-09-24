@@ -1,0 +1,13 @@
+id: "lone_parent_sibships"
+labels { text: "A lone parent's two half-sibships, each from a line to an omitted partner" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 1 gender: GENDER_WOMAN proband: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 1 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 3 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 4 index: 1 gender: GENDER_MAN conditions { status: CONDITION_STATUS_AFFECTED } }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } }
+matings { partner_a { generation: 2 index: 1 } offspring { child { generation: 3 index: 1 } } offspring { child { generation: 3 index: 2 } } }
+matings { partner_a { generation: 2 index: 1 } offspring { child { generation: 3 index: 3 } } }
+matings { partner_a { generation: 3 index: 1 } offspring { child { generation: 4 index: 1 } } }

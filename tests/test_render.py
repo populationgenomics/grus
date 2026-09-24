@@ -184,7 +184,8 @@ def test_couples_are_adjacent(name: str) -> None:
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
     p = _load(name)
-    at = _coords(render.layout(p))
+    lay = render.layout(p)
+    at = _coords(lay)
     idx = _index(p)
     for m in p.matings:
         if not m.offspring or not m.HasField("partner_a"):
@@ -192,6 +193,16 @@ def test_children_lie_within_parent_span(name: str) -> None:
         parent_x = [at[idx[_pos(m.partner_a)]][2]]
         if m.HasField("partner_b"):
             parent_x.append(at[idx[_pos(m.partner_b)]][2])
+        else:  # a lone parent's descent drops from its line to the omitted partner, the phantom beside it
+            level, col, _ = at[idx[_pos(m.partner_a)]]
+            mate = [c for c in (col - 1, col + 1) if 0 <= c < lay.n[level] and lay.nid[level][c] in lay.phantom]
+            assert mate, f"{name}: lone parent {_pos(m.partner_a)} has no phantom partner"
+            partner_of = {lay.nid[level][c]: c for c in mate}
+            kid_level, kid_col, _ = at[idx[_pos(m.offspring[0].child)]]
+            pc = lay.fam[kid_level][kid_col]
+            phantom_col = pc + 1 if pc == col else pc
+            assert lay.nid[level][phantom_col] in partner_of
+            parent_x.append(lay.pos[level][phantom_col])
         midpoint = sum(parent_x) / len(parent_x)
         child_x = [at[idx[_pos(o.child)]][2] for o in m.offspring]
         assert min(child_x) - _EPS <= midpoint <= max(child_x) + _EPS

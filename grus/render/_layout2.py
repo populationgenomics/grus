@@ -90,6 +90,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
         foundersib_groups,
         first_generation=prep.first_generation,
         passthrough=prep.passthrough,
+        phantom=prep.phantom,
     )
 
     routed = _routed_matings(g, built, ordering.routed)
@@ -114,10 +115,11 @@ class _Prepared:
     cross: set[int]
     first_generation: int
     passthrough: frozenset[int]
+    phantom: frozenset[int]
 
 
 def _prepare(p: pb.Pedigree) -> _Prepared:
-    """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, pass-throughs.
+    """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, phantoms, pass-throughs.
 
     Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
     couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
@@ -128,8 +130,9 @@ def _prepare(p: pb.Pedigree) -> _Prepared:
     cross = _layout._cross_matings(g)
     _layout._detect_loops(g, cross)
     first_generation = _layout._rank(g)
+    phantom = _layout._insert_phantoms(g)
     passthrough = _layout._insert_passthroughs(g)
-    return _Prepared(g, ghost_of, cross, first_generation, passthrough)
+    return _Prepared(g, ghost_of, cross, first_generation, passthrough, phantom)
 
 
 def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[int]) -> list[_layout.RoutedMating]:
@@ -167,9 +170,8 @@ def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
     midpoint, or a lone parent's x), so two failures read as a false family:
 
     * **a mixed group**: a drawn group whose children are not exactly one mating's, drawn from that mating's
-      partners. ``fam`` records only the parent's column, so two sibships of one lone parent become one group
-      (three full siblings where the IR has two half-sibships), and a lone-parent sibship of someone with a mate
-      is drawn from the couple.
+      partners. ``fam`` records only the parent's column; phantom partners give each lone-parent mating its own
+      couple, so this is a layout bug the check keeps from reaching a figure.
     * **meeting bars**: two groups on a row whose bars overlap or touch. A drop beside its children extends its
       bar toward them (``_draw._sibship``), and where it reaches a neighbouring bar the two read as one sibship
       with two sets of parents. Children's spans alone never meet (ordering keeps sibships contiguous), so the
@@ -251,7 +253,10 @@ def _x_model(
     blocks: list[list[_Block]],
     geom: _geometry.Geometry,
 ) -> _xsolve.Model:
-    """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch."""
+    """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch.
+
+    A line to an omitted partner (a phantom) has no stretch cost; see below.
+    """
     rows = lay.nid
     gaps = tuple((row[k], row[k + 1], seps[level][k]) for level, row in enumerate(rows) for k in range(len(row) - 1))
     # A bonded pair sits exactly its row separation apart. Taken from ``seps`` directly, not as a difference of the
@@ -259,10 +264,12 @@ def _x_model(
     # arithmetic, contradict the pair's ``>= sep`` gap.
     rigid = tuple((rows[level][a], rows[level][b], seps[level][a]) for level, a, b in _block_pairs(blocks))
     bonded = {(rows[level][a], rows[level][b]) for level, a, b in _block_pairs(blocks)}
+    # A line to an omitted partner (a phantom) has no partner symbol to hold near, so its length costs nothing
+    # here: it stretches as far as centring its drop needs, and compactness (levels 2-3) keeps it no longer.
     couples = tuple(
         (left, right, geom.couple_gap, geom.sib_gap - geom.couple_gap)
         for left, right in _couples(lay)
-        if (left, right) not in bonded
+        if (left, right) not in bonded and left not in lay.phantom and right not in lay.phantom
     )
     return _xsolve.Model(
         cells=tuple(c for row in rows for c in row),

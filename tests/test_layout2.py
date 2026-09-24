@@ -601,13 +601,26 @@ def _lone_parent_pedigree(with_mate: bool) -> pb.Pedigree:
     return p
 
 
-@pytest.mark.parametrize("with_mate", [False, True])
-def test_a_lone_parents_second_sibship_defers(with_mate: bool) -> None:
-    # The layout records a child's parent by column, so II-1's second, lone-parent sibship joined the first: three
-    # full siblings where the IR has two half-sibships (review-set figure c09), or III-3 drawn as II-1 and II-2's.
-    # Until the layout records each child's mating, the layout defers rather than draw a false family.
-    with pytest.raises(render.DeferredFeatureError, match="lone parent's sibships"):
-        render.layout(_lone_parent_pedigree(with_mate))
+@pytest.mark.parametrize(
+    ("with_mate", "sibships"),
+    [
+        (False, {("II-1", "III-1 III-2"), ("II-1", "III-3")}),
+        (True, {("II-1 II-2", "III-1 III-2"), ("II-1", "III-3")}),
+    ],
+)
+def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple[str, str]]) -> None:
+    # The layout recorded a child's parent by column, so II-1's lone-parent sibship joined its other one: three full
+    # siblings where the IR has two half-sibships (review-set figure c09), or III-3 drawn as II-1 and II-2's. Each
+    # lone-parent mating now has a phantom partner, drawn as a marriage line to an omitted partner as the literature
+    # draws it, so each sibship drops from its own line.
+    svg = render.render_svg(_lone_parent_pedigree(with_mate))
+    drawn = set(re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)"', svg))
+    assert {s for s in drawn if s[1].startswith("III")} == sibships
+    omitted = re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg)
+    assert omitted == (["II-1"] if with_mate else ["II-1", "II-1"])
+    assert "ind-III-4" not in svg and svg.count('class="individual') == len(
+        _lone_parent_pedigree(with_mate).individuals
+    )
 
 
 def test_meeting_sib_bars_defer() -> None:

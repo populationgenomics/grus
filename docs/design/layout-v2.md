@@ -53,6 +53,12 @@ spaced like a symbol and drawn as the line through its row. A couple always shar
 partners are on different generations, becomes a same-row couple by duplicating the shallower partner as a **ghost** on
 the deeper row; any other couple across generations has no drawn form and defers.
 
+A **lone-parent mating** (the other parent omitted from the figure) gets a **phantom partner** cell beside the parent,
+so it is an ordinary couple to ordering and the x-solve, and drawing emits a marriage line to where the partner would
+stand and no symbol — as the literature draws an omitted partner. Each lone-parent sibship then drops from its own line,
+so a parent's half-sibships by different, undrawn partners never share a drop and bar. A phantom's line carries no
+stretch cost: with no partner symbol its length means nothing, so it stretches as far as centring its drop needs.
+
 ### The solve (x-positions)
 
 Continuous x per individual and per mating node (a mating node sits between its partners; descent drops from it). Three
@@ -102,7 +108,7 @@ Non-overlap is always satisfiable in 1-D, so layout **rarely fails**: the worst 
 drawing, a strictly better contract than v1's "detect and defer". The residual deferrals (`DeferredFeatureError`, drawn
 as a placeholder — never a wrong drawing) are listed in [`renderer.md`](renderer.md) "Deferred": an interlocking loop, a
 child of more than one mating, a routed union *with offspring*, sib bars that meet (a torn sibship, or a drop's bar
-extension reaching a neighbour's), a lone parent's second sibship.
+extension reaching a neighbour's).
 
 ### Soft constraints — a strength hierarchy, relaxed lexicographically (not a weighted sum)
 

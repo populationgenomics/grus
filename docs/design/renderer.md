@@ -155,9 +155,8 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
   > 2-mate individual whose overflow mating bears children defers rather than mislay the descent (`_build`).
 - **Sib bars that meet** — two sibships whose drawn bars overlap or touch on a row: a torn sibship, or a drop the
   x-solve leaves beside its children whose bar extension reaches a neighbour's. Either reads as one sibship with several
-  sets of parents (`_overlapping_sibships`).
-- **A lone parent's second sibship** — the `Layout` records a child's parent by column, so two sibships of one lone
-  parent would draw as one, and a lone-parent sibship of someone with a mate would draw from the couple.
+  sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
+  the check keeps from reaching a figure (`_overlapping_sibships`).
 
 ## Alternatives considered
 

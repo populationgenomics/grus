@@ -399,8 +399,10 @@ class _Draw:
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
     def _cell_w(self, idx: int) -> float:
-        """The width cell ``idx``'s label stack reserves; a pass-through draws a line only, and reserves none."""
-        return 0.0 if idx in self.lay.passthrough else self._label_w(self._ind_at(idx))
+        """The width cell ``idx``'s label stack reserves; a pass-through or phantom is a line only and reserves none."""
+        if idx in self.lay.passthrough or idx in self.lay.phantom:
+            return 0.0
+        return self._label_w(self._ind_at(idx))
 
     def _label_w(self, ind: pb.Individual) -> float:
         """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
@@ -460,7 +462,8 @@ class _Draw:
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
             for k, x in enumerate(row):
-                extent = max(self.half, self._cell_w(self.lay.nid[level][k]) / 2)
+                idx = self.lay.nid[level][k]
+                extent = 0.0 if idx in self.lay.phantom else max(self.half, self._cell_w(idx) / 2)
                 los.append(self._px[x] - extent)
                 his.append(self._px[x] + extent)
         return (min(los), max(his)) if los else (0.0, 0.0)
@@ -533,18 +536,23 @@ class _Draw:
                 if not kind:
                     continue
                 childless = self.lay.childless[level][k] if level < len(self.lay.childless) else 0
-                classes = ["mating"]
+                left, right = self.lay.nid[level][k], self.lay.nid[level][k + 1]
+                classes = ["mating"] + (["partner-omitted"] if {left, right} & self.lay.phantom else [])
                 if kind == 2:
                     classes.append("consanguineous")
                 if childless == int(pb.CHILDLESSNESS_BY_CHOICE):
                     classes.append("childless-by-choice")
                 elif childless == int(pb.CHILDLESSNESS_INFERTILITY):
                     classes.append("childless-infertility")
-                partners = f"{self._cell_position(level, k)} {self._cell_position(level, k + 1)}"
+                partners = " ".join(
+                    self._cell_position(level, c) for c in (k, k + 1) if self.lay.nid[level][c] not in self.lay.phantom
+                )
                 out.append(_open_g(classes, {"data-partners": partners}))
                 y = self.py(level)
-                x1 = self.px(self.lay.pos[level][k]) + self.half
-                x2 = self.px(self.lay.pos[level][k + 1]) - self.half
+                # A line leaves each drawn partner's edge; at an omitted partner it ends where that partner would
+                # stand (the phantom's centre), as the literature draws a partner left out of the figure.
+                x1 = self.px(self.lay.pos[level][k]) + (0.0 if left in self.lay.phantom else self.half)
+                x2 = self.px(self.lay.pos[level][k + 1]) - (0.0 if right in self.lay.phantom else self.half)
                 if kind == 2:
                     off = self.geom.double_line_offset / 2
                     out.append(_line(x1, y - off, x2, y - off))
@@ -644,9 +652,12 @@ class _Draw:
                     ]
                     top_pc = self.lay.fam[top_level][top_pc]
                     top_level -= 1
-                parents = [self._cell_position(top_level, top_pc)]
-                if self.lay.spouse[top_level][top_pc]:
-                    parents.append(self._cell_position(top_level, top_pc + 1))
+                heads = [top_pc, top_pc + 1] if self.lay.spouse[top_level][top_pc] else [top_pc]
+                parents = [
+                    self._cell_position(top_level, c)
+                    for c in heads
+                    if self.lay.nid[top_level][c] not in self.lay.phantom
+                ]
                 children = " ".join(self._cell_position(level, k) for k in groups[pc])
                 out.append(_open_g(["sibship"], {"data-parents": " ".join(parents), "data-children": children}))
                 out += hops
@@ -759,6 +770,8 @@ class _Draw:
                 idx = self.lay.nid[level][k]
                 if idx in self.lay.passthrough:
                     continue  # a descent's line through this row, drawn by _descents
+                if idx in self.lay.phantom:
+                    continue  # an omitted partner: only its marriage line is drawn, by _matings
                 cx, cy = self.px(self.lay.pos[level][k]), self.py(level)
                 real = self.lay.ghost_of.get(idx)
                 if real is not None:
