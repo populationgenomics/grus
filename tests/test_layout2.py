@@ -573,3 +573,47 @@ def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
         "2-3",
         "2-6",
     ]
+
+
+def _pos(g: int, i: int) -> pb.Position:
+    return pb.Position(generation=g, index=i)
+
+
+def _lone_parent_pedigree(with_mate: bool) -> pb.Pedigree:
+    """II-1 heads two sibships: III-1/III-2 alone (or with II-2), and III-3 alone."""
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=woman),
+            *([pb.Individual(generation=2, index=2, gender=man)] if with_mate else []),
+            *(pb.Individual(generation=3, index=k, gender=man) for k in (1, 2, 3)),
+        ]
+    )
+    p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2)).offspring.add(child=_pos(2, 1))
+    first = p.matings.add(partner_a=_pos(2, 1))
+    if with_mate:
+        first.partner_b.CopyFrom(_pos(2, 2))
+    first.offspring.add(child=_pos(3, 1))
+    first.offspring.add(child=_pos(3, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 3))
+    return p
+
+
+@pytest.mark.parametrize("with_mate", [False, True])
+def test_a_lone_parents_second_sibship_defers(with_mate: bool) -> None:
+    # The layout records a child's parent by column, so II-1's second, lone-parent sibship joined the first: three
+    # full siblings where the IR has two half-sibships (review-set figure c09), or III-3 drawn as II-1 and II-2's.
+    # Until the layout records each child's mating, the layout defers rather than draw a false family.
+    with pytest.raises(render.DeferredFeatureError, match="lone parent's sibships"):
+        render.layout(_lone_parent_pedigree(with_mate))
+
+
+def test_meeting_sib_bars_defer() -> None:
+    # A fuzzed pedigree, minimised. Twins II-1 and II-2 and their spouses lock row II, so II-2 x II-6's drop falls
+    # beside its twins and their bar runs into II-3 x II-4's: the row read as one family with several sets of
+    # parents. The layout defers on bars that meet, the drop's extension included.
+    p = ir.load_pbtxt((pathlib.Path(__file__).parent / "deferrals" / "sib_bars_meet.pbtxt").read_text())
+    with pytest.raises(render.DeferredFeatureError, match="sib bars would meet"):
+        render.layout(p)

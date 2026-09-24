@@ -100,11 +100,8 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
     result = dataclasses.replace(built, pos=pos, routed=routed)
-    if _overlapping_sibships(g, result):
-        raise _layout.DeferredFeatureError(
-            "the ordering could not keep every sibship contiguous, so two sibships' descent bars overlap (a "
-            "child would read as issue of several matings) — an interlocking loop/multi-mate shape; deferred"
-        )
+    if (why := _overlapping_sibships(g, result)) is not None:
+        raise _layout.DeferredFeatureError(f"{why}; deferred")
     return result
 
 
@@ -163,30 +160,40 @@ def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[in
     return out
 
 
-def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> bool:
-    """Whether any two matings' child x-spans overlap on a row — the torn-sibship backstop.
+def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
+    """Why the drawing would misstate a descent, or ``None``: the backstop against a silently wrong figure.
 
-    A cross-join order that pulls a partner with siblings to its mate can tear that sibship, stretching its sib
-    bar until it overlaps another (a child reads as the issue of several matings). Ordering keeps sibships
-    contiguous, so this backstop never fires on a drawable shape; ``layout`` defers rather than mislay out
-    anything an order somehow tears (an interlocking loop/multi-mate shape).
+    Drawing reads sibships from ``fam`` and draws each as one bar from its children to its drop (the parents'
+    midpoint, or a lone parent's x), so two failures read as a false family:
+
+    * **a mixed group**: a drawn group whose children are not exactly one mating's, drawn from that mating's
+      partners. ``fam`` records only the parent's column, so two sibships of one lone parent become one group
+      (three full siblings where the IR has two half-sibships), and a lone-parent sibship of someone with a mate
+      is drawn from the couple.
+    * **meeting bars**: two groups on a row whose bars overlap or touch. A drop beside its children extends its
+      bar toward them (``_draw._sibship``), and where it reaches a neighbouring bar the two read as one sibship
+      with two sets of parents. Children's spans alone never meet (ordering keeps sibships contiguous), so the
+      extension is what this catches.
+
+    ``layout`` defers on either rather than draw it.
     """
+    mating_of = {k: mi for mi, mr in enumerate(g.matings) if not mr.partnerless for k in mr.kids}
     xof = {i: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, i in enumerate(row)}
-    spans: dict[int, list[tuple[float, float]]] = collections.defaultdict(list)
-    for mr in g.matings:
-        kids = [k for k in mr.kids if k in xof]
-        if not kids:
-            continue
-        xs = [xof[k] for k in kids]
-        spans[g.level[kids[0]]].append((min(xs), max(xs)))
-    for row in spans.values():
+    bars: dict[int, list[tuple[float, float]]] = collections.defaultdict(list)
+    for s in _relations(lay):
+        matings = {mating_of.get(c) for c in s.children}
+        mi = next(iter(matings))
+        if len(matings) != 1 or mi is None or set(g.matings[mi].partners) != set(s.parents):
+            return "a lone parent's sibships would draw as one family, or from the wrong parents"
+        drop = sum(xof[q] for q in s.parents) / len(s.parents)
+        xs = [xof[c] for c in s.children] + [drop]
+        bars[g.level[s.children[0]]].append((min(xs), max(xs)))
+    for row in bars.values():
         row.sort()
-        reach = float("-inf")
-        for lo, hi in row:
-            if lo < reach - 1e-9:
-                return True
-            reach = max(reach, hi)
-    return False
+        for (_, hi), (lo, _) in itertools.pairwise(row):
+            if lo <= hi + 1e-9:
+                return "two sibships' sib bars would meet and read as one family"
+    return None
 
 
 def _relations(lay: _layout.Layout) -> list[_Sibship]:

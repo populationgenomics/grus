@@ -505,7 +505,7 @@ def test_double_cousin_loop_still_defers() -> None:
     An interlocking loop the ordering cannot open as adjacent couples without tearing a sibship; the
     torn-sibship backstop fires.
     """
-    with pytest.raises(render.DeferredFeatureError, match="descent bars overlap"):
+    with pytest.raises(render.DeferredFeatureError, match="sib bars would meet"):
         render.render_svg(_double_cousin_loop())
 
 
