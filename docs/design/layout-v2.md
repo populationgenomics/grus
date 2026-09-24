@@ -64,16 +64,19 @@ stages:
 1. **Ordering** — the left→right order within each rank, over the surviving blocks. Deterministic heuristic
    (weighted-median + transposition sweeps, as in `dot`); a small exact search only where the pruned space is tiny. The
    objective is lexicographic — **torn sibships, then crossings, then birth-order inversions, then total edge length** —
-   and the loop keeps the best iterate under it on strict improvement, stopping when a down+up round changes nothing (not at the first
-   zero-crossing order: the settling pass is what puts a parent over its child among equal-crossing orders). Each
-   transposition move is priced locally (the two swapped units' endpoint pairs, `dot`'s in/out-cross) and accepted on a
-   strict crossing decrease, or on a tie when it strictly repairs birth order or returns an atom to its canonical
-   orientation — so every sweep terminates. The moves are adjacent-unit swaps and reversals of a whole adjacency atom (a
-   couple, a twin group, or a chain of both, such as twins joined to one twin's spouse); an atom starts in the
-   orientation with fewer birth-order inversions. The moves are local, so a birth-order repair that needs two ranks to
-   change together (a twin marrying into another family, whose parents' couples would have to swap) is not found.
-   Crossing minimization is the *weak*-strength tie-breaker among orders the stronger constraints leave free — never
-   overriding contiguity or adjacency.
+   and the loop keeps the best iterate under it on strict improvement, stopping when a down+up round changes nothing
+   (not at the first zero-crossing order: the settling pass is what puts a parent over its child among equal-crossing
+   orders). Torn sibships rank first only in choosing the best iterate: each transposition move is priced locally by
+   crossings (the two swapped units' endpoint pairs, `dot`'s in/out-cross) and accepted on a strict crossing decrease,
+   or on a tie when it strictly repairs birth order or returns an atom to its canonical orientation — so every sweep
+   terminates. The moves are adjacent-unit swaps and reversals of a whole adjacency atom (a couple, a twin group, or a
+   chain of both, such as twins joined to one twin's spouse); an atom starts in the orientation with fewer birth-order
+   inversions. The moves are local, so a birth-order repair that needs two ranks to change together (a twin marrying
+   into another family, whose parents' couples would have to swap) is not found. Pricing moves by tears first was tried
+   and rejected: it traded crossings without limit and stopped searches early on shapes that were already clean. A tear
+   the search cannot avoid still defers; for cousins whose families sit far apart the fix is the routed consanguineous
+   marriage (below), not reordering. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger
+   constraints leave free — never overriding contiguity or adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by a **deterministic
    combinatorial** method (grus ships iterative barycentre sweeps + per-row PAVA isotonic resolve; the seam admits
    Brandes–Köpf or network-simplex x-coord). No numeric-solver dependency, bit-reproducible goldens. A relaxed (routed)

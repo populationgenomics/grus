@@ -12,10 +12,13 @@ order per generation rank; Stage A's x-solver turns it into coordinates.
 Couple adjacency and twin grouping are STRUCTURE, not soft penalties: each is an **adjacency atom** (a path of
 individuals kept contiguous on their rank, orientation free). A same-generation cross-marriage (a
 boundary-bridge join) is an ordinary couple atom whose two members belong to different families, so ordering
-alone brings the two sibships' ends together — no special placement pass. Sibship contiguity is emergent (the
-children of one mating share a connector, so crossing-minimisation clusters them), matching v1. An individual
-needing more than two 1-D neighbours (>2 matings) overflows: the two highest-weight matings stay adjacent, the
-rest are **routed** (recorded in ``Ordering.routed`` for Stage C; Stage B still defers routed shapes as v1
+alone brings the two sibships' ends together — no special placement pass. Sibship contiguity mostly emerges (the
+children of one mating share a connector, so crossing-minimisation clusters them), and the best order the search
+visits is chosen with torn sibships ranked first, so an untorn order it reaches is never lost to one with fewer
+crossings. The moves themselves are priced by crossings: pricing them by tears first traded crossings without
+limit (a tear-free order with dozens of crossings) and cut searches short on shapes that were already clean.
+An individual needing more than two 1-D neighbours (>2 matings) overflows: the two highest-weight matings stay
+adjacent, the rest are **routed** (recorded in ``Ordering.routed`` for Stage C; Stage B still defers routed shapes as v1
 does). Determinism is bit-exact: no RNG, sorted integer/identity iteration, a fixed pass count, ``best``
 replaced only on strict improvement, and a four-level IR-derived tie-break whose ultimate backstop is the
 individuals' stable ``(generation, index)`` identity (NOT their post-shuffle row index — so the order is
@@ -142,6 +145,10 @@ class _Model:
                 self.down[m].append(k)
                 self.up[k].append(m)
         self.max_rank = max(self.rank.values(), default=-1)
+        self.connectors_on: dict[int, list[int]] = defaultdict(list)
+        for node, rr in sorted(self.rank.items()):
+            if self.is_mating(node):
+                self.connectors_on[rr].append(node)
         self.min_rank = min(self.rank.values(), default=0)  # a founder-sibship connector sits at rank -1
 
     # -- atoms: per even rank, the must-be-adjacent chains (couples + twin groups) --
@@ -355,18 +362,31 @@ def count_crossings(g: _layout._Graph, ranks: list[list[int]]) -> int:
         if r % 2 == 0:
             order_map.setdefault(r, [])
             continue
-        conns = [n for n, rr in model.rank.items() if rr == r and model.is_mating(n)]
-        pos_up = _positions(order_map, r - 1) if r - 1 in order_map else {}
-        pos_dn = _positions(order_map, r + 1) if r + 1 in order_map else {}
-
-        def key(n: int, up: dict[int, int] = pos_up, dn: dict[int, int] = pos_dn) -> tuple[float, int]:
-            ups = [up[v] for v in model.up.get(n, ()) if v in up]
-            ps = ups or [dn[v] for v in model.down.get(n, ()) if v in dn]
-            mean = sum(ps) / len(ps) if ps else 0.0
-            return (mean, n)
-
-        order_map[r] = sorted(conns, key=key)
+        order_map[r] = _placed_connectors(model, order_map, r)
     return _total_crossings(model, order_map)
+
+
+def _placed_connectors(model: _Model, order_map: dict[int, list[int]], r: int) -> list[int]:
+    """The connector nodes of odd rank ``r``, ordered at the mean of their partners' (else children's) columns.
+
+    That is where drawing puts a mating symbol, so crossings counted against this order are the drawn ones.
+    """
+    conns = model.connectors_on.get(r, [])
+    up = _positions(order_map, r - 1) if r - 1 in order_map else {}
+    dn = _positions(order_map, r + 1) if r + 1 in order_map else {}
+
+    def key(n: int) -> tuple[float, int]:
+        ups = [up[v] for v in model.up.get(n, ()) if v in up]
+        ps = ups or [dn[v] for v in model.down.get(n, ()) if v in dn]
+        return (sum(ps) / len(ps) if ps else 0.0, n)
+
+    return sorted(conns, key=key)
+
+
+def _band_crossings(model: _Model, order_map: dict[int, list[int]], lo: int, hi: int) -> int:
+    """Crossings between consecutive ranks ``lo..hi`` (clamped to the model's ranks)."""
+    lo, hi = max(lo, model.min_rank), min(hi, model.max_rank)
+    return sum(_bilayer_crossings(model, order_map.get(r, []), order_map.get(r + 1, [])) for r in range(lo, hi))
 
 
 # --- mincross: wmedian + transpose + tiny exact refinement -------------------------------------------------
@@ -538,17 +558,9 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
         adj_pos.append((model.up, _positions(order_map, r - 1)))
     if r < model.max_rank:
         adj_pos.append((model.down, _positions(order_map, r + 1)))
-    torn = model.sibships_on.get(r) is not None
-
-    def overlaps(trial: list[tuple[int, ...]]) -> int:
-        return _rank_overlaps(model, r, [i for a in trial for i in a]) if torn else 0
-
-    current = overlaps(units)
     for u, unit in enumerate(units):  # atom reversals (a couple flip is the two-member case)
         if len(unit) < 2:
             continue
-        flipped = tuple(reversed(unit))
-        after = overlaps([*units[:u], flipped, *units[u + 1 :]])
         # Reversing a unit flips the relative order of every pair in it, and a crossing depends only on relative
         # order, so the reversal's crossing change is the sum of its pairwise swap gains.
         gain = sum(
@@ -556,23 +568,16 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
             for a in range(len(unit))
             for b in range(a + 1, len(unit))
         )
+        flipped = tuple(reversed(unit))
         canonical = unit == model.atom_of[unit[0]]
         birth_gain = _inversions(birth, unit) - _inversions(birth, flipped)
-        if after < current or (
-            after == current and (gain > 0 or (gain == 0 and (birth_gain > 0 or (birth_gain == 0 and not canonical))))
-        ):
+        if gain > 0 or (gain == 0 and (birth_gain > 0 or (birth_gain == 0 and not canonical))):
             units[u] = flipped
-            current = after
             improved = True
     for k in range(len(units) - 1):  # adjacent-unit swaps
-        trial = [*units[:k], units[k + 1], units[k], *units[k + 2 :]]
-        after = overlaps(trial)
         gain = _swap_gain(model, adj_pos, units[k], units[k + 1])
-        if after < current or (
-            after == current and (gain > 0 or (gain == 0 and _birth_gain(birth, units[k], units[k + 1]) > 0))
-        ):
+        if gain > 0 or (gain == 0 and _birth_gain(birth, units[k], units[k + 1]) > 0):
             units[k], units[k + 1] = units[k + 1], units[k]
-            current = after
             improved = True
     order_map[r] = [i for a in units for i in a]
     return improved
@@ -581,9 +586,10 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
 def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
     """Exact per-rank search on ranks with few atoms.
 
-    Enumerate atom permutations and reversals, keep the min-crossing order (tie-broken by fewer birth-order
-    inversions, then the smallest identity sequence — the objective's order, so the settled map is not thrown
-    away for trading birth order for identity). Makes small boundary-bridge ranks provably optimal and their
+    Enumerate atom permutations and reversals, keep the min-crossing order (tie-broken by fewer torn sibships,
+    then fewer birth-order inversions, then the smallest identity sequence — the objective's order after
+    crossings, so the settled map is not thrown away for trading birth order for identity). Makes small
+    boundary-bridge ranks provably optimal and their
     choice deterministic.
     """
     for _ in range(2):  # two settling passes; small and convergent
@@ -592,19 +598,32 @@ def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
             if not units or len(units) > _EXACT_ATOM_CAP:
                 continue
             variants = [[unit, tuple(reversed(unit))] if len(unit) >= 2 else [unit] for unit in units]
+            # On an individuals' rank, the connector ranks either side follow the trial order (re-placed as drawing
+            # places them), so a move is costed against where its matings will sit, not where they sat before —
+            # otherwise moving a couple looks costly against stale connectors and the search keeps a crossing.
+            follow = [c for c in (r - 1, r + 1) if r % 2 == 0 and c in order_map and c % 2 == 1]
+            saved = {c: list(order_map[c]) for c in follow}
             best_order: list[int] | None = None
+            best_conns: dict[int, list[int]] = saved
             best_key: tuple[int, int, int, tuple[tuple[int, int], ...]] | None = None
             for perm in itertools.permutations(range(len(units))):
                 for choice in itertools.product(*(range(len(v)) for v in variants)):
                     seq = [i for u in perm for i in variants[u][choice[u]]]
                     order_map[r] = seq
-                    cost = _neighbour_cost(model, order_map, r)
+                    if follow:
+                        for c in follow:
+                            order_map[c] = _placed_connectors(model, order_map, c)
+                        cost = _band_crossings(model, order_map, r - 2, r + 2)
+                    else:
+                        cost = _neighbour_cost(model, order_map, r)
                     ident = tuple(model.ident(i) for i in seq if not model.is_mating(i))
-                    key = (_rank_overlaps(model, r, seq), cost, _inversions(model.birth, seq), ident)
+                    key = (cost, _rank_overlaps(model, r, seq), _inversions(model.birth, seq), ident)
                     if best_key is None or key < best_key:
                         best_key, best_order = key, list(seq)
+                        best_conns = {c: list(order_map[c]) for c in follow}
             assert best_order is not None
             order_map[r] = best_order
+            order_map.update(best_conns)
 
 
 def _edge_length(model: _Model, order_map: dict[int, list[int]]) -> int:
@@ -682,8 +701,8 @@ def _mincross(model: _Model, init: dict[int, list[int]]) -> dict[int, list[int]]
     """Dot's mincross loop, then a tiny exact search on small ranks.
 
     Alternate ``wmedian`` (down/up) and ``transpose``, keep the best order under the lexicographic objective
-    (crossings, birth-order inversions, edge length) on strict improvement — no drift on ties, so the result is
-    deterministic; stop when a down+up round leaves the order unchanged. The exact search then settles small
+    (torn sibships, crossings, birth-order inversions, edge length) on strict improvement — no drift on ties, so the
+    result is deterministic; stop when a down+up round leaves the order unchanged. The exact search then settles small
     ranks and fixes their tie-break.
     """
     best = {r: list(nodes) for r, nodes in init.items()}
