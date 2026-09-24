@@ -38,31 +38,19 @@ class _Sibship:
     parents: tuple[int, ...]
     children: tuple[int, ...]
 
-    def anchor(self, x: list[float]) -> float:
-        """The descent origin: the couple's midpoint, or the lone parent's x."""
-        return sum(x[pcell] for pcell in self.parents) / len(self.parents)
-
-    def centroid(self, x: list[float]) -> float:
-        return sum(x[c] for c in self.children) / len(self.children)
-
 
 @dataclasses.dataclass(frozen=True)
 class _Block:
-    """A contiguity block on one row: a maximal run of columns the solve translates as one rigid body.
+    """A contiguity block on one row: a maximal run of columns held rigid, each at its min-separation from the next.
 
-    A block is placed by its barycentre — the average of what its members want minus their fixed within-block
-    offsets — with each member pinned at ``base + offset``. Because the offsets are exactly the row's
-    min-separations between consecutive members, the block satisfies its own separation chain, so the per-row
-    PAVA resolve can only pool the whole block with a neighbour (moving every member equally), never split it.
-    A lone cell is a size-1 block (``offsets == (0.0,)``), which places identically to a bare per-cell pull.
+    The x-solve fixes every consecutive pair in a block at exactly its row separation, so the block moves as one
+    body and never splits. A lone cell is a size-1 block.
 
     Attributes:
         cols: the block's column indices on its row, contiguous and left-to-right.
-        offsets: cumulative within-block separation, ``offsets[0] == 0`` — ``x[cols[j]] == base + offsets[j]``.
     """
 
     cols: tuple[int, ...]
-    offsets: tuple[float, ...]
 
 
 def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layout.Layout:
@@ -72,7 +60,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     ``ghost`` duplication, cross/loop detection, rows from IR generation, pass-throughs); order
     each rank by crossing minimization (``_ordering.order``); ``_build`` the per-level arrays (``fam`` /
     ``spouse`` / ``twins`` / founder sibships) from that order; then replace ``pos`` with the deterministic
-    x-solve (``_assign_x``, quantised) and attach any routed matings.
+    x-solve (``_x_model`` + ``_xsolve.solve``, quantised) and attach any routed matings.
 
     A consanguinity-loop mating is an ordinary adjacent (double-line) couple once the ordering pulls each
     partner to its sibship end, so boundary-bridge cross-joins and cousin marriages with siblings draw with
@@ -259,11 +247,11 @@ def _x_model(
     """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch."""
     rows = lay.nid
     gaps = tuple((row[k], row[k + 1], seps[level][k]) for level, row in enumerate(rows) for k in range(len(row) - 1))
-    rigid = tuple(
-        (rows[level][a], rows[level][b], blk.offsets[j + 1] - blk.offsets[j])
-        for level, blk, j, a, b in _block_pairs(rows, blocks)
-    )
-    bonded = {(rows[level][a], rows[level][b]) for level, _, _, a, b in _block_pairs(rows, blocks)}
+    # A bonded pair sits exactly its row separation apart. Taken from ``seps`` directly, not as a difference of the
+    # block's cumulative float offsets, whose rounding can land an ulp below the separation and, under exact
+    # arithmetic, contradict the pair's ``>= sep`` gap.
+    rigid = tuple((rows[level][a], rows[level][b], seps[level][a]) for level, a, b in _block_pairs(blocks))
+    bonded = {(rows[level][a], rows[level][b]) for level, a, b in _block_pairs(blocks)}
     couples = tuple(
         (left, right, geom.couple_gap, geom.sib_gap - geom.couple_gap)
         for left, right in _couples(lay)
@@ -278,12 +266,9 @@ def _x_model(
     )
 
 
-def _block_pairs(rows: list[list[int]], blocks: list[list[_Block]]):
-    """Each adjacent pair of columns inside a block: ``(level, block, j, left col, right col)``."""
-    for level in range(len(rows)):
-        for blk in blocks[level]:
-            for j, (a, b) in enumerate(itertools.pairwise(blk.cols)):
-                yield level, blk, j, a, b
+def _block_pairs(blocks: list[list[_Block]]) -> list[tuple[int, int, int]]:
+    """Each adjacent pair of columns inside a block: ``(level, left col, right col)``."""
+    return [(level, a, b) for level, row in enumerate(blocks) for blk in row for a, b in itertools.pairwise(blk.cols)]
 
 
 def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibship]) -> list[list[_Block]]:
@@ -297,8 +282,8 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
       cohesion this generalizes.
     * **co-twins** (``twins`` flag) — a twin group never separates.
     * a **founder-sib floater**: a member of a partnerless mating's sibship that heads no descent (no drawn
-      children) has no anchor of its own, so the barycentre sweep would leave it behind while an anchored
-      sibling is pulled away (c19's leaf ``1-1``). It bonds to one same-sibship neighbour — the left if present,
+      children) has no anchor of its own, so centring alone would not keep it beside an anchored sibling pulled
+      away (c19's leaf ``1-1``). It bonds to one same-sibship neighbour — the left if present,
       else the right — so it travels with the group. A sibling that *does* head a subtree is already anchored
       by that subtree and is not bonded (over-rigidifying it would stop each subtree centring independently).
 
@@ -334,22 +319,18 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
                 bond[k - 1] = True
             elif k + 1 < ncols and fs_group.get((level, k + 1)) == gid:
                 bond[k] = True
-        out.append(_row_blocks(bond, ncols, seps[level]))
+        out.append(_row_blocks(bond, ncols))
     return out
 
 
-def _row_blocks(bond: list[bool], ncols: int, row_seps: list[float]) -> list[_Block]:
-    """Cut a row into its bonded runs, each with cumulative within-block offsets from ``row_seps``."""
+def _row_blocks(bond: list[bool], ncols: int) -> list[_Block]:
+    """Cut a row into its bonded runs."""
     blocks: list[_Block] = []
     k = 0
     while k < ncols:
         j = k
         while j < ncols - 1 and bond[j]:
             j += 1
-        cols = tuple(range(k, j + 1))
-        offsets = [0.0]
-        for c in cols[1:]:
-            offsets.append(offsets[-1] + row_seps[c - 1])
-        blocks.append(_Block(cols=cols, offsets=tuple(offsets)))
+        blocks.append(_Block(cols=tuple(range(k, j + 1))))
         k = j + 1
     return blocks

@@ -8,11 +8,13 @@ floating-point HiGHS backend agreeing with the exact one.
 from __future__ import annotations
 
 import dataclasses
+import itertools
 
 import pytest
 import test_render
 
 from grus import render
+from grus.models import pedigree_pb2 as pb
 
 _EPS = 1e-6
 
@@ -51,3 +53,53 @@ def test_highs_agrees_with_z3(name: str) -> None:
     assert floating.nid == exact.nid
     for a, b in zip(exact.pos, floating.pos, strict=True):
         assert all(abs(u - v) < _EPS for u, v in zip(a, b, strict=True)), f"{name}: backends disagree"
+
+
+def _p(g: int, i: int) -> pb.Position:
+    return pb.Position(generation=g, index=i)
+
+
+def _ind(g: int, i: int, gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
+    return pb.Individual(generation=g, index=i, gender=gender)
+
+
+@pytest.mark.parametrize(("twins", "couple_gap", "sib_gap"), [(4, 0.5, 0.7), (6, 1.0, 1.1), (5, 0.3, 0.9)])
+def test_rigid_gaps_are_exact_for_any_separation(twins: int, couple_gap: float, sib_gap: float) -> None:
+    # A twin group is one rigid block. Its pairs were once fixed at differences of cumulative float offsets, which
+    # can land an ulp below the separation: under exact arithmetic ``== d`` and ``>= sep`` then contradict, and the
+    # model had no solution. The pairs now take the separation itself.
+    p = pb.Pedigree(individuals=[_ind(1, 1), _ind(1, 2, pb.GENDER_WOMAN), *(_ind(2, k) for k in range(1, twins + 1))])
+    p.matings.add(
+        partner_a=_p(1, 1),
+        partner_b=_p(1, 2),
+        offspring=[
+            pb.Offspring(child=_p(2, k), twin_group=1, twin_type=pb.ZYGOSITY_TYPE_MONOZYGOTIC)
+            for k in range(1, twins + 1)
+        ],
+    )
+    geom = dataclasses.replace(render.DEFAULT_GEOMETRY, couple_gap=couple_gap, sib_gap=sib_gap)
+    row = render.layout(p, geom).pos[1]
+    assert all(abs(b - a - sib_gap) < _EPS for a, b in itertools.pairwise(row))
+
+
+@pytest.mark.parametrize("backend", list(render.XSolver))
+def test_parts_with_no_descent_link_are_anchored(backend: render.XSolver) -> None:
+    # Two families on disjoint generations share no descent, so nothing in the objectives ties one's position to the
+    # other's; with a single pinned cell the tie-break was unbounded (Z3 returned an arbitrary point, HiGHS failed).
+    # Every cell is now x >= 0, so each part settles at the left edge.
+    if backend is render.XSolver.HIGHS:
+        pytest.importorskip("highspy")
+    p = pb.Pedigree(
+        individuals=[
+            _ind(1, 1),
+            _ind(1, 2, pb.GENDER_WOMAN),
+            _ind(2, 1),
+            _ind(3, 1),
+            _ind(3, 2, pb.GENDER_WOMAN),
+            _ind(4, 1),
+        ]
+    )
+    p.matings.add(partner_a=_p(1, 1), partner_b=_p(1, 2), offspring=[pb.Offspring(child=_p(2, 1))])
+    p.matings.add(partner_a=_p(3, 1), partner_b=_p(3, 2), offspring=[pb.Offspring(child=_p(4, 1))])
+    lay = render.layout(p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=backend))
+    assert lay.pos == [[0.0, 1.0], [0.5], [0.0, 1.0], [0.5]]

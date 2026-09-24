@@ -18,10 +18,15 @@ ones before it:
 2. **balance** — the largest excess gap (a gap's width beyond its minimum separation), so slack spreads evenly
    instead of piling onto one couple or sibship;
 3. **compactness** — the total excess gap;
-4. **tie-break** — a fixed weighted sum of positions, pulling cells left, so the optimum is a single point.
+4. **tie-break** — a fixed weighted sum of positions, pulling cells left, so the optimum is a single point. The
+   weights follow no arithmetic pattern: a pattern (equal steps) leaves directions such as ``(+1, -2, +1)`` on three
+   consecutive free cells orthogonal to the weights, and so unresolved.
 
 Subject to the row separations (each adjacent pair at least its gap apart; the order never changes), the rigid
-blocks (a block's members at their fixed offsets), and the first cell pinned at 0.
+blocks (each consecutive pair in a block at exactly its separation), and every cell at ``x >= 0``. The objectives
+before the tie-break depend only on differences of positions; the tie-break's pull left against ``x >= 0`` then fixes
+the translation of every part of the drawing, including a part with no descent link to the rest (families on
+disjoint generations), which a single pinned cell would leave unbounded.
 
 Why an exact program, not relaxation sweeps: centring alone leaves directions it cannot see. A half-sibling hinge's
 married-in spouse and the family descended through that couple can slide together (spouse ``2t``, family ``t``)
@@ -30,9 +35,13 @@ pass cap. Stating compactness as an objective below centring removes the freedom
 longer depends on an iteration budget.
 
 Two backends solve the same model. ``Z3`` (the default) optimises over exact rationals, so positions are bit-identical
-on every platform — what the byte-compared goldens rest on. ``HIGHS`` (the optional ``highs`` extra) solves the four
+on every platform — what the byte-compared goldens rest on. ``HIGHS`` (the optional ``highs`` extra) solves the five
 objectives as successive floating-point linear programs, each earlier optimum held as a constraint; it agrees with
-Z3 up to solver tolerance, and where an objective has several optima it may choose differently.
+Z3 up to solver tolerance.
+
+Both backends solve the levels one at a time, each earlier optimum held as a constraint on the next. For Z3 this is
+several times faster than its built-in lexicographic mode on the same model (about 3 s against 20 s for a 267-person
+pedigree), and gives the same optimum: a later level is minimised over every layout optimal at the earlier ones.
 """
 
 from __future__ import annotations
@@ -87,63 +96,70 @@ def solve(model: Model, backend: XSolver) -> dict[int, float]:
     raise ValueError(f"unknown x solver {backend!r}")
 
 
-def _tie_weights(model: Model) -> list[fractions.Fraction]:
-    """Distinct positive weights, increasing along ``cells``: ``1 + k / (n + 1)``."""
-    n = len(model.cells)
-    return [1 + fractions.Fraction(k, n + 1) for k in range(n)]
+_TIE_MODULUS = 10007  # a prime; the weights are its residues scrambled by another prime, so they follow no pattern
+
+
+def _tie_weights(model: Model) -> list[int]:
+    """Distinct positive integer weights along ``cells``, with no arithmetic pattern (see the module docstring)."""
+    return [_TIE_MODULUS + (k * 7919) % _TIE_MODULUS for k in range(len(model.cells))]
 
 
 def _q(v: float) -> fractions.Fraction:
-    return fractions.Fraction(v)  # exact: separations and offsets are binary floats
+    return fractions.Fraction(v)  # exact: a separation is a binary float, and converts without rounding
 
 
 def _solve_z3(model: Model) -> dict[int, float]:
     import z3
 
     x = {c: z3.Real(f"x{c}") for c in model.cells}
-    opt = z3.Optimize()
-    opt.set(priority="lex")
 
-    def val(f: fractions.Fraction) -> z3.ArithRef:
+    def val(f: fractions.Fraction | int) -> z3.ArithRef:
+        f = fractions.Fraction(f)
         return z3.RealVal(f"{f.numerator}/{f.denominator}")
 
-    opt.add(x[model.cells[0]] == 0)
-    for left, right, sep in model.gaps:
-        opt.add(x[right] - x[left] >= val(_q(sep)))
-    for left, right, d in model.rigid:
-        opt.add(x[right] - x[left] == val(_q(d)))
-    devs = []
-    for s, (parents, children) in enumerate(model.sibships):
-        dev = z3.Real(f"dev{s}")
+    cons = [x[c] >= 0 for c in model.cells]
+    cons += [x[right] - x[left] >= val(_q(sep)) for left, right, sep in model.gaps]
+    cons += [x[right] - x[left] == val(_q(d)) for left, right, d in model.rigid]
+    outside, devs = [], []
+    for s_, (parents, children) in enumerate(model.sibships):
         mid = z3.Sum([x[p] for p in parents]) / len(parents)
         centroid = z3.Sum([x[c] for c in children]) / len(children)
-        opt.add(dev >= mid - centroid, dev >= centroid - mid)
-        devs.append(dev)
-    outside = []
-    for s_, (parents, children) in enumerate(model.sibships):
-        o = z3.Real(f"out{s_}")
-        mid = z3.Sum([x[p] for p in parents]) / len(parents)
-        opt.add(o >= 0, o >= x[children[0]] - mid, o >= mid - x[children[-1]])
+        o, dev = z3.Real(f"out{s_}"), z3.Real(f"dev{s_}")
+        cons += [o >= 0, o >= x[children[0]] - mid, o >= mid - x[children[-1]]]
+        cons += [dev >= mid - centroid, dev >= centroid - mid]
         outside.append(o)
+        devs.append(dev)
     stretch = []
     for q, (left, right, gap, allowance) in enumerate(model.couples):
         over = z3.Real(f"over{q}")
-        spread: z3.ArithRef = x[right] - x[left] - val(_q(gap))
-        opt.add(over >= 0, over >= spread - val(_q(allowance)))
+        spread = x[right] - x[left] - val(_q(gap))
+        cons += [over >= 0, over >= spread - val(_q(allowance))]
         stretch.append(z3.Sum([val(_STRETCH_SLOPE) * spread, val(_OVERSTRETCH_EXTRA) * over]))
     excess = [x[right] - x[left] - val(_q(sep)) for left, right, sep in model.gaps]
     worst = z3.Real("worst")
-    for e in excess:
-        opt.add(worst >= e)
+    cons += [worst >= e for e in excess]
     zero = z3.RealVal(0)
-    opt.minimize(z3.Sum(outside) if outside else zero)
-    opt.minimize(z3.Sum(devs + stretch) if devs or stretch else zero)
-    opt.minimize(worst if excess else zero)
-    opt.minimize(z3.Sum(excess) if excess else zero)
-    opt.minimize(z3.Sum([val(w) * x[c] for w, c in zip(_tie_weights(model), model.cells, strict=True)]))
-    if opt.check() != z3.sat:
-        raise RuntimeError(f"x model has no solution ({opt.reason_unknown()})")
-    m = opt.model()
+    objectives = [
+        z3.Sum(outside) if outside else zero,
+        z3.Sum(devs + stretch) if devs or stretch else zero,
+        worst if excess else zero,
+        z3.Sum(excess) if excess else zero,
+        z3.Sum([val(w) * x[c] for w, c in zip(_tie_weights(model), model.cells, strict=True)]),
+    ]
+    held = []
+    m: z3.ModelRef | None = None
+    for k, objective in enumerate(objectives):
+        opt = z3.Optimize()
+        opt.add(*cons, *held)
+        handle = opt.minimize(objective)
+        if opt.check() != z3.sat:
+            raise RuntimeError(f"x model objective {k} has no optimum (z3: {opt.check()})")
+        best = opt.lower(handle)
+        if not (z3.is_rational_value(best) or z3.is_int_value(best)):  # else infinite (unbounded)
+            raise RuntimeError(f"x model objective {k} is unbounded ({best})")
+        held.append(objective == best)
+        m = opt.model()
+    assert m is not None  # objectives is never empty
     out: dict[int, float] = {}
     for c in model.cells:
         r = m.eval(x[c], model_completion=True)
@@ -169,9 +185,11 @@ def _solve_highs(model: Model) -> dict[int, float]:
     ncols = worst + 1
     h = highspy.Highs()
     h.setOptionValue("output_flag", False)
+    for option in ("primal_feasibility_tolerance", "dual_feasibility_tolerance"):
+        h.setOptionValue(option, 1e-10)
     lower = np.full(ncols, -inf)
     upper = np.full(ncols, inf)
-    lower[n:] = 0.0  # deviations, overstretches and the worst excess are non-negative
+    lower[:] = 0.0  # positions (the tie-break's pull left settles every part against 0), deviations, excesses
     h.addVars(ncols, lower, upper)
 
     def row(lo: float, hi: float, terms: Sequence[tuple[int, float]]) -> None:
@@ -179,7 +197,6 @@ def _solve_highs(model: Model) -> dict[int, float]:
         coef = np.array([v for _, v in terms], dtype=np.float64)
         h.addRow(lo, hi, len(terms), idx, coef)
 
-    row(0.0, 0.0, [(col[model.cells[0]], 1.0)])
     for left, right, sep in model.gaps:
         row(sep, inf, [(col[right], 1.0), (col[left], -1.0)])
         row(-sep, inf, [(worst, 1.0), (col[right], -1.0), (col[left], 1.0)])  # worst >= x_r - x_l - sep
@@ -220,7 +237,7 @@ def _solve_highs(model: Model) -> dict[int, float]:
         {**{n + s: 1.0 for s in range(ndev)}, **stretch_cost},  # (the stretch's constant -gap is dropped)
         {worst: 1.0},
         gap_cost,  # sum of gaps; the separations are constant, so this orders like the total excess
-        {col[c]: float(w) for w, c in zip(_tie_weights(model), model.cells, strict=True)},
+        {col[c]: w / _TIE_MODULUS for w, c in zip(_tie_weights(model), model.cells, strict=True)},
     ]
     for k, obj in enumerate(objectives):
         cost = np.zeros(ncols)
@@ -232,6 +249,6 @@ def _solve_highs(model: Model) -> dict[int, float]:
             raise RuntimeError(f"x model objective {k} not optimal ({h.modelStatusToString(h.getModelStatus())})")
         if k + 1 < len(objectives) and obj:
             best = h.getInfo().objective_function_value
-            row(-inf, best + 1e-9 * (1.0 + abs(best)), list(obj.items()))  # hold this optimum for the next
+            row(-inf, best + 1e-10 * (1.0 + abs(best)), list(obj.items()))  # hold this optimum for the next
     values = h.getSolution().col_value
     return {c: float(values[col[c]]) for c in model.cells}
