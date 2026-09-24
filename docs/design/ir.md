@@ -127,8 +127,11 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   `gender` and `Condition.status` are real values not the zero sentinel; `twin_type` set iff `twin_group` present.
 - **Graph invariants** live in the `grus.ir` loader, which fails loud: every referenced `Position` exists among the
   pedigree's individuals; `(generation, index)` is unique per pedigree; a mating's two partners are distinct; offspring
-  exist; the graph is acyclic for tier-1 render. Several probands are valid (a family ascertained through more than one
-  member; imported cohort data has them). Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are
+  exist; a child's generation exceeds each parent's, and one mating's offspring share a generation. Generation is the
+  drawn row, so a child is usually one below its parents but may be further down — drawn beside half-siblings whose
+  other parent is a generation lower, or across omitted generations — and generation increasing along every descent edge
+  also rules out ancestry cycles. Several probands are valid (a family ascertained through more than one member;
+  imported cohort data has them). Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are
   `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never emitted.
 
 ## Alternatives considered

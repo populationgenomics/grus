@@ -290,7 +290,7 @@ def test_validate_rejects_stray_partner_b() -> None:
 
 
 def test_validate_rejects_self_ancestry_cycle() -> None:
-    # A is listed as an offspring of its own mating -> A is its own ancestor.
+    # A is listed as an offspring of its own mating -> A is its own ancestor, so not below itself.
     p = pb.Pedigree(
         individuals=[
             pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN),
@@ -304,7 +304,7 @@ def test_validate_rejects_self_ancestry_cycle() -> None:
             )
         ],
     )
-    with pytest.raises(ir.IntegrityError):
+    with pytest.raises(ir.IntegrityError, match="not below its parent"):
         ir.validate(p)
 
 
@@ -330,8 +330,43 @@ def test_validate_rejects_longer_cycle() -> None:
             ),
         ],
     )
-    with pytest.raises(ir.IntegrityError):
+    with pytest.raises(ir.IntegrityError, match="not below its parent"):
         ir.validate(p)
+
+
+def _couple_with_children(*children: pb.Position) -> pb.Pedigree:
+    """A gen-1 couple and the given children, each individual declared at its own position."""
+    return pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN),
+            pb.Individual(generation=1, index=2, gender=pb.GENDER_WOMAN),
+            *(pb.Individual(generation=c.generation, index=c.index, gender=pb.GENDER_UNKNOWN) for c in children),
+        ],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=1, index=1),
+                partner_b=pb.Position(generation=1, index=2),
+                offspring=[pb.Offspring(child=c) for c in children],
+            )
+        ],
+    )
+
+
+def test_validate_rejects_child_on_its_parents_generation() -> None:
+    with pytest.raises(ir.IntegrityError, match="not below its parent"):
+        ir.validate(_couple_with_children(pb.Position(generation=1, index=3)))
+
+
+def test_validate_rejects_siblings_on_different_generations() -> None:
+    p = _couple_with_children(pb.Position(generation=2, index=1), pb.Position(generation=3, index=1))
+    with pytest.raises(ir.IntegrityError, match=r"offspring span generations \[2, 3\]"):
+        ir.validate(p)
+
+
+def test_validate_accepts_child_more_than_one_generation_below() -> None:
+    # A child drawn two rows down (beside half-siblings whose other parent is a generation lower, or across
+    # omitted generations) is valid: generation is the drawn row, and it still exceeds each parent's.
+    ir.validate(_couple_with_children(pb.Position(generation=3, index=1)))
 
 
 def test_validate_accepts_several_probands() -> None:
