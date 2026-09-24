@@ -73,17 +73,8 @@ def _load_pair(name: str) -> pb.Pedigree:
 
 
 def _prepared(p: pb.Pedigree) -> _layout_mod._Graph:
-    """Run the layout front end (validate, ranks, alignment) to get the graph the crossing counter reads."""
-    ir.validate(p)
-    g = _layout_mod._derive(p)
-    _layout_mod._duplicate_cross_generation(g)
-    cross = _layout_mod._cross_matings(g)
-    _layout_mod._detect_loops(g, cross)
-    depth = _layout_mod._kindepth(g)
-    _layout_mod._align_couples(g, depth, cross)
-    base = min(depth) if depth else 0
-    g.level = [d - base for d in depth]
-    return g
+    """Run the layout front end (the graph the crossing counter reads)."""
+    return _layout2_mod._prepare(p).graph
 
 
 def _crossings(p: pb.Pedigree, ranks: list[list[int]]) -> int:
@@ -91,8 +82,13 @@ def _crossings(p: pb.Pedigree, ranks: list[list[int]]) -> int:
 
 
 def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, int]]]:
-    """Per-rank stable identities ``(generation, index)`` — the arrangement independent of row indexing."""
-    return [[(p.individuals[i].generation, p.individuals[i].index) for i in row] for row in ranks]
+    """Per-rank stable identities ``(generation, index)`` — the arrangement independent of row indexing.
+
+    Read from the prepared graph, so a pass-through cell has its synthetic identity (keyed on the sibship it
+    leads to, not on the input order).
+    """
+    individuals = _layout2_mod._prepare(p).graph.individuals
+    return [[(individuals[i].generation, individuals[i].index) for i in row] for row in ranks]
 
 
 def _shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
@@ -161,15 +157,14 @@ def test_order_is_run_to_run_deterministic(name: str) -> None:
     assert render.layout(p) == render.layout(p)
 
 
-@pytest.mark.parametrize("name", [*_TIER1, "childless", "founder_sibship_marry_in", *_CROSS_JOINS])
+_SHUFFLED_GOLDENS = ("childless", "founder_sibship_marry_in", "descent_across_rows", "detached_branch")
+
+
+@pytest.mark.parametrize("name", [*_TIER1, *_SHUFFLED_GOLDENS, *_CROSS_JOINS])
 def test_order_is_shuffle_invariant(name: str) -> None:
     # The strongest determinism test: the drawn arrangement (by stable identity) must not depend on the input
     # individuals'/matings' order — only on the tie-break. Shuffling changes row indices but not the drawing.
-    p = (
-        test_render._load(name)
-        if name in _TIER1 or name in ("childless", "founder_sibship_marry_in")
-        else _load_pair(name)
-    )
+    p = test_render._load(name) if name in _TIER1 or name in _SHUFFLED_GOLDENS else _load_pair(name)
     ref = _ident_rows(p, render.layout(p).nid)
     for seed in range(4):
         q = _shuffled(p, seed)
@@ -335,10 +330,22 @@ def test_review_set_deferral_count_is_zero() -> None:
 # --- cohesion + contiguity blocks -------------------------------------------------------------------------
 
 
-def _couple_gaps(lay: object) -> list[float]:
-    """Every drawn couple's x-distance under a layout (any mating flagged ``spouse``, childless included)."""
-    xof = {c: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, c in enumerate(row)}  # type: ignore[attr-defined]
-    return [abs(xof[a] - xof[b]) for a, b in _layout2_mod._couples(lay)]  # type: ignore[arg-type]
+def _couple_gaps(lay: render.Layout) -> list[float]:
+    """Every drawn couple's x-distance (any mating flagged ``spouse``, childless included).
+
+    Except a couple heading a descent across rows, and any other couple of the same individual: the couple
+    centres over its pass-through, whose column the rows it crosses decide, and a hinge sits centred between
+    its matings, so their widths are set there (``test_couple_over_a_passthrough_centres_on_it``).
+    """
+    xof = {c: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, c in enumerate(row)}
+    heads = {
+        (lay.nid[level - 1][lay.fam[level][k]], lay.nid[level - 1][lay.fam[level][k] + 1])
+        for level in range(1, len(lay.nid))
+        for k, c in enumerate(lay.nid[level])
+        if c in lay.passthrough and lay.spouse[level - 1][lay.fam[level][k]]
+    }
+    members = {c for couple in heads for c in couple}
+    return [abs(xof[a] - xof[b]) for a, b in _layout2_mod._couples(lay) if a not in members and b not in members]
 
 
 @pytest.mark.parametrize("name", [*_DRAWABLE, "c05"])
@@ -349,6 +356,20 @@ def test_drawn_couples_stay_tight(name: str) -> None:
     lay = render.layout(test_render._load(name) if name in _DRAWABLE else _load_pair(name))
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"
+
+
+def test_couple_over_a_passthrough_centres_on_it() -> None:
+    # I-1 x I-3's child is drawn on row III: the couple's midpoint sits over the pass-through on row II, and the
+    # pass-through over the child, so the descent is one straight line.
+    lay = render.layout(test_render._load("descent_across_rows"))
+    ((cell,),) = [[c for c in row if c in lay.passthrough] for row in lay.nid if any(c in lay.passthrough for c in row)]
+    level, k = next((lv, row.index(cell)) for lv, row in enumerate(lay.nid) if cell in row)
+    pc = lay.fam[level][k]
+    assert lay.spouse[level - 1][pc], "the pass-through descends from a couple"
+    mid = (lay.pos[level - 1][pc] + lay.pos[level - 1][pc + 1]) / 2
+    assert abs(lay.pos[level][k] - mid) < _EPS
+    (child_k,) = [j for j, f in enumerate(lay.fam[level + 1]) if f == k]
+    assert abs(lay.pos[level + 1][child_k] - lay.pos[level][k]) < _EPS
 
 
 def test_c05_couples_are_at_couple_gap() -> None:
@@ -414,3 +435,99 @@ def test_c19_founder_sibship_stays_contiguous() -> None:
     x_head = at[idx[(1, 10)]][2]
     assert at[idx[(1, 1)]][0] == at[idx[(1, 10)]][0], "1-1 and 1-10 share a row (the founder sibship)"
     assert abs(abs(x_leaf - x_head) - render.DEFAULT_GEOMETRY.sib_gap) < _EPS, "1-1 must ride sib_gap from its sibling"
+
+
+# --- rows are IR generations; descents across rows ---------------------------------------------------------
+
+
+def _couple_and_child(child_generation: int, *, top: int = 1, twins: bool = False) -> pb.Pedigree:
+    """A generation-``top`` couple whose children (one, or MZ twins) are drawn on ``child_generation``."""
+    kids = [pb.Position(generation=child_generation, index=i) for i in (1, 2)[: 2 if twins else 1]]
+    return pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=top, index=1, gender=pb.GENDER_MAN),
+            pb.Individual(generation=top, index=2, gender=pb.GENDER_WOMAN),
+            *(pb.Individual(generation=k.generation, index=k.index, gender=pb.GENDER_WOMAN) for k in kids),
+        ],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=top, index=1),
+                partner_b=pb.Position(generation=top, index=2),
+                offspring=[
+                    pb.Offspring(child=k, twin_group=1, twin_type=pb.ZYGOSITY_TYPE_MONOZYGOTIC)
+                    if twins
+                    else pb.Offspring(child=k)
+                    for k in kids
+                ],
+            )
+        ],
+    )
+
+
+def test_first_drawn_generation_numbers_the_gutter() -> None:
+    # A pedigree whose top row is generation II draws II and III — not I and II — and says so in the markup.
+    svg = render.render_svg(_couple_and_child(3, top=2))
+    assert render.layout(_couple_and_child(3, top=2)).first_generation == 2
+    assert re.findall(r'class="generation" data-generation="(\d+)"', svg) == ["2", "3"]
+    assert [t for *_, t in test_render._markers(svg)] == ["II", "III"]
+
+
+def test_descent_across_rows_passes_through_each_crossed_row() -> None:
+    # Children drawn three rows below their parents: one pass-through on each of the two rows between, and
+    # the children hang from the last one, twin grouping intact.
+    p = _couple_and_child(4, twins=True)
+    lay = render.layout(p)
+    assert [sum(c in lay.passthrough for c in row) for row in lay.nid] == [0, 1, 1, 0]
+    assert lay.twins[3][0] == pb.ZYGOSITY_TYPE_MONOZYGOTIC
+    assert [lay.nid[2][f] in lay.passthrough for f in lay.fam[3]] == [True, True]
+
+
+def test_descent_across_rows_is_one_sibship_group_and_no_symbol() -> None:
+    svg = render.render_svg(_couple_and_child(4, twins=True))
+    assert svg.count('class="individual') == 4  # the two parents and the twins; pass-throughs draw no symbol
+    groups = re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)">', svg)
+    assert groups == [("I-1 I-2", "IV-1 IV-2")]
+
+
+def test_couple_across_generations_defers() -> None:
+    # A marry-in on a different generation from their partner has no drawn form (only an avuncular join of two
+    # born-in partners is drawn across generations, via the ghost): deferred, not moved onto the partner's row.
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN),
+            pb.Individual(generation=2, index=1, gender=pb.GENDER_WOMAN),
+            pb.Individual(generation=3, index=1, gender=pb.GENDER_WOMAN),
+        ],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=1, index=1),
+                partner_b=pb.Position(generation=2, index=1),
+                offspring=[pb.Offspring(child=pb.Position(generation=3, index=1))],
+            )
+        ],
+    )
+    with pytest.raises(render.DeferredFeatureError, match="spans generations 1 and 2"):
+        render.layout(p)
+
+
+def test_deferral_names_the_descent_not_a_passthrough() -> None:
+    # I-1's third mating overflows (routed), and its child is drawn a row lower: the deferral names the real
+    # child, not the synthetic pass-through carrying its descent.
+    i = test_render._ind
+    p = pb.Pedigree(
+        individuals=[i(1, 1), i(1, 2), i(1, 3), i(1, 4), i(2, 1), i(2, 2), i(3, 1)],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=1, index=1),
+                partner_b=pb.Position(generation=1, index=k),
+                offspring=[pb.Offspring(child=child)],
+            )
+            for k, child in (
+                (2, pb.Position(generation=2, index=1)),
+                (3, pb.Position(generation=2, index=2)),
+                (4, pb.Position(generation=3, index=1)),
+            )
+        ],
+    )
+    with pytest.raises(render.DeferredFeatureError, match="'descent to 3-1'"):
+        render.layout(p)

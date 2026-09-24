@@ -41,9 +41,10 @@ is MIT).
 
 Full spec in [`layout-v2.md`](layout-v2.md); the shape drawing depends on:
 
-1. **Generation ranks (hard)** — `kindepth` (depth = longest path from a founder) then marry-in alignment (push the
-   shallower lineage down so spouses share a row). An avuncular (cross-generation) join is drawn by duplicating the
-   shallower partner as a **ghost** on the deeper row; interlocking consanguinity loops are detected and deferred.
+1. **Generation ranks (hard)** — each individual's row is its IR generation, the row the figure draws it on. A descent
+   spanning several rows passes through a cell on each row it crosses. An avuncular (cross-generation) join is drawn by
+   duplicating the shallower partner as a **ghost** on the deeper row; interlocking consanguinity loops are detected and
+   deferred.
 1. **Ordering** — a deterministic left→right order per rank by weighted-median + transposition crossing minimization
    (dot's `mincross`), couples and twin groups kept contiguous as adjacency atoms. A same-generation cross-lineage /
    loop marriage becomes an ordinary adjacent couple once ordering pulls each partner to its sibship end; an individual
@@ -96,11 +97,11 @@ the single-condition affected/carrier fills above are drawn, the multi-region ca
 text equals a line already present (e.g. an extractor that repeats the id). The deprecated `label` field is never drawn.
 Lines use `LABEL_SIZE`, separated by `LABEL_LINE_GAP`; the first line sits `LABEL_GAP` below the symbol's bottom edge.
 
-**Generation markers.** A Roman numeral (`I`, `II`, … from the 1-based level) is drawn once per row in a reserved **left
-gutter** of width `GEN_MARKER_GUTTER`, at the gutter's horizontal centre and on the row's symbol-centre `y`. The whole
-drawing shifts right by the gutter (hence the `GEN_MARKER_GUTTER` term in `px`); the gutter sits left of `MARGIN`, and
-because `MARGIN` exceeds the leftmost symbol's proband-arrow / slash overhang, the marker never collides with a symbol
-or an arrow — the collision that made an earlier, gutter-less attempt untenable.
+**Generation markers.** A Roman numeral (the row's IR generation, so a pedigree whose top row is `II` starts there) is
+drawn once per row in a reserved **left gutter** of width `GEN_MARKER_GUTTER`, at the gutter's horizontal centre and on
+the row's symbol-centre `y`. The whole drawing shifts right by the gutter (hence the `GEN_MARKER_GUTTER` term in `px`);
+the gutter sits left of `MARGIN`, and because `MARGIN` exceeds the leftmost symbol's proband-arrow / slash overhang, the
+marker never collides with a symbol or an arrow — the collision that made an earlier, gutter-less attempt untenable.
 
 **Spacing scales with the labels.** The stack hangs in the generation gap below its symbol, so the reserved space is
 sized from the actual pedigree, not a fixed band:
@@ -148,6 +149,9 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
   single cross-mating that ordering makes an adjacent couple; a surviving cycle is one the ordering cannot open that way
   (`_detect_loops`).
 - **A child of more than one mating** — adoption / multi-parentage the graph model does not yet place (`_derive`).
+- **A couple across generations** other than an avuncular join between two partners with drawn parents — a marry-in
+  numbered on a different generation from their partner has no drawn form; it is deferred rather than moved onto the
+  partner's row (`_rank`).
 - **A routed / overflow mating that *has* offspring** — descent from a non-adjacent parent pair is not yet drawn, so a
   > 2-mate individual whose overflow mating bears children defers rather than mislay the descent (`_build`).
 - **A torn sibship** — an order the ordering could not keep contiguous, so two sibships' descent bars would overlap;

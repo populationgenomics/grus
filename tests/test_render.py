@@ -149,20 +149,14 @@ def test_render_is_deterministic(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", _NAMES)
-def test_generations_are_monotonic_rows(name: str) -> None:
+def test_rows_are_ir_generations(name: str) -> None:
+    # The row is the IR generation (the drawn row), offset so the first generation is level 0 — not a depth
+    # computed from the matings, so a detached branch and a child drawn rows below its parents keep theirs.
     p = _load(name)
-    at = _coords(render.layout(p))
-    idx = _index(p)
-    for m in p.matings:
-        if not m.HasField("partner_a"):
-            continue  # a founder sibship has no drawn parent to rank children against
-        parents = [idx[_pos(m.partner_a)]]
-        if m.HasField("partner_b"):
-            parents.append(idx[_pos(m.partner_b)])
-        for o in m.offspring:
-            child = idx[_pos(o.child)]
-            for parent in parents:
-                assert at[child][0] == at[parent][0] + 1
+    lay = render.layout(p)
+    at = _coords(lay)
+    for i, ind in enumerate(p.individuals):
+        assert at[i][0] == ind.generation - lay.first_generation
 
 
 @pytest.mark.parametrize("name", _NAMES)
