@@ -12,6 +12,8 @@ from __future__ import annotations
 import dataclasses
 import enum
 
+from grus.render._xsolve import XSolver
+
 
 class CarrierStyle(enum.Enum):
     """Which drawing convention to use for a carrier — a rendering choice, not IR meaning.
@@ -85,6 +87,9 @@ class Geometry:
     # default matches the existing literature (dot for X-linked carriers), so re-renders line up with the
     # corpus figures reviewers compare against; PARTITION_FILL gives the NSGC-2022-normalized output.
     carrier_style: CarrierStyle = CarrierStyle.INHERITANCE_GLYPH
+    # The x-solve backend. Z3 is exact (bit-identical positions everywhere, what the goldens are pinned to);
+    # HIGHS is the optional floating-point alternative (the ``highs`` extra).
+    x_solver: XSolver = XSolver.Z3
 
 
 DEFAULT_GEOMETRY = Geometry()

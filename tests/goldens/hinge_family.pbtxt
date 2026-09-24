@@ -1,0 +1,18 @@
+id: "hinge_family"
+labels { text: "Half-siblings: the hinge\'s second family hangs free of the rest" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 1 gender: GENDER_MAN }
+individuals { generation: 2 index: 2 gender: GENDER_MAN deceased: true }
+individuals { generation: 2 index: 3 gender: GENDER_WOMAN deceased: true }
+individuals { generation: 3 index: 1 gender: GENDER_MAN }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 4 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 3 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 4 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 5 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 5 gender: GENDER_WOMAN }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } offspring { child { generation: 2 index: 2 } } }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 3 } offspring { child { generation: 3 index: 1 } } offspring { child { generation: 3 index: 2 } } }
+matings { partner_a { generation: 2 index: 2 } partner_b { generation: 2 index: 4 } offspring { child { generation: 3 index: 3 } } offspring { child { generation: 3 index: 4 } } }
+matings { partner_a { generation: 2 index: 2 } partner_b { generation: 2 index: 5 } offspring { child { generation: 3 index: 5 } } }

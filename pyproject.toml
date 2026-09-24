@@ -22,6 +22,9 @@ requires-python = ">=3.13"
 dependencies = [
   "protobuf>=6,<7",
   "protovalidate>=1.0",
+  # The layout's x-solve: an exact lexicographic linear program (grus/render/_xsolve.py). Exact rationals keep
+  # positions bit-identical on every platform, which the byte-compared goldens rest on.
+  "z3-solver>=4.13",
 ]
 
 # PEP 735 dependency groups, installed on demand with `uv sync --group <name>`.
@@ -35,6 +38,8 @@ lint = ["pre-commit>=4", "ruff>=0.15", "pyright>=1.1.390", "pytest>=8", "types-p
 [project.optional-dependencies]
 # SVG -> PNG (`grus render --png`); cairosvg needs native libcairo.
 raster = ["cairosvg>=2.7"]
+# A floating-point alternative x-solve backend (Geometry(x_solver=XSolver.HIGHS)).
+highs = ["highspy>=1.7"]
 
 [project.scripts]
 grus = "grus.cli:main"

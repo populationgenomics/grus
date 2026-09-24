@@ -44,3 +44,19 @@ jobs:
       - run: uv sync --locked --python 3.13 --extra raster
       - run: uv run python -c "import cairosvg"
       - run: uv run pytest tests/test_render_raster.py
+
+  pytest-highs:
+    # The `highs` extra (the floating-point x-solve backend). Its agreement tests skip when highspy is missing,
+    # which reads as a pass, so the import is asserted before pytest runs.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv sync --locked --python 3.13 --extra highs
+      - run: uv run python -c "import highspy"
+      - run: uv run pytest tests/test_xsolve.py

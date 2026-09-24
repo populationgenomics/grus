@@ -14,7 +14,7 @@ side (c09), a boundary-bridge box-in (c05-class). v2 replaces the recursion **an
 **layout is a constrained coordinate assignment under a constraint hierarchy** — generation ranks are fixed, a small set
 of strengthed pedigree constraints is resolved by *lexicographic relaxation* (drop the weakest constraint in any
 conflict, demoting the affected mating to a **routed edge**), and a deterministic combinatorial solve places x under the
-survivors. Not a weighted objective; not a QP.
+survivors. Not a weighted objective.
 
 ## Background — why the model, not more passes
 
@@ -82,10 +82,15 @@ stages:
    two sets of parents. A tear the search cannot avoid still defers; for cousins whose families sit far apart the fix is
    the routed consanguineous marriage (below), not reordering. Crossing minimization is the *weak*-strength tie-breaker
    among orders the stronger constraints leave free — never overriding contiguity or adjacency.
-1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by a **deterministic
-   combinatorial** method (grus ships iterative barycentre sweeps + per-row PAVA isotonic resolve; the seam admits
-   Brandes–Köpf or network-simplex x-coord). No numeric-solver dependency, bit-reproducible goldens. A relaxed (routed)
-   mating exerts no couple-adjacency pull here, so each parent-anchored partner settles under its own parents.
+1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
+   program** (`_xsolve.py`), subject to the row separations and block rigidity. Its objectives, each minimised among the
+   optima of those before it: (0) every descent lands on its own sib bar — the parents' midpoint within the children's
+   span; (1) centring — each midpoint over its children's centroid, plus a stretch cost on a half-sibling hinge's
+   couples, cheap up to `sib_gap` and steep beyond, so a hinge spreads that far to centre its families and a descent
+   drops to the end of its bar rather than a couple line crossing the figure; (2) the largest excess gap, so slack
+   spreads evenly; (3) the total excess gap; (4) a fixed tie-break, so the optimum is one point. The default backend
+   (z3) solves over exact rationals; HiGHS is an optional floating-point alternative. A relaxed (routed) mating exerts
+   no couple-adjacency pull here, so each parent-anchored partner settles under its own parents.
 1. **Edge routing** — draw each relationship (see below).
 
 ### Hard constraints
@@ -158,10 +163,11 @@ relationship is just an edge the router draws.
 ### Determinism
 
 Goldens are byte-compared, so the whole pipeline must be **bit-deterministic**: no RNG, fixed iteration order,
-deterministic tie-breaks. The strength hierarchy is resolved by lexicographic relaxation and x by a combinatorial solve,
-so no floating QP enters the pipeline — the failure mode that killed `alignped4` in v1 (solver settings drifting the
-residual across a rounding boundary) cannot arise. `pos` is additionally quantised to a fixed grid (Stage D) against
-cross-arch float drift in the barycentre iteration.
+deterministic tie-breaks. The strength hierarchy is resolved by lexicographic relaxation, and x by a linear program the
+default backend solves over exact rationals, so the failure mode that killed `alignped4` in v1 (floating solver settings
+drifting the residual across a rounding boundary) cannot arise: the same model gives the same rationals on every
+platform, and the final objective makes the optimum unique. `pos` is quantised to a fixed grid (Stage D), which also
+absorbs the HiGHS backend's tolerance.
 
 ## Alternatives considered
 
@@ -190,10 +196,16 @@ cross-arch float drift in the barycentre iteration.
   to solve (Stage E already found the hierarchy is structural). The one non-obvious ranking, descent-anchor (strong)
   above couple-adjacency (medium), is what produces the consanguinity-union-as-routed drawing; validate it against the
   review set, not by re-weighting.
-- **x-assignment method.** *Decided:* combinatorial only (grus ships barycentre + PAVA; Brandes–Köpf / network-simplex
-  admissible at the `_assign_x` seam), deterministic and dependency-free. No QP: the strength hierarchy is resolved by
-  relaxation, not weighted minimization, so there is no quadratic objective to hand a solver. The seam stays an
-  interface for a *different* combinatorial method, not for a QP.
+- **x-assignment by relaxation sweeps.** Down/up barycentre sweeps with a per-row PAVA resolve, as shipped before the
+  linear program: dependency-free and fast. Rejected: the sweeps balance centring but have no compactness term, so
+  anything held only through couple midpoints — a half-sibling hinge's married-in spouse and the family descended
+  through that couple, which can slide together without moving any child off its parents — drifted until the pass cap (a
+  12-person pedigree 70 units wide, a 45-person one 458), and the result depended on the cap. Their fixed points also
+  left descents beside their own sib bars (859 of them over 1,562 fuzzed pedigrees, against 37 under the program). A
+  pattern-matched compaction pass fixed one shape and missed others of the class.
+- **A quadratic x-solve.** Squared centring distances trade more gently than absolute ones, and HiGHS solves them. Not
+  taken: a quadratic needs a floating solver, which gives up the exact reproducibility the goldens rest on, and the
+  linear program's balance objective recovers the even spread absolute distances otherwise lack.
 - **Edge-routing style.** Orthogonal polylines (matches Bennett) vs splines; how loop edges avoid symbols; whether a
   routed mating reads as clearly as an adjacent one.
 - **Birth-order demotion.** *Done (Stage D):* demoted from ir.md's "one semantic horizontal fact" to a *soft*

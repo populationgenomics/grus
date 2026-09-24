@@ -16,7 +16,7 @@ defer), never be mislaid out.
 
 from __future__ import annotations
 
-import collections
+import dataclasses
 import itertools
 import os
 import pathlib
@@ -183,31 +183,12 @@ def test_couples_are_adjacent(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
-    # An ordinary couple's midpoint lies within its children's span. Two exceptions. A lone child who is a partner of a
-    # cross-lineage marriage is pulled to stand beside its mate (cousins_across_family), and the drawing routes its
-    # descent down, across and down. A half-sibling hinge's couple can be boxed in by the families beside it and drop
-    # beside its children (hinge_offcentre); what must hold for every couple is that the drop still meets the sib bar
-    # (test_svg_output.test_every_sibship_is_one_connected_drawing).
     p = _load(name)
     at = _coords(render.layout(p))
     idx = _index(p)
-    has_parents = {_pos(o.child) for m in p.matings if m.HasField("partner_a") for o in m.offspring}
-    cross = {
-        _pos(x)
-        for m in p.matings
-        if m.HasField("partner_b") and _pos(m.partner_a) in has_parents and _pos(m.partner_b) in has_parents
-        for x in (m.partner_a, m.partner_b)
-    }
-    mates = collections.Counter(
-        _pos(x) for m in p.matings if m.HasField("partner_b") for x in (m.partner_a, m.partner_b)
-    )
     for m in p.matings:
         if not m.offspring or not m.HasField("partner_a"):
             continue  # a founder sibship centres under an implied hanger, not drawn parents
-        if len(m.offspring) == 1 and _pos(m.offspring[0].child) in cross:
-            continue  # a lone cross-lineage partner stands beside its mate (see above)
-        if m.HasField("partner_b") and max(mates[_pos(m.partner_a)], mates[_pos(m.partner_b)]) > 1:
-            continue  # a hinge's couple (see above)
         parent_x = [at[idx[_pos(m.partner_a)]][2]]
         if m.HasField("partner_b"):
             parent_x.append(at[idx[_pos(m.partner_b)]][2])
@@ -1598,7 +1579,12 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
             ),
         ],
     )
-    lay = render.layout(p)
+    # The exact x-solve centres this shape, so offset it by hand: rows III and IV one unit right of where they
+    # were placed, which leaves III-1 off II-1 x II-2's midpoint with every row's order and spacing intact.
+    placed = render.layout(p)
+    lay = dataclasses.replace(
+        placed, pos=[[x + (1.0 if level >= 2 else 0.0) for x in row] for level, row in enumerate(placed.pos)]
+    )
     draw = _Draw(p, lay, render.DEFAULT_GEOMETRY)
     at, idx = _coords(lay), _index(p)
     (lvl, k, _cx) = at[idx[(3, 1)]]  # III-1: only child of II-1 x II-2
@@ -1607,7 +1593,7 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     assert abs(lay.pos[lvl][k] - (ii1[2] + ii2[2]) / 2) > 0.1, (
         "precondition: III-1 is offset from its parents' midpoint"
     )
-    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render.render_svg(p))
+    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', draw.svg())
     parent_y = draw.py(1)
     # a descent leg leaves the mating midpoint at the parents' row y (the bug emitted a leg only at the child x)
     assert any(

@@ -7,35 +7,23 @@ crossing-minimizing within-rank order.
 ``layout`` wires them: prepare the graph, order each rank, ``_build`` the per-level arrays from that order,
 then replace ``pos`` with the deterministic x-solve below and attach any routed matings.
 
-The x-solve is the classic Sugiyama coordinate-assignment iteration: alternate a **down-sweep** (each child
-onto its parents' anchor) and an **up-sweep** (each mating's midpoint onto its children's centroid), each a
-Gauss-Seidel pass that reads freshly-updated neighbours and then resolves every row back onto the hard order
-+ min-separation. The two directions damp each other (a single all-at-once Jacobi step oscillates on the
-mutual parent<->child pull). The per-row resolve is the Pool Adjacent Violators isotonic regression — the
-exact, O(row), dependency-free minimiser of ``sum (x-desired)^2`` subject to the row's separation chain,
-i.e. a combinatorial QP on the ordering. The iteration contracts to the balanced layout (every drawn
-mating's midpoint exactly over its children's centroid) where the fixed order admits one. No RNG, fixed
-iteration order, no floating solver settings; the final ``pos`` is quantised to a fixed grid so the residual
-of the iterative solve cannot tip a rounding boundary and the byte-compared goldens stay stable across
-arch/compiler.
-
-``_assign_x`` is the seam: a later QP or Brandes-Köpf variant can replace it without touching the relation
-extraction. Design: docs/design/layout-v2.md; plan: docs/plans/28.
+The x-solve (``_x_model`` + ``_xsolve.solve``) chooses every x from one lexicographic linear program over the
+fixed order: descent centring first, then even spacing, then compactness, then a fixed tie-break, subject to the
+row separations and the rigid contiguity blocks (``_xsolve`` states the model and why it replaced iterative
+sweeps). The final ``pos`` is quantised to a fixed grid. Design: docs/design/layout-v2.md; plan: docs/plans/28.
 """
 
 from __future__ import annotations
 
 import collections
 import dataclasses
-from collections.abc import Callable, Iterable
+import itertools
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _layout, _ordering
+from grus.render import _geometry, _layout, _ordering, _xsolve
 
-_MAX_ITERS = 2000  # barycentre sweeps; the contraction converges far inside this on drawable pedigrees
-_TOL = 1e-11  # per-sweep max move to stop at (well below the 1e-9 invariant slack on centring residual)
-_POS_QUANTUM = 6  # decimal places the final x is rounded to, so the iterative solve's residual can't tip a
+_POS_QUANTUM = 6  # decimal places the final x is rounded to, so a floating backend's residual can't tip a
 # rounding boundary — the goldens are byte-compared, so pos must be bit-stable across arch/compiler
 
 
@@ -59,19 +47,6 @@ class _Sibship:
 
 
 @dataclasses.dataclass(frozen=True)
-class _Ctx:
-    """The fixed relations a sweep reads: who each cell descends from and heads.
-
-    Attributes:
-        as_child: cell -> the drawn mating it is a child of (at most one; ``_derive`` defers a multi-parented child).
-        as_parent: cell -> the matings it heads (usually one; a shared hinge heads several).
-    """
-
-    as_child: dict[int, _Sibship]
-    as_parent: dict[int, list[_Sibship]]
-
-
-@dataclasses.dataclass(frozen=True)
 class _Block:
     """A contiguity block on one row: a maximal run of columns the solve translates as one rigid body.
 
@@ -88,10 +63,6 @@ class _Block:
 
     cols: tuple[int, ...]
     offsets: tuple[float, ...]
-
-
-# A per-cell target function for one sweep direction: (x, cell, ctx) -> desired x.
-_Desired = Callable[[list[float], int, _Ctx], float]
 
 
 def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layout.Layout:
@@ -137,7 +108,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     sibships = _relations(built)
     seps = _row_seps(built, geom.couple_gap, geom.sib_gap)
     blocks = _blocks(built, seps, sibships)
-    x = _assign_x(built.nid, seps, sibships, blocks)
+    x = _xsolve.solve(_x_model(built, seps, sibships, blocks, geom), geom.x_solver)
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
     result = dataclasses.replace(built, pos=pos, routed=routed)
@@ -278,49 +249,41 @@ def _row_seps(lay: _layout.Layout, couple_gap: float, sib_gap: float) -> list[li
     ]
 
 
-def _assign_x(
-    rows: list[list[int]],
+def _x_model(
+    lay: _layout.Layout,
     seps: list[list[float]],
     sibships: list[_Sibship],
     blocks: list[list[_Block]],
-) -> list[float]:
-    """The x-assignment seam: deterministic down/up barycentre sweeps + per-row separation resolve.
+    geom: _geometry.Geometry,
+) -> _xsolve.Model:
+    """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch."""
+    rows = lay.nid
+    gaps = tuple((row[k], row[k + 1], seps[level][k]) for level, row in enumerate(rows) for k in range(len(row) - 1))
+    rigid = tuple(
+        (rows[level][a], rows[level][b], blk.offsets[j + 1] - blk.offsets[j])
+        for level, blk, j, a, b in _block_pairs(rows, blocks)
+    )
+    bonded = {(rows[level][a], rows[level][b]) for level, _, _, a, b in _block_pairs(rows, blocks)}
+    couples = tuple(
+        (left, right, geom.couple_gap, geom.sib_gap - geom.couple_gap)
+        for left, right in _couples(lay)
+        if (left, right) not in bonded
+    )
+    return _xsolve.Model(
+        cells=tuple(c for row in rows for c in row),
+        gaps=gaps,
+        rigid=rigid,
+        sibships=tuple((s.parents, s.children) for s in sibships),
+        couples=couples,
+    )
 
-    Returns a cell-indexed x list. Cells are packed left-to-right at their min-separations, then swept until
-    a full down+up pass moves nothing (or the cap is hit). Each row is placed as contiguity ``blocks`` (rigid
-    bodies), not bare cells, so a block never splits. The x has one free translational degree of freedom (no
-    absolute anchor: down and up pulls are both relative), so each pass is re-origined to pin the left edge —
-    otherwise a component with no fixed anchor translates by a constant every pass and the ``_TOL`` stop never
-    trips (the shape is settled but drifting). A QP could replace this function wholesale — the relation
-    extraction and flag wiring do not depend on how x is computed, only on the returned coordinates.
-    """
-    ncells = max((c for row in rows for c in row), default=-1) + 1
-    x = [0.0] * ncells
-    for level, row in enumerate(rows):
-        acc = 0.0
-        for k, c in enumerate(row):
-            if k:
-                acc += seps[level][k - 1]
-            x[c] = acc
-    as_child = {c: s for s in sibships for c in s.children}  # a cell is a child of <=1 drawn mating (_derive guard)
-    as_parent: dict[int, list[_Sibship]] = collections.defaultdict(list)
-    for s in sibships:
-        for pcell in s.parents:
-            as_parent[pcell].append(s)
-    ctx = _Ctx(as_child=as_child, as_parent=as_parent)
-    prev = list(x)
-    for _ in range(_MAX_ITERS):
-        _sweep(x, rows, seps, blocks, range(len(rows)), _down_desired, ctx)
-        _sweep(x, rows, seps, blocks, reversed(range(len(rows))), _up_desired, ctx)
-        shift = min(x, default=0.0)  # re-origin: pin the left edge each pass so the free translation is not drift
-        if shift:
-            for i in range(len(x)):
-                x[i] -= shift
-        delta = max((abs(x[i] - prev[i]) for i in range(len(x))), default=0.0)
-        prev = list(x)
-        if delta < _TOL:
-            break
-    return x
+
+def _block_pairs(rows: list[list[int]], blocks: list[list[_Block]]):
+    """Each adjacent pair of columns inside a block: ``(level, block, j, left col, right col)``."""
+    for level in range(len(rows)):
+        for blk in blocks[level]:
+            for j, (a, b) in enumerate(itertools.pairwise(blk.cols)):
+                yield level, blk, j, a, b
 
 
 def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibship]) -> list[list[_Block]]:
@@ -390,84 +353,3 @@ def _row_blocks(bond: list[bool], ncols: int, row_seps: list[float]) -> list[_Bl
         blocks.append(_Block(cols=cols, offsets=tuple(offsets)))
         k = j + 1
     return blocks
-
-
-def _sweep(
-    x: list[float],
-    rows: list[list[int]],
-    seps: list[list[float]],
-    blocks: list[list[_Block]],
-    order: Iterable[int],
-    desired: _Desired,
-    ctx: _Ctx,
-) -> float:
-    """One Gauss-Seidel pass over the rows in ``order``: retarget each row's blocks, resolve it, write it back.
-
-    Each block is placed as a rigid body: its members' individual desires are averaged into one barycentre
-    ``base = mean(want - offset)`` and every member re-targeted to ``base + offset``, so the block translates to
-    the average of what its members want and keeps its internal spacing exactly. The per-row separation resolve
-    then only ever pools a whole block with a neighbour (moving every member equally), never splits it — a
-    size-1 block reduces to the bare per-cell pull, an ordinary couple to the ``±gap/2`` midpoint step, and a
-    founder sibship to a run that rides with its anchored member.
-    """
-    delta = 0.0
-    for level in order:
-        row = rows[level]
-        want = [desired(x, c, ctx) for c in row]
-        target = list(want)
-        for blk in blocks[level]:
-            base = sum(want[k] - off for k, off in zip(blk.cols, blk.offsets, strict=True)) / len(blk.cols)
-            for k, off in zip(blk.cols, blk.offsets, strict=True):
-                target[k] = base + off
-        for c, nx in zip(row, _resolve_row(target, seps[level]), strict=True):
-            delta = max(delta, abs(nx - x[c]))
-            x[c] = nx
-    return delta
-
-
-def _down_desired(x: list[float], c: int, ctx: _Ctx) -> float:
-    """Down-sweep target: a child onto its parents' anchor (couple cohesion is applied by the rigid-body step)."""
-    s = ctx.as_child.get(c)
-    return s.anchor(x) if s is not None else x[c]
-
-
-def _up_desired(x: list[float], c: int, ctx: _Ctx) -> float:
-    """Up-sweep target: shift a parent so each mating it heads centres its midpoint on that mating's children.
-
-    A shared hinge averages the shifts, balancing the matings it anchors. Couple cohesion is applied by the
-    rigid-body step, not here.
-    """
-    matings = ctx.as_parent.get(c)
-    if matings:
-        return x[c] + sum(s.centroid(x) - s.anchor(x) for s in matings) / len(matings)
-    return x[c]
-
-
-def _resolve_row(desired: list[float], seps: list[float]) -> list[float]:
-    """Project ``desired`` onto the row polytope ``x[k+1] - x[k] >= seps[k]``, minimising squared deviation.
-
-    Substituting ``z[k] = x[k] - cum[k]`` (``cum`` the cumulative required separation) turns the chain into
-    ``z`` non-decreasing, so the exact minimiser is the L2 isotonic regression of ``desired - cum`` — computed
-    by Pool Adjacent Violators (merge a block into its predecessor whenever the predecessor's mean exceeds
-    it). Deterministic and O(row).
-    """
-    n = len(desired)
-    if n == 0:
-        return []
-    cum = [0.0] * n
-    for k in range(1, n):
-        cum[k] = cum[k - 1] + seps[k - 1]
-    sums: list[float] = []
-    counts: list[int] = []
-    for k in range(n):
-        sums.append(desired[k] - cum[k])
-        counts.append(1)
-        while len(sums) >= 2 and sums[-2] * counts[-1] > sums[-1] * counts[-2]:
-            s2, n2 = sums.pop(), counts.pop()
-            s1, n1 = sums.pop(), counts.pop()
-            sums.append(s1 + s2)
-            counts.append(n1 + n2)
-    flat: list[float] = []
-    for s, c in zip(sums, counts, strict=True):
-        flat.extend([s / c] * c)
-    return [flat[k] + cum[k] for k in range(n)]
