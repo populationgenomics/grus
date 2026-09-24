@@ -70,8 +70,15 @@ def order(g: _layout._Graph, cross: set[int]) -> Ordering:
     """
     model = _Model(g)
     routed = model.routed
-    order_map = _init_order(model)
-    order_map = _mincross(model, order_map)
+    init = _init_order(model)
+    order_map = _mincross(model, init)
+    if _total_overlaps(model, order_map):
+        # Local moves cannot reverse an atom and re-sort the rank below it together, so an atom that starts in the
+        # wrong orientation (birth order, where a marriage below needs the reverse) can leave a tear the search never
+        # repairs. Retry once from every atom reversed; keep the better. No cost when nothing is torn.
+        retry = _mincross(model, _reversed_atoms(model, init))
+        if _objective(model, retry) < _objective(model, order_map):
+            order_map = retry
     ranks = [order_map.get(2 * lvl, []) for lvl in range(model.nlevels)]
     return Ordering(ranks=[list(r) for r in ranks], routed=frozenset(routed))
 
@@ -271,6 +278,15 @@ def _init_order(model: _Model) -> dict[int, list[int]]:
         visit_ind(i)
 
     return _regroup(model, appear)
+
+
+def _reversed_atoms(model: _Model, order_map: dict[int, list[int]]) -> dict[int, list[int]]:
+    """``order_map`` with every multi-member atom on the individuals' ranks reversed in place."""
+    out = {r: list(nodes) for r, nodes in order_map.items()}
+    for r in out:
+        if r % 2 == 0:
+            out[r] = [i for unit in _rank_units(model, out, r) for i in reversed(unit)]
+    return out
 
 
 def _regroup(model: _Model, appear: dict[int, list[int]]) -> dict[int, list[int]]:

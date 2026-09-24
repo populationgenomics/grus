@@ -560,3 +560,20 @@ def test_cousins_across_a_family_move_it_aside() -> None:
     # family to the end instead.
     lay = render.layout(test_render._load("cousins_across_family"))
     assert lay.routed == []
+
+
+def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
+    # Twins II-1 and II-2 both marry, a spouse-twin-twin-spouse chain that starts in birth order. II-1's daughter
+    # marries II-3's son, so II-1 must stand next to II-3 and the chain reversed. Local moves cannot reverse it and
+    # re-sort row III together, so the search kept a torn order and the pedigree deferred; the retry from reversed
+    # atoms finds the clean one.
+    p = test_render._load("twins_marry_cousins_apart")
+    lay = render.layout(p)
+    assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == [
+        "2-4",
+        "2-2",
+        "2-1",
+        "2-5",
+        "2-3",
+        "2-6",
+    ]
