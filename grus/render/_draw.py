@@ -678,7 +678,12 @@ class _Draw:
         attach = [sum(self.px(self.lay.pos[level][k]) for k in g) / len(g) for g in groups]
         if len(groups) == 1:
             return [_line(mid_x, parent_y, attach[0], bar_y), *self._twins(level, groups[0], bar_y, top)]
-        out = [_line(mid_x, parent_y, mid_x, bar_y), _line(min(attach), bar_y, max(attach), bar_y)]
+        # The bar reaches the drop: a hinge's couple the rows keep from centring over its children drops beside
+        # them, and a bar spanning only the children would leave that drop ending in mid-air.
+        out = [
+            _line(mid_x, parent_y, mid_x, bar_y),
+            _line(min(*attach, mid_x), bar_y, max(*attach, mid_x), bar_y),
+        ]
         for group, ax in zip(groups, attach, strict=True):
             if len(group) == 1:
                 out.append(_line(ax, bar_y, ax, top))

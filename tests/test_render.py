@@ -16,6 +16,7 @@ defer), never be mislaid out.
 
 from __future__ import annotations
 
+import collections
 import itertools
 import os
 import pathlib
@@ -182,8 +183,11 @@ def test_couples_are_adjacent(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
-    # Except a lone child who is a partner of a cross-lineage marriage: it is pulled to stand beside its mate
-    # (cousins_across_family), and the drawing routes its descent down, across and down.
+    # An ordinary couple's midpoint lies within its children's span. Two exceptions. A lone child who is a partner of a
+    # cross-lineage marriage is pulled to stand beside its mate (cousins_across_family), and the drawing routes its
+    # descent down, across and down. A half-sibling hinge's couple can be boxed in by the families beside it and drop
+    # beside its children (hinge_offcentre); what must hold for every couple is that the drop still meets the sib bar
+    # (test_svg_output.test_every_sibship_is_one_connected_drawing).
     p = _load(name)
     at = _coords(render.layout(p))
     idx = _index(p)
@@ -194,11 +198,16 @@ def test_children_lie_within_parent_span(name: str) -> None:
         if m.HasField("partner_b") and _pos(m.partner_a) in has_parents and _pos(m.partner_b) in has_parents
         for x in (m.partner_a, m.partner_b)
     }
+    mates = collections.Counter(
+        _pos(x) for m in p.matings if m.HasField("partner_b") for x in (m.partner_a, m.partner_b)
+    )
     for m in p.matings:
         if not m.offspring or not m.HasField("partner_a"):
             continue  # a founder sibship centres under an implied hanger, not drawn parents
         if len(m.offspring) == 1 and _pos(m.offspring[0].child) in cross:
             continue  # a lone cross-lineage partner stands beside its mate (see above)
+        if m.HasField("partner_b") and max(mates[_pos(m.partner_a)], mates[_pos(m.partner_b)]) > 1:
+            continue  # a hinge's couple (see above)
         parent_x = [at[idx[_pos(m.partner_a)]][2]]
         if m.HasField("partner_b"):
             parent_x.append(at[idx[_pos(m.partner_b)]][2])
