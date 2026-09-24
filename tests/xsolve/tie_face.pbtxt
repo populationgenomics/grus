@@ -1,0 +1,317 @@
+id: "f218"
+individuals {
+  generation: 1
+  index: 1
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 1
+  index: 2
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 2
+  index: 1
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 2
+  index: 2
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 2
+  index: 3
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 2
+  index: 4
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 3
+  index: 1
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 3
+  index: 2
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 3
+  index: 3
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 3
+  index: 4
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 3
+  index: 5
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 3
+  index: 6
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 3
+  index: 7
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 3
+  index: 8
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 4
+  index: 1
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 4
+  index: 2
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 4
+  index: 3
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 4
+  index: 4
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 4
+  index: 5
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 4
+  index: 6
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 4
+  index: 7
+  gender: GENDER_WOMAN
+}
+individuals {
+  generation: 4
+  index: 8
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 5
+  index: 1
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 5
+  index: 2
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 5
+  index: 3
+  gender: GENDER_MAN
+}
+individuals {
+  generation: 5
+  index: 4
+  gender: GENDER_WOMAN
+}
+matings {
+  partner_a {
+    generation: 1
+    index: 1
+  }
+  partner_b {
+    generation: 1
+    index: 2
+  }
+  offspring {
+    child {
+      generation: 2
+      index: 1
+    }
+  }
+  offspring {
+    child {
+      generation: 2
+      index: 2
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 2
+    index: 1
+  }
+  partner_b {
+    generation: 2
+    index: 3
+  }
+  offspring {
+    child {
+      generation: 3
+      index: 1
+    }
+  }
+  offspring {
+    child {
+      generation: 3
+      index: 2
+    }
+  }
+  offspring {
+    child {
+      generation: 3
+      index: 3
+    }
+  }
+  offspring {
+    child {
+      generation: 3
+      index: 4
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 2
+    index: 2
+  }
+  partner_b {
+    generation: 2
+    index: 4
+  }
+  offspring {
+    child {
+      generation: 3
+      index: 5
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 3
+    index: 2
+  }
+  partner_b {
+    generation: 3
+    index: 6
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 1
+    }
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 2
+    }
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 3
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 3
+    index: 5
+  }
+  partner_b {
+    generation: 3
+    index: 7
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 4
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 3
+    index: 3
+  }
+  partner_b {
+    generation: 3
+    index: 8
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 5
+    }
+    twin_group: 1
+    twin_type: ZYGOSITY_TYPE_DIZYGOTIC
+  }
+  offspring {
+    child {
+      generation: 4
+      index: 6
+    }
+    twin_group: 1
+    twin_type: ZYGOSITY_TYPE_DIZYGOTIC
+  }
+}
+matings {
+  partner_a {
+    generation: 4
+    index: 3
+  }
+  partner_b {
+    generation: 4
+    index: 7
+  }
+  offspring {
+    child {
+      generation: 5
+      index: 1
+    }
+  }
+  offspring {
+    child {
+      generation: 5
+      index: 2
+    }
+  }
+}
+matings {
+  partner_a {
+    generation: 4
+    index: 4
+  }
+  partner_b {
+    generation: 4
+    index: 8
+  }
+  offspring {
+    child {
+      generation: 5
+      index: 3
+    }
+  }
+  offspring {
+    child {
+      generation: 5
+      index: 4
+    }
+  }
+}

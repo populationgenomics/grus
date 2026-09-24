@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import pathlib
 
 import pytest
 import test_render
 
-from grus import render
+from grus import ir, render
 from grus.models import pedigree_pb2 as pb
+from grus.render import _xsolve
 
 _EPS = 1e-6
 
@@ -53,6 +55,30 @@ def test_highs_agrees_with_z3(name: str) -> None:
     assert floating.nid == exact.nid
     for a, b in zip(exact.pos, floating.pos, strict=True):
         assert all(abs(u - v) < _EPS for u, v in zip(a, b, strict=True)), f"{name}: backends disagree"
+
+
+def test_highs_agrees_with_z3_where_the_old_weights_left_a_face() -> None:
+    # A fuzzed 26-person pedigree. Under the old tie-break weights, residues k * 7919 mod 10007, cells 22-25 could
+    # move by (+t, -t, -t, +t) at no cost on any level: the weights' steps take two values, so the direction was
+    # orthogonal to them. Z3 and HiGHS stopped at different ends of that face, 0.625 apart.
+    pytest.importorskip("highspy")
+    p = ir.load_pbtxt((pathlib.Path(__file__).parent / "xsolve" / "tie_face.pbtxt").read_text())
+    exact = render.layout(p)
+    floating = render.layout(p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS))
+    for a, b in zip(exact.pos, floating.pos, strict=True):
+        assert all(abs(u - v) < _EPS for u, v in zip(a, b, strict=True))
+
+
+def test_tie_weights_have_no_small_integer_relation() -> None:
+    # The tie-break settles a face only if no edge direction of it is orthogonal to the weights; those directions
+    # are small integer combinations of nearby cells. No combination with coefficients in -2..2 over any window of
+    # four cells may vanish.
+    model = _xsolve.Model(cells=tuple(range(200)), gaps=(), rigid=(), sibships=())
+    w = _xsolve._tie_weights(model)
+    for k in range(len(w) - 3):
+        for coef in itertools.product(range(-2, 3), repeat=4):
+            if any(coef):
+                assert sum(c * v for c, v in zip(coef, w[k : k + 4], strict=True)) != 0, (k, coef)
 
 
 def _p(g: int, i: int) -> pb.Position:

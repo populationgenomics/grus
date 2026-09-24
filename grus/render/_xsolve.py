@@ -19,8 +19,12 @@ ones before it:
    instead of piling onto one couple or sibship;
 3. **compactness** — the total excess gap;
 4. **tie-break** — a fixed weighted sum of positions, pulling cells left, so the optimum is a single point. The
-   weights follow no arithmetic pattern: a pattern (equal steps) leaves directions such as ``(+1, -2, +1)`` on three
-   consecutive free cells orthogonal to the weights, and so unresolved.
+   optimum after level 3 can be a face, and the tie-break settles it only if no edge direction of that face is
+   orthogonal to the weights. Those directions are small integer combinations of cells (``(+1, -1, -1, +1)`` on
+   four cells, say), so weights with any linear structure fail on some of them: equal steps, and equally residues
+   ``k * a mod p``, whose steps take only two values, so ``w[k+1] - w[k] == w[k+3] - w[k+2]`` for most ``k``
+   (seen as a Z3/HiGHS disagreement on a 26-person pedigree). The weights are hashes of the cell's rank, 32-bit
+   and independent, so a given small direction is orthogonal to them with probability about ``2**-32``.
 
 Subject to the row separations (each adjacent pair at least its gap apart; the order never changes), the rigid
 blocks (each consecutive pair in a block at exactly its separation), and every cell at ``x >= 0``. The objectives
@@ -49,6 +53,7 @@ from __future__ import annotations
 import dataclasses
 import enum
 import fractions
+import hashlib
 from collections.abc import Sequence
 
 
@@ -96,12 +101,19 @@ def solve(model: Model, backend: XSolver) -> dict[int, float]:
     raise ValueError(f"unknown x solver {backend!r}")
 
 
-_TIE_MODULUS = 10007  # a prime; the weights are its residues scrambled by another prime, so they follow no pattern
+_TIE_SCALE = 2**32  # the weights lie in [_TIE_SCALE, 2 * _TIE_SCALE)
 
 
 def _tie_weights(model: Model) -> list[int]:
-    """Distinct positive integer weights along ``cells``, with no arithmetic pattern (see the module docstring)."""
-    return [_TIE_MODULUS + (k * 7919) % _TIE_MODULUS for k in range(len(model.cells))]
+    """Distinct-with-high-probability positive integer weights along ``cells``, with no linear structure.
+
+    Each is a hash of the cell's rank in ``cells`` (see the module docstring), so the weights are fixed per model
+    shape and identical on every platform.
+    """
+    return [
+        _TIE_SCALE + int.from_bytes(hashlib.blake2b(k.to_bytes(8, "little"), digest_size=4).digest(), "little")
+        for k in range(len(model.cells))
+    ]
 
 
 def _q(v: float) -> fractions.Fraction:
@@ -237,7 +249,7 @@ def _solve_highs(model: Model) -> dict[int, float]:
         {**{n + s: 1.0 for s in range(ndev)}, **stretch_cost},  # (the stretch's constant -gap is dropped)
         {worst: 1.0},
         gap_cost,  # sum of gaps; the separations are constant, so this orders like the total excess
-        {col[c]: w / _TIE_MODULUS for w, c in zip(_tie_weights(model), model.cells, strict=True)},
+        {col[c]: w / _TIE_SCALE for w, c in zip(_tie_weights(model), model.cells, strict=True)},
     ]
     for k, obj in enumerate(objectives):
         cost = np.zeros(ncols)
