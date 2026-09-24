@@ -13,10 +13,11 @@ Couple adjacency and twin grouping are STRUCTURE, not soft penalties: each is an
 individuals kept contiguous on their rank, orientation free). A same-generation cross-marriage (a
 boundary-bridge join) is an ordinary couple atom whose two members belong to different families, so ordering
 alone brings the two sibships' ends together — no special placement pass. Sibship contiguity mostly emerges (the
-children of one mating share a connector, so crossing-minimisation clusters them), and the best order the search
-visits is chosen with torn sibships ranked first, so an untorn order it reaches is never lost to one with fewer
-crossings. The moves themselves are priced by crossings: pricing them by tears first traded crossings without
-limit (a tear-free order with dozens of crossings) and cut searches short on shapes that were already clean.
+children of one mating share a connector, so crossing-minimisation clusters them), and the best order the mincross
+loop visits is chosen with torn sibships ranked first, so an untorn order it reaches is never lost to one with fewer
+crossings (the exact search ranks crossings first; ``_exact_ranks`` says why). The moves themselves are priced by
+crossings: pricing them by tears first traded crossings without limit (a tear-free order with dozens of crossings)
+and cut searches short on shapes that were already clean.
 An individual needing more than two 1-D neighbours (>2 matings) overflows: the two highest-weight matings stay
 adjacent, the rest are **routed** (recorded in ``Ordering.routed`` for Stage C; Stage B still defers routed shapes as v1
 does). Determinism is bit-exact: no RNG, sorted integer/identity iteration, a fixed pass count, ``best``
@@ -586,11 +587,17 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
 def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
     """Exact per-rank search on ranks with few atoms.
 
-    Enumerate atom permutations and reversals, keep the min-crossing order (tie-broken by fewer torn sibships,
-    then fewer birth-order inversions, then the smallest identity sequence — the objective's order after
-    crossings, so the settled map is not thrown away for trading birth order for identity). Makes small
-    boundary-bridge ranks provably optimal and their
-    choice deterministic.
+    Enumerate atom permutations and reversals and keep the order with the fewest crossings, then the fewest torn
+    sibships, then the fewest birth-order inversions, then the smallest identity sequence (inversions before
+    identity, so the settled map is not thrown away for trading birth order for identity). On an individuals' rank
+    the cost is the crossings of the band either side, with its connector ranks re-placed for each trial. Makes
+    small boundary-bridge ranks provably optimal and their choice deterministic.
+
+    Crossings rank above tears here, unlike in the objective, because ``_rank_overlaps`` sees a lone child as a
+    point: a lone child moved past another family, its descent then running along that family's bar, counts as
+    a crossing and no tear. Ranking tears first chose those orders, and the drawing merged the two bars into one
+    sibship with two sets of parents (57 of the 72 fuzzed pedigrees it made drawable). The fix is a tear measure
+    that sees the descent, not this key.
     """
     for _ in range(2):  # two settling passes; small and convergent
         for r in range(model.min_rank, model.max_rank + 1):

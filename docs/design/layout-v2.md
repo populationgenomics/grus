@@ -73,10 +73,13 @@ stages:
    chain of both, such as twins joined to one twin's spouse); an atom starts in the orientation with fewer birth-order
    inversions. The moves are local, so a birth-order repair that needs two ranks to change together (a twin marrying
    into another family, whose parents' couples would have to swap) is not found. Pricing moves by tears first was tried
-   and rejected: it traded crossings without limit and stopped searches early on shapes that were already clean. A tear
-   the search cannot avoid still defers; for cousins whose families sit far apart the fix is the routed consanguineous
-   marriage (below), not reordering. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger
-   constraints leave free — never overriding contiguity or adjacency.
+   and rejected: it traded crossings without limit and stopped searches early on shapes that were already clean. The
+   exact search ranks crossings before tears too: the tear measure sees a lone child as a point, so moving one past
+   another family counts only as a crossing, though its descent then runs along that family's bar and the drawing reads
+   as one sibship with two sets of parents. A tear the search cannot avoid still defers; for cousins whose families sit
+   far apart the fix is the routed consanguineous marriage (below), not reordering. Crossing minimization is the
+   *weak*-strength tie-breaker among orders the stronger constraints leave free — never overriding contiguity or
+   adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by a **deterministic
    combinatorial** method (grus ships iterative barycentre sweeps + per-row PAVA isotonic resolve; the seam admits
    Brandes–Köpf or network-simplex x-coord). No numeric-solver dependency, bit-reproducible goldens. A relaxed (routed)
