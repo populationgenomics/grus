@@ -1,8 +1,9 @@
 """Pedigree layout: the constraint model (``layout``) — rank -> ordering -> block x-solve -> routed edges.
 
 This is the layout half of the renderer (docs/design/layout-v2.md). ``_layout`` provides the shared front
-end (validation, generation ranking, marry-in alignment, the avuncular ``ghost``, cross/loop detection) and
-the ``_build`` seam to the drawing arrays; ``_ordering`` provides the crossing-minimizing within-rank order.
+end (validation, the avuncular ``ghost``, cross/loop detection, ranking by IR generation, pass-throughs for a
+descent spanning rows) and the ``_build`` seam to the drawing arrays; ``_ordering`` provides the
+crossing-minimizing within-rank order.
 ``layout`` wires them: prepare the graph, order each rank, ``_build`` the per-level arrays from that order,
 then replace ``pos`` with the deterministic x-solve below and attach any routed matings.
 
@@ -96,8 +97,8 @@ _Desired = Callable[[list[float], int, _Ctx], float]
 def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layout.Layout:
     """Lay ``p`` out on the (level, x) grid; return the per-level arrays the drawing step reads.
 
-    The v2 constraint model, in four stages: validate and prepare the graph (``_layout``'s front end —
-    generation ranks, marry-in alignment, the avuncular ``ghost`` duplication, cross/loop detection); order
+    The v2 constraint model, in four stages: validate and prepare the graph (``_prepare`` — the avuncular
+    ``ghost`` duplication, cross/loop detection, rows from IR generation, pass-throughs); order
     each rank by crossing minimization (``_ordering.order``); ``_build`` the per-level arrays (``fam`` /
     ``spouse`` / ``twins`` / founder sibships) from that order; then replace ``pos`` with the deterministic
     x-solve (``_assign_x``, quantised) and attach any routed matings.
@@ -112,24 +113,25 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
         DeferredFeatureError: a topology the model does not draw (see :class:`DeferredFeatureError`) — an
-            interlocking loop, a child of more than one mating, an order ``_build`` cannot express (a
-            routed/overflow mating that *has* offspring), or a torn sibship whose descent bars would overlap.
+            interlocking loop, a child of more than one mating, a couple across generations other than an
+            avuncular join, an order ``_build`` cannot express (a routed/overflow mating that *has* offspring),
+            or a torn sibship whose descent bars would overlap.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    ir.validate(p)
-    g = _layout._derive(p)
-    ghost_of = _layout._duplicate_cross_generation(g)
-    cross = _layout._cross_matings(g)
-    _layout._detect_loops(g, cross)
-    depth = _layout._kindepth(g)
-    _layout._align_couples(g, depth, cross)
-    base_level = min(depth) if depth else 0
-    g.level = [d - base_level for d in depth]
+    prep = _prepare(p)
+    g = prep.graph
 
-    ordering = _ordering.order(g, cross)
+    ordering = _ordering.order(g, prep.cross)
     xpos = {i: float(k) for row in ordering.ranks for k, i in enumerate(row)}
     foundersib_groups = [mr.kids for mr in g.partnerless]
-    built = _layout._build(g, xpos, ghost_of, foundersib_groups)  # a routed/overflow mating with offspring defers here
+    built = _layout._build(  # a routed/overflow mating with offspring defers here
+        g,
+        xpos,
+        prep.ghost_of,
+        foundersib_groups,
+        first_generation=prep.first_generation,
+        passthrough=prep.passthrough,
+    )
 
     routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
@@ -145,6 +147,33 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
             "child would read as issue of several matings) — an interlocking loop/multi-mate shape; deferred"
         )
     return result
+
+
+@dataclasses.dataclass(frozen=True)
+class _Prepared:
+    """The ranked graph the ordering and ``_build`` read, with what the front end derived on the way."""
+
+    graph: _layout._Graph
+    ghost_of: dict[int, int]
+    cross: set[int]
+    first_generation: int
+    passthrough: frozenset[int]
+
+
+def _prepare(p: pb.Pedigree) -> _Prepared:
+    """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, pass-throughs.
+
+    Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
+    couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
+    """
+    ir.validate(p)
+    g = _layout._derive(p)
+    ghost_of = _layout._duplicate_cross_generation(g)
+    cross = _layout._cross_matings(g)
+    _layout._detect_loops(g, cross)
+    first_generation = _layout._rank(g)
+    passthrough = _layout._insert_passthroughs(g)
+    return _Prepared(g, ghost_of, cross, first_generation, passthrough)
 
 
 def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[int]) -> list[_layout.RoutedMating]:

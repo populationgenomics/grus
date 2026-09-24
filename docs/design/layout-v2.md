@@ -39,9 +39,19 @@ constraints, expressed as a strength hierarchy, not code paths.
 
 ### Ranks (hard)
 
-y is the generation row from `kindepth` + marry-in alignment (v1's phase 1, reused unchanged). Cross-generation matings
-(avuncular) do **not** force a same-row couple — they are a routed edge between two ranks (this subsumes the v1 `ghost`
-duplication).
+y is the individual's IR generation — the row the figure draws them on ([`ir.md`](ir.md)) — offset so the first
+generation is row 0. It is read, not computed. Computing it, as kinship2's `kindepth` does (depth is the longest path
+from a founder, then a spouse's lineage is pulled down to share a row), agrees with the figure on a connected pedigree
+drawn by the book, and disagrees exactly where real figures depart from it: a branch drawn detached because its
+attachment is uncertain has depth 0 and lands in row I, and a child drawn beside half-siblings whose other parent is a
+generation lower comes out one row too high. Both occur in the corpus.
+
+Reading rows from the IR means a descent can span several rows. Each row it crosses gets a **pass-through** cell, the
+dummy node of layered graph drawing: the couple heads the first, each heads the next, and the last heads the real
+sibship. Ordering, the x-solve and drawing then only ever see edges between adjacent rows; a pass-through is ordered and
+spaced like a symbol and drawn as the line through its row. A couple always shares a row. An avuncular marriage, whose
+partners are on different generations, becomes a same-row couple by duplicating the shallower partner as a **ghost** on
+the deeper row; any other couple across generations has no drawn form and defers.
 
 ### The solve (x-positions)
 
@@ -154,6 +164,10 @@ cross-arch float drift in the barycentre iteration.
   loop edges, duplicate only the residual. Produces the right output, and its *insights* (mated members go to ends; up
   to two per sibship) are adopted here — but as **emergent consequences of the soft constraints**, not as coded rules.
   Rejected as an architecture: it re-encodes the objective as bespoke heuristics, keeping the patch treadmill.
+- **Compute ranks from the matings** (kinship2's `kindepth` plus marry-in alignment, v1's phase 1). Needs no generation
+  data, which suits an importer that has none — and grus's importers do exactly this to synthesise generations. For
+  drawing it is rejected: the IR already carries the drawn row, and where the computed rank differs, the figure is right
+  and the computation is wrong (a detached branch, a half-sibling drawn a row lower).
 - **Graphviz `dot` as-is.** The right optimization architecture, but pedigree-blind constraints (couples drift, children
   off-centre, graph-y bends). v2 is "dot's architecture with pedigree constraints", not dot.
 

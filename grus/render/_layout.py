@@ -5,11 +5,15 @@ solver in ``_layout2`` (``layout``), which reuses everything here. What lives he
 
 1. ``_derive`` — parent/spouse/children maps from ``Mating``s, indexing everyone ``0..n-1`` by their
    position in ``Pedigree.individuals`` (the ``Position`` id is for drawing only);
-2. generational ranking (``_kindepth`` = longest path from a founder) then marry-in alignment
-   (``_align_couples`` pulls a shallower spouse's lineage down so partners share a row), plus the
-   avuncular ``ghost`` duplication (``_duplicate_cross_generation``) and the cross-lineage / loop
+2. the avuncular ``ghost`` duplication (``_duplicate_cross_generation``) and the cross-lineage / loop
    detection (``_cross_matings``, ``_detect_loops``);
-3. ``_build`` — emit the per-level arrays (``n / nid / pos / fam / spouse / twins / ...``), the only
+3. ranking (``_rank``): each individual's row is its IR ``generation`` (the drawn row), offset so the
+   pedigree's first generation is row 0 — so a detached branch sits on its own generations and a child
+   drawn more than one row below its parents stays there;
+4. pass-throughs (``_insert_passthroughs``): a descent spanning several rows gets one synthetic cell on
+   each row it crosses, the layered-drawing dummy node, so ordering, x-solve and ``_build`` see only
+   adjacent-row edges and drawing emits one line through the crossed rows;
+5. ``_build`` — emit the per-level arrays (``n / nid / pos / fam / spouse / twins / ...``), the only
    interface the drawing step reads, from a within-rank order. A single-parent sibship is signalled to
    drawing by a zero ``spouse`` on the parent column.
 
@@ -20,6 +24,7 @@ has zero partners (a founder sibship), one (a lone drawn parent), or two.
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 
 from grus.models import pedigree_pb2 as pb
@@ -37,9 +42,11 @@ class DeferredFeatureError(Exception):
     >2-mate individuals via routed edges, two-lineage joins brought adjacent by the ordering), so the
     residual deferral set is small: an interlocking consanguinity loop (a cycle that survives excluding the
     cross-lineage joins — ``_detect_loops``); an individual who is a child of more than one mating
-    (``_derive``); an order ``_build`` cannot express (a routed or overflow mating that *has* offspring —
-    descent from a non-adjacent parent pair); and a torn sibship whose descent bars would overlap. The IR
-    still round-trips; the gap is meant to surface in the eval diff rather than a wrong drawing.
+    (``_derive``); a couple whose partners are on different generations other than an avuncular join between
+    two born-in partners, which draws via the ghost (``_rank``); an order ``_build`` cannot express (a routed
+    or overflow mating that *has* offspring — descent from a non-adjacent parent pair); and a torn sibship
+    whose descent bars would overlap. The IR still round-trips; the gap is meant to surface in the eval diff
+    rather than a wrong drawing.
     """
 
 
@@ -105,6 +112,14 @@ class Layout:
         routed: matings drawn as routed edges rather than adjacent straight lines (a >2-mate individual's
             overflow mating — the partners cannot both be its neighbour). Empty for v1 and for every
             adjacency-drawable shape, so it never perturbs existing output. See ``RoutedMating``.
+        first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
+            ``first_generation + L``. Rows between the first and last generation are kept even when empty
+            (a detached branch several generations down).
+        passthrough: cells whose ``nid`` is a **synthetic pass-through** on a row a descent crosses — the
+            couple (or lone parent) heads the first pass-through, each heads the next, and the last heads the
+            real sibship, which keeps its twins and birth order. Drawing emits no symbol for a pass-through,
+            only the line through it, and one ``sibship`` group from the real parents to the real children.
+            A pass-through index is ``>= len(Pedigree.individuals)``, like a ghost's.
     """
 
     n: list[int]
@@ -117,6 +132,8 @@ class Layout:
     ghost_of: dict[int, int] = field(default_factory=dict)
     founder_sibships: list[tuple[int, tuple[int, ...]]] = field(default_factory=list)
     routed: list[RoutedMating] = field(default_factory=list)
+    first_generation: int = 1
+    passthrough: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -306,7 +323,7 @@ def _cross_matings(g: _Graph) -> set[int]:
     A couple whose *both* members belong to (different) drawn subtrees is not a marry-in the ranking hangs
     off one lineage; it is a join of two lineages. ``_detect_loops`` **excludes** these from the cycle test
     (a same-generation cross-mating is how every drawable consanguinity loop closes, so excluding it leaves a
-    forest), and ``_align_couples`` aligns one whose partners share an IR generation. The v2 ordering then
+    forest). The v2 ordering then
     draws the join as an ordinary adjacent couple by pulling each partner to its sibship end — no special
     placement pass. Single-parent matings are exempt (one partner).
 
@@ -334,8 +351,9 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
     one lineage across the generation boundary would distort a drawn generation. Instead, following
     kinship2/CraneFoot, the shallower partner is **duplicated**: a synthetic ghost individual is created on
     the deeper partner's generation and substituted into the join, so the marriage becomes an ordinary
-    marry-in couple the ranking and ordering place as a same-row couple (the ghost has no parents; alignment
-    pulls it to the deeper row). The real partner keeps its own row and its other matings; drawing renders
+    marry-in couple the ranking and ordering place as a same-row couple (the ghost has no parents and the
+    deeper partner's generation, so it ranks onto that row). The real partner keeps its own row and its other
+    matings; drawing renders
     the ghost as a duplicate of the real individual with a dashed "same individual" link.
 
     Returns ``{ghost_index: real_index}`` for the drawing step; mutates ``g`` in place (appends the ghost
@@ -372,102 +390,102 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
     return ghost_of
 
 
-def _kindepth(g: _Graph) -> list[int]:
-    """Generational depth = longest path from a founder (a child is one below its deepest parent)."""
-    depth = [0] * g.n
-    for _ in range(g.n + 1):
-        changed = False
-        for mr in g.matings:
-            if mr.partnerless:
-                continue  # a founder sibship has no drawn parent to push its offspring down from
-            base = max(depth[pk] for pk in mr.partners) + 1
-            for k in mr.kids:
-                if base > depth[k]:
-                    depth[k] = base
-                    changed = True
-        if not changed:
-            return depth
-    raise DeferredFeatureError("ancestry cycle detected while ranking generations")  # pragma: no cover
+def _rank(g: _Graph) -> int:
+    """Set ``g.level`` from each individual's IR ``generation``; return the generation drawn on level 0.
 
+    Generation is the drawn row (docs/design/ir.md), so it is the rank: no depth is computed. A branch whose
+    founders are drawn several generations down keeps its generations, and a child drawn more than one row
+    below its parents (beside half-siblings whose other parent is lower) stays there — ``_insert_passthroughs``
+    carries its descent across the rows between. ``grus.ir.validate`` has already checked that every child is
+    below its parents and that siblings share a generation.
 
-def _align_couples(g: _Graph, depth: list[int], cross: set[int]) -> None:
-    """Marry-in alignment: pull the shallower partner's lineage down so every couple shares a row.
-
-    Only two-partner matings need alignment (a lone parent has no partner to level with). A cross-lineage
-    join is **aligned only when its partners share an IR generation** — then a computed-level split between
-    them (as in c16, where one partner descends from a founder marry-in and the other from a longer lineage)
-    is a ``kindepth`` artifact to correct, not a real generation gap, and pulling the shallower lineage down
-    makes the join a same-row couple the ordering brings adjacent. A join whose partners sit on **different**
-    IR generations is a genuine cross-generation marriage (uncle-niece) — left mismatched here and handled by
-    ghost duplication (``_duplicate_cross_generation``), never force-aligned (that would distort a drawn
-    generation). Repeatedly
-    take the worst-mismatched couple, push the shallow member and all its ancestors down by the gap, then
-    re-relax descendants. Depths only increase and are bounded, so this converges.
+    Raises:
+        DeferredFeatureError: a couple's partners are on different generations. The one cross-generation
+            marriage drawn — an avuncular join of two born-in partners — was turned into a same-row couple by
+            ``_duplicate_cross_generation`` before ranking; any other has no drawn form.
     """
-    anc = _ancestors(g)
-    for _ in range(g.n * g.n + 1):
-        _relax_down(g, depth)
-        worst: _Mating | None = None
-        gap = 0
-        for mr in g.matings:
-            if mr.b is None or (mr.index in cross and not _same_generation(g, mr)):
-                continue
-            d = abs(depth[mr.a] - depth[mr.b])
-            if d > gap:
-                gap, worst = d, mr
-        if worst is None:
-            return
-        b = worst.b
-        assert b is not None  # only two-partner matings enter `worst` (single-parent skipped above)
-        shallow = worst.a if depth[worst.a] < depth[b] else b
-        deep = worst.other(shallow)
-        delta = depth[deep] - depth[shallow]
-        for node in anc(shallow) | {shallow}:
-            depth[node] += delta
-    raise DeferredFeatureError("could not align generations (unexpected topology)")  # pragma: no cover
+    first = min((ind.generation for ind in g.individuals), default=1)
+    g.level = [ind.generation - first for ind in g.individuals]
+    for mr in g.matings:
+        if mr.b is not None and g.level[mr.a] != g.level[mr.b]:
+            raise DeferredFeatureError(
+                f"couple {g.label(mr.a)!r} x {g.label(mr.b)!r} spans generations "
+                f"{g.individuals[mr.a].generation} and {g.individuals[mr.b].generation}; only a marriage between "
+                "two partners with drawn parents is drawn across generations"
+            )
+    return first
 
 
-def _same_generation(g: _Graph, mr: _Mating) -> bool:
-    """Whether a two-partner mating's partners carry the same IR ``generation`` (the drawn pedigree row)."""
-    assert mr.b is not None
-    return g.individuals[mr.a].generation == g.individuals[mr.b].generation
+def _insert_passthroughs(g: _Graph) -> frozenset[int]:
+    """Carry every descent that spans more than one row through a synthetic cell on each row it crosses.
+
+    For a mating whose children sit ``d > 1`` rows below its partners (siblings share a row, so the gap is the
+    sibship's), the mating's offspring become one pass-through on the next row; each pass-through is the lone
+    parent of the next; the last is the lone parent of the real children, keeping their birth order and twin
+    groups. After this every parent -> child edge joins adjacent rows, which is all the ordering, x-solve and
+    ``_build`` handle. A pass-through's identity is ``(row generation, 1_000_000 * child generation + child
+    index)`` of the sibship's first child: stable under a shuffle of the input and distinct from every real
+    individual, so the ordering's tie-break stays deterministic.
+
+    Mutates ``g`` in place (appends the pass-through individuals and their lone-parent matings, rewrites the
+    spanning mating's offspring and the parent pointers); returns the pass-through indices.
+    """
+    passthrough: set[int] = set()
+    for mi, mr in enumerate(list(g.matings)):
+        if mr.partnerless or not mr.offspring:
+            continue
+        top = g.level[mr.partners[0]]
+        gap = g.level[mr.offspring[0].child] - top
+        if gap <= 1:
+            continue
+        first_child = g.individuals[mr.offspring[0].child]
+        chain: list[int] = []
+        for row in range(top + 1, top + gap):
+            cell = len(g.individuals)
+            g.individuals.append(
+                pb.Individual(
+                    generation=first_child.generation - (top + gap - row),
+                    index=1_000_000 * first_child.generation + first_child.index,
+                )
+            )
+            g.level.append(row)
+            g.matings_of[cell] = []
+            chain.append(cell)
+            passthrough.add(cell)
+        head = _Mating(
+            index=mi,
+            partners=mr.partners,
+            consanguineous=mr.consanguineous,
+            offspring=(_Off(child=chain[0], twin_group=None, twin_type=0),),
+            childlessness=mr.childlessness,
+        )
+        g.matings[mi] = head
+        for pk in mr.partners:
+            g.matings_of[pk] = [head if m.index == mi else m for m in g.matings_of[pk]]
+        g.parents[chain[0]] = mr.partners
+        for upper, lower in itertools.pairwise(chain):
+            _add_lone_parent_mating(g, upper, (_Off(child=lower, twin_group=None, twin_type=0),))
+            g.parents[lower] = (upper,)
+        _add_lone_parent_mating(g, chain[-1], mr.offspring)
+        for k in mr.kids:
+            g.parents[k] = (chain[-1],)
+    return frozenset(passthrough)
 
 
-def _relax_down(g: _Graph, depth: list[int]) -> None:
-    """Push children down until each sits exactly one row below its deepest parent (increase-only)."""
-    for _ in range(g.n + 1):
-        changed = False
-        for mr in g.matings:
-            if mr.partnerless:
-                continue
-            base = max(depth[pk] for pk in mr.partners) + 1
-            for k in mr.kids:
-                if base > depth[k]:
-                    depth[k] = base
-                    changed = True
-        if not changed:
-            return
-
-
-def _ancestors(g: _Graph):
-    """Return a memoised ``i -> set of proper ancestors`` function (loop-free, so it terminates)."""
-    memo: dict[int, frozenset[int]] = {}
-
-    def anc(i: int) -> frozenset[int]:
-        if i in memo:
-            return memo[i]
-        acc: set[int] = set()
-        for par in g.parents.get(i, ()):
-            acc.add(par)
-            acc |= anc(par)
-        memo[i] = frozenset(acc)
-        return memo[i]
-
-    return anc
+def _add_lone_parent_mating(g: _Graph, parent: int, offspring: tuple[_Off, ...]) -> None:
+    mating = _Mating(index=len(g.matings), partners=(parent,), consanguineous=False, offspring=offspring)
+    g.matings.append(mating)
+    g.matings_of[parent].append(mating)
 
 
 def _build(
-    g: _Graph, xpos: dict[int, float], ghost_of: dict[int, int], foundersib_groups: list[tuple[int, ...]]
+    g: _Graph,
+    xpos: dict[int, float],
+    ghost_of: dict[int, int],
+    foundersib_groups: list[tuple[int, ...]],
+    *,
+    first_generation: int = 1,
+    passthrough: frozenset[int] = frozenset(),
 ) -> Layout:
     """Bucket placed individuals into per-level arrays and derive fam / spouse / twins / founder sibships."""
     base_x = min(xpos.values()) if xpos else 0.0
@@ -560,4 +578,6 @@ def _build(
         childless=childless,
         ghost_of=ghost_of,
         founder_sibships=founder_sibships,
+        first_generation=first_generation,
+        passthrough=passthrough,
     )

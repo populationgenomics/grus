@@ -36,8 +36,10 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
 * ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``, ``routed``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
-  (``sibship founder`` for a parentless hanger). ``<g class="ghost-link" data-position=…>`` per dashed
-  same-individual connector. ``<g class="generation" data-generation=…>`` per Roman-numeral marker.
+  (``sibship founder`` for a parentless hanger); a descent drawn across rows — children more than one
+  generation below their parents — is one group holding the line through every row it crosses.
+  ``<g class="ghost-link" data-position=…>`` per dashed same-individual connector.
+  ``<g class="generation" data-generation=…>`` per Roman-numeral marker, numbered by IR generation.
 * ``id_prefix`` goes in front of every id and id reference (clip paths included); it must be empty or an
   id-safe token (a letter or underscore, then letters, digits, ``_``, ``.``, ``-``). A composed figure
   prefixes its tiles ``p0-``, ``p1-``, … under the caller's prefix; a caller inlining several figures on
@@ -396,6 +398,10 @@ class _Draw:
         """The individual in cell ``idx`` — resolving a synthetic ghost (cross-generation duplicate) to its real."""
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
+    def _cell_w(self, idx: int) -> float:
+        """The width cell ``idx``'s label stack reserves; a pass-through draws a line only, and reserves none."""
+        return 0.0 if idx in self.lay.passthrough else self._label_w(self._ind_at(idx))
+
     def _label_w(self, ind: pb.Individual) -> float:
         """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
 
@@ -433,8 +439,8 @@ class _Draw:
                 cl, cr = col_of[row[left]], col_of[row[right]]
                 if cl == cr:
                     continue
-                wi = self._label_w(self._ind_at(self.lay.nid[level][left]))
-                wj = self._label_w(self._ind_at(self.lay.nid[level][right]))
+                wi = self._cell_w(self.lay.nid[level][left])
+                wj = self._cell_w(self.lay.nid[level][right])
                 clearances[cr].append((cl, (wi + wj) / 2 + self.geom.label_size))
         offset = [0.0] * len(cols)
         for c in range(1, len(cols)):
@@ -454,7 +460,7 @@ class _Draw:
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
             for k, x in enumerate(row):
-                extent = max(self.half, self._label_w(self._ind_at(self.lay.nid[level][k])) / 2)
+                extent = max(self.half, self._cell_w(self.lay.nid[level][k]) / 2)
                 los.append(self._px[x] - extent)
                 his.append(self._px[x] + extent)
         return (min(los), max(his)) if los else (0.0, 0.0)
@@ -503,8 +509,9 @@ class _Draw:
         x = self.geom.gen_marker_gutter / 2
         out: list[str] = []
         for level in range(len(self.lay.nid)):
-            out.append(_open_g(["generation"], {"data-generation": str(level + 1)}))
-            out.append(_text(x, self.py(level), _roman(level + 1), _GEN_MARKER_SIZE))
+            generation = self.lay.first_generation + level
+            out.append(_open_g(["generation"], {"data-generation": str(generation)}))
+            out.append(_text(x, self.py(level), _roman(generation), _GEN_MARKER_SIZE))
             out.append("</g>")
         return out
 
@@ -611,20 +618,38 @@ class _Draw:
         return out
 
     def _descents(self) -> list[str]:
-        """Descent drop + sibship bar + per-child stubs, grouping children by their parent (couple or lone)."""
+        """Descent drop + sibship bar + per-child stubs, grouping children by their parent (couple or lone).
+
+        A sibship hung from a pass-through is the end of a descent across rows: its group names the real
+        parents at the top of the chain and holds every hop — the drop to each pass-through, the line through
+        it, and the final sibship. The hops into pass-throughs are drawn there, not as sibships of their own.
+        """
         out: list[str] = []
         for level in range(1, len(self.lay.nid)):
             groups: dict[int, list[int]] = {}
             for k in range(self.lay.n[level]):
                 pc = self.lay.fam[level][k]
-                if pc >= 0:
+                if pc >= 0 and self.lay.nid[level][k] not in self.lay.passthrough:
                     groups.setdefault(pc, []).append(k)
             for pc in sorted(groups):
-                parents = [self._cell_position(level - 1, pc)]
-                if self.lay.spouse[level - 1][pc]:
-                    parents.append(self._cell_position(level - 1, pc + 1))
+                hops: list[str] = []
+                top_level, top_pc = level - 1, pc
+                while self.lay.nid[top_level][top_pc] in self.lay.passthrough:
+                    through_y = self.py(top_level)
+                    through_x = self.px(self.lay.pos[top_level][top_pc])
+                    hops = [
+                        *self._sibship(top_level, self.lay.fam[top_level][top_pc], [top_pc]),
+                        _line(through_x, through_y - self.half, through_x, through_y),
+                        *hops,
+                    ]
+                    top_pc = self.lay.fam[top_level][top_pc]
+                    top_level -= 1
+                parents = [self._cell_position(top_level, top_pc)]
+                if self.lay.spouse[top_level][top_pc]:
+                    parents.append(self._cell_position(top_level, top_pc + 1))
                 children = " ".join(self._cell_position(level, k) for k in groups[pc])
                 out.append(_open_g(["sibship"], {"data-parents": " ".join(parents), "data-children": children}))
+                out += hops
                 out += self._sibship(level, pc, groups[pc])
                 out.append("</g>")
         return out
@@ -727,6 +752,8 @@ class _Draw:
         for level in range(len(self.lay.nid)):
             for k in range(self.lay.n[level]):
                 idx = self.lay.nid[level][k]
+                if idx in self.lay.passthrough:
+                    continue  # a descent's line through this row, drawn by _descents
                 cx, cy = self.px(self.lay.pos[level][k]), self.py(level)
                 real = self.lay.ghost_of.get(idx)
                 if real is not None:
