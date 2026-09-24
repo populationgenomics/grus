@@ -68,8 +68,11 @@ stages:
    zero-crossing order: the settling pass is what puts a parent over its child among equal-crossing orders). Each
    transposition move is priced locally (the two swapped units' endpoint pairs, `dot`'s in/out-cross) and accepted on a
    strict crossing decrease, or on a tie when it strictly repairs birth order or returns a couple to its IR partner
-   order — so every sweep terminates. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger
-   constraints leave free — never overriding contiguity or adjacency.
+   order — so every sweep terminates. The moves are adjacent-unit swaps and reversals of a whole adjacency atom (a
+   couple, a twin group, or a chain of both, such as twins joined to one twin's spouse); an atom starts in the
+   orientation with fewer birth-order inversions, so birth order yields only to what a mating forces. Crossing
+   minimization is the *weak*-strength tie-breaker among orders the stronger constraints leave free — never overriding
+   contiguity or adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by a **deterministic
    combinatorial** method (grus ships iterative barycentre sweeps + per-row PAVA isotonic resolve; the seam admits
    Brandes–Köpf or network-simplex x-coord). No numeric-solver dependency, bit-reproducible goldens. A relaxed (routed)
