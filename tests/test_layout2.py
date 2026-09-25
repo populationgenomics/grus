@@ -81,14 +81,14 @@ def _crossings(p: pb.Pedigree, ranks: list[list[int]]) -> int:
     return _ordering_mod.count_crossings(_prepared(p), ranks)
 
 
-def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, int]]]:
-    """Per-rank stable identities ``(generation, index)`` — the arrangement independent of row indexing.
+def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, ...]]]:
+    """Per-rank stable identities (``_Graph.ident``) — the arrangement independent of row indexing.
 
     Read from the prepared graph, so a pass-through cell has its synthetic identity (keyed on the sibship it
     leads to, not on the input order).
     """
-    individuals = _layout2_mod._prepare(p).graph.individuals
-    return [[(individuals[i].generation, individuals[i].index) for i in row] for row in ranks]
+    graph = _layout2_mod._prepare(p).graph
+    return [[graph.ident(i) for i in row] for row in ranks]
 
 
 def _shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
@@ -845,7 +845,7 @@ def test_facing_seeds_do_not_depend_on_input_order() -> None:
     from grus.render import _layout2 as l2
     from grus.render import _ordering
 
-    def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, int], ...], list[tuple[int, int]]]]:
+    def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, ...], ...], list[tuple[int, ...]]]]:
         prep = l2._prepare(p)
         model = _ordering._Model(prep.graph)
         by_index = {mr.index: mr for mr in prep.graph.matings}
@@ -1037,3 +1037,31 @@ def test_render_is_shuffle_invariant(name: str) -> None:
     ref = render.render_svg(p)
     for seed in range(4):
         assert render.render_svg(_shuffled(p, seed)) == ref
+
+
+def _two_nieces(offset: int) -> pb.Pedigree:
+    """Uncle II-1 marries nieces III-1 and III-2 (two ghosts on row III); ``offset`` is added to row III's indexes."""
+    woman = pb.GENDER_WOMAN
+    niece = [(3, 1 + offset), (3, 2 + offset)]
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(2, 4), _ghost_ind(*niece[0], woman), _ghost_ind(*niece[1], woman)]
+    people += [_ghost_ind(4, 1), _ghost_ind(4, 2)]
+    matings = [
+        _ghost_mating((1, 1), (1, 2), (2, 1), (2, 2), (2, 4)),
+        _ghost_mating((2, 2), (2, 3), *niece),
+        _ghost_mating((2, 1), niece[0], (4, 1), consang=True),
+        _ghost_mating((2, 1), niece[1], (4, 2), consang=True),
+    ]
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+def test_no_valid_index_reorders_a_ghost() -> None:
+    # A ghost's identity is tagged, not a large number, so a real index anywhere in the valid range (up to 2**31 - 1)
+    # neither collides with it nor changes where it stands.
+    def arrangement(p: pb.Pedigree) -> list[list[str]]:
+        lay = render.layout(p)
+        return [["ghost" if i in lay.ghost_of else f"{p.individuals[i].generation}" for i in row] for row in lay.nid]
+
+    ref = arrangement(_two_nieces(0))
+    for offset in (999_999_999, 1_000_000_000, 2**31 - 3):
+        assert arrangement(_two_nieces(offset)) == ref
