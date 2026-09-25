@@ -22,6 +22,11 @@ message PedigreeLayout {
   }
 }
 
+// The stored layouts of a PedigreeSet's pedigrees, one per pedigree in the set's order.
+message PedigreeSetLayout {
+  repeated PedigreeLayout pedigrees = 1;
+}
+
 // What the layout depended on. A layout is valid for a pedigree + geometry only if all three match.
 message LayoutKey {
   // grus's layout-algorithm version; bumped by any grus change that alters a layout.

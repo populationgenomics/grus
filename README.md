@@ -8,6 +8,7 @@ uv add grus            # or: pip install grus
 grus import family.fam -o family.pbtxt      # PLINK/LINKAGE PED, kinship2 tables, Phenopackets Family, Open Pedigree JSON
 grus validate family.pbtxt
 grus render family.pbtxt -o family.svg      # --png with the `raster` extra (needs libcairo)
+grus layout family.pbtxt -o family.layout.pbtxt   # lay out once; `grus render --layout` then draws from it
 ```
 
 ```python

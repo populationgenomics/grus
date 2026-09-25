@@ -8,6 +8,10 @@ entry points and are not dispatched from here.
 Input is a ``PedigreeSet`` or a bare ``Pedigree`` in either text surface (pbtxt / proto3-JSON); the
 surface is taken from the file suffix (``.json`` -> JSON, anything else -> pbtxt) unless ``--format``
 says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure.
+
+``layout`` writes an IR file's stored layout (a ``PedigreeLayout``, or a ``PedigreeSetLayout`` for a set) in the
+same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
+(docs/design/layout-store.md).
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ from typing import Literal
 from google.protobuf import json_format, text_format
 
 from grus import convert, ir, render
+from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 
 TextFormat = Literal["pbtxt", "json"]
@@ -90,15 +95,27 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _load_stored(path: pathlib.Path, for_set: bool) -> lpb.PedigreeLayout | lpb.PedigreeSetLayout:
+    """Parse a stored-layout file of the kind the IR input needs (a set's layout for a set)."""
+    parse = json_format.Parse if _text_format(path, None) == "json" else text_format.Parse
+    return parse(path.read_text(), lpb.PedigreeSetLayout() if for_set else lpb.PedigreeLayout())
+
+
 def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
+    is_set = isinstance(loaded, pb.PedigreeSet)
+    stored = _load_stored(args.layout, is_set) if args.layout is not None else None
     try:
-        svg = (
-            render.render_set_svg(loaded, geom, id_prefix=args.id_prefix)
-            if isinstance(loaded, pb.PedigreeSet)
-            else render.render_svg(loaded, geom, id_prefix=args.id_prefix)
-        )
+        if isinstance(loaded, pb.PedigreeSet):
+            layouts = list(stored.pedigrees) if isinstance(stored, lpb.PedigreeSetLayout) else None
+            svg = render.render_set_svg(loaded, geom, id_prefix=args.id_prefix, stored_layouts=layouts)
+        else:
+            one = stored if isinstance(stored, lpb.PedigreeLayout) else None
+            svg = render.render_svg(loaded, geom, id_prefix=args.id_prefix, stored_layout=one)
+    except render.StaleLayoutError as e:
+        print(f"grus render: error: {args.layout}: {e}", file=sys.stderr)
+        return 1
     except ValueError as e:  # the renderer's argument checks (id_prefix), reported as a usage error
         print(f"grus render: error: {e}", file=sys.stderr)
         return 2
@@ -117,6 +134,24 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_layout(args: argparse.Namespace) -> int:
+    loaded = load_ir(args.input, _text_format(args.input, args.format))
+    geom = _geometry(args)
+    record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
+        lpb.PedigreeSetLayout(pedigrees=[render.store_layout(p, geom) for p in loaded.pedigrees])
+        if isinstance(loaded, pb.PedigreeSet)
+        else render.store_layout(loaded, geom)
+    )
+    out: pathlib.Path | None = args.output
+    fmt = args.to or (_text_format(out, None) if out is not None else "pbtxt")
+    text = json_format.MessageToJson(record) if fmt == "json" else text_format.MessageToString(record)
+    if out is None:
+        sys.stdout.write(text)
+    else:
+        out.write_text(text)
+    return 0
+
+
 def _cmd_import(args: argparse.Namespace) -> int:
     ps = convert.import_file(args.input, fmt=args.from_format)
     text = ir.dump_set_json(ps) if args.to == "json" else ir.dump_set_pbtxt(ps)
@@ -128,8 +163,8 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the ``grus`` argument parser with its validate / render / import subcommands."""
-    parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, import.")
+    """Build the ``grus`` argument parser with its validate / render / layout / import subcommands."""
+    parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, layout, import.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     validate = sub.add_parser("validate", help="parse + validate IR files (pbtxt / JSON), report each")
@@ -153,7 +188,21 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[s.value for s in render.CarrierStyle],
         help="carrier glyph convention (default: inheritance_glyph)",
     )
+    render_cmd.add_argument(
+        "--layout",
+        type=pathlib.Path,
+        help="draw from this stored layout (from `grus layout`) instead of laying out; refused if stale",
+    )
     render_cmd.set_defaults(func=_cmd_render)
+
+    layout_cmd = sub.add_parser("layout", help="lay an IR file out once and write the stored layout")
+    layout_cmd.add_argument("input", type=pathlib.Path)
+    layout_cmd.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
+    layout_cmd.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
+    layout_cmd.add_argument(
+        "--to", choices=("pbtxt", "json"), help="text surface to write (default: from the output suffix, else pbtxt)"
+    )
+    layout_cmd.set_defaults(func=_cmd_layout, carrier_style=None)
 
     imp = sub.add_parser("import", help="convert an external pedigree file into the IR")
     imp.add_argument("input", type=pathlib.Path)

@@ -37,6 +37,12 @@ class PedigreeLayout(_message.Message):
     deferred: str
     def __init__(self, key: _Optional[_Union[LayoutKey, _Mapping]] = ..., placement: _Optional[_Union[Placement, _Mapping]] = ..., deferred: _Optional[str] = ...) -> None: ...
 
+class PedigreeSetLayout(_message.Message):
+    __slots__ = ("pedigrees",)
+    PEDIGREES_FIELD_NUMBER: _ClassVar[int]
+    pedigrees: _containers.RepeatedCompositeFieldContainer[PedigreeLayout]
+    def __init__(self, pedigrees: _Optional[_Iterable[_Union[PedigreeLayout, _Mapping]]] = ...) -> None: ...
+
 class LayoutKey(_message.Message):
     __slots__ = ("algorithm_version", "pedigree_digest", "geometry")
     ALGORITHM_VERSION_FIELD_NUMBER: _ClassVar[int]

@@ -123,3 +123,42 @@ def test_render_rejects_an_unsafe_id_prefix(tmp_path: pathlib.Path, capsys: pyte
     out = tmp_path / "out.svg"
     assert cli.main(["render", str(src), "--id-prefix", 'bad"prefix', "-o", str(out)]) == 2
     assert "id_prefix" in capsys.readouterr().err and not out.exists()
+
+
+@pytest.mark.parametrize("suffix", [".pbtxt", ".json"])
+def test_layout_then_render_from_it_matches_a_fresh_render(tmp_path: pathlib.Path, suffix: str) -> None:
+    from grus.render import render_svg
+
+    p = ir.load_pbtxt((_GOLDENS / "lone_parent_sibships.pbtxt").read_text())
+    src = tmp_path / "p.pbtxt"
+    src.write_text(ir.dump_pbtxt(p))
+    stored = tmp_path / f"p.layout{suffix}"
+    out = tmp_path / "p.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_svg(p)
+
+
+def test_layout_of_a_set_renders_the_figure(tmp_path: pathlib.Path) -> None:
+    from grus.render import render_set_svg
+
+    ps = pb.PedigreeSet(pedigrees=[_trio(), ir.load_pbtxt((_GOLDENS / "twins.pbtxt").read_text())])
+    src = tmp_path / "s.pbtxt"
+    src.write_text(ir.dump_set_pbtxt(ps))
+    stored = tmp_path / "s.layout.pbtxt"
+    out = tmp_path / "s.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_set_svg(ps)
+
+
+def test_render_refuses_a_stale_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    src = tmp_path / "p.pbtxt"
+    src.write_text(ir.dump_pbtxt(_trio()))
+    stored = tmp_path / "p.layout.pbtxt"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    edited = _trio()
+    edited.individuals[0].deceased = not edited.individuals[0].deceased
+    src.write_text(ir.dump_pbtxt(edited))
+    assert cli.main(["render", str(src), "--layout", str(stored)]) == 1
+    assert "digest" in capsys.readouterr().err
