@@ -80,6 +80,7 @@ class _Model:
         self.mat_base = g.n
         self.nlevels = (max(g.level) + 1) if g.level else 0
         self.routed: set[int] = set()
+        self.birth = _birth_of(g)
         self._resolve_overflow()
         self._build_layers()
         self._build_atoms()
@@ -189,15 +190,17 @@ class _Model:
     def _orient(self, comp: set[int], adj: dict[int, set[int]]) -> tuple[int, ...]:
         """Order a component into its canonical path.
 
-        Pick the lexicographically smallest ``(generation, index)`` sequence so the orientation is stable and
-        reproduces v1's ``partner_a``-left default.
+        Of the path's two orientations, pick the one with fewer birth-order inversions among the siblings in it
+        (a twin pair joined to one twin's spouse must not read younger-first), then the lexicographically
+        smallest ``(generation, index)`` sequence, so the orientation is stable and reproduces v1's
+        ``partner_a``-left default.
         """
         if len(comp) == 1:
             return (next(iter(comp)),)
         ends = sorted((i for i in comp if len(adj[i]) <= 1), key=self.ident)
         if len(ends) != 2:  # not a simple path (a cycle or a branch) — Stage C; emit sorted, caller defers
             return tuple(sorted(comp, key=self.ident))
-        best: tuple[tuple[int, int], ...] | None = None
+        best: tuple[int, tuple[tuple[int, int], ...]] | None = None
         best_path: tuple[int, ...] = ()
         for end in ends:
             path = [end]
@@ -209,7 +212,7 @@ class _Model:
                     break
                 prev, cur = cur, nxts[0]
                 path.append(cur)
-            key = tuple(self.ident(i) for i in path)
+            key = (_inversions(self.birth, path), tuple(self.ident(i) for i in path))
             if best is None or key < best:
                 best, best_path = key, tuple(path)
         return best_path
@@ -396,8 +399,8 @@ def _rank_units(model: _Model, order_map: dict[int, list[int]], r: int) -> list[
         if i in placed:
             continue
         atom = model.atom_of[i]
-        # Members in their current order (a flipped couple reads back flipped); ``model.atom_of`` holds the
-        # canonical (IR partner) order that ``_transpose_rank`` prefers on ties.
+        # Members in their current order (a reversed atom reads back reversed); ``model.atom_of`` holds the
+        # canonical orientation (fewest birth-order inversions, then identity) that ``_transpose_rank`` prefers.
         units.append(tuple(n for n in current if n in atom))
         placed.update(atom)
     return units
@@ -434,9 +437,23 @@ def _neighbour_cost(model: _Model, order_map: dict[int, list[int]], r: int) -> i
     return c
 
 
-def _birth(model: _Model) -> dict[int, tuple[int, int]]:
-    """Individual -> (sibship id, birth position) from ``Mating.offspring`` order, for the birth-order tie rule."""
-    return {o.child: (mr.index, k) for mr in model.g.matings for k, o in enumerate(mr.offspring)}
+def _birth_of(g: _layout._Graph) -> dict[int, tuple[int, int]]:
+    """Individual -> (sibship id, birth position) from ``Mating.offspring`` order, for the birth-order rule."""
+    return {o.child: (mr.index, k) for mr in g.matings for k, o in enumerate(mr.offspring)}
+
+
+def _inversions(birth: dict[int, tuple[int, int]], seq: tuple[int, ...] | list[int]) -> int:
+    """Sibling pairs in ``seq`` drawn out of birth order (an older sibling right of a younger one)."""
+    total = 0
+    for a in range(len(seq)):
+        ba = birth.get(seq[a])
+        if ba is None:
+            continue
+        for b in range(a + 1, len(seq)):
+            bb = birth.get(seq[b])
+            if bb is not None and bb[0] == ba[0] and ba[1] > bb[1]:
+                total += 1
+    return total
 
 
 def _birth_gain(birth: dict[int, tuple[int, int]], left: tuple[int, ...], right: tuple[int, ...]) -> int:
@@ -458,12 +475,12 @@ def _birth_gain(birth: dict[int, tuple[int, int]], left: tuple[int, ...], right:
 
 
 def _transpose(model: _Model, order_map: dict[int, list[int]]) -> None:
-    """Adjacent-unit swaps and couple flips (dot's ``transpose``).
+    """Adjacent-unit swaps and atom reversals (dot's ``transpose``).
 
-    A swap is accepted on a strict crossing decrease or, on a crossing tie, a strict birth-order improvement /
-    a couple's return to canonical order.
+    A move is accepted on a strict crossing decrease or, on a crossing tie, a strict birth-order improvement /
+    an atom's return to its canonical orientation.
     """
-    birth = _birth(model)
+    birth = model.birth
     changed = True
     while changed:
         changed = False
@@ -499,14 +516,15 @@ def _swap_gain(
 
 
 def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birth: dict[int, tuple[int, int]]) -> bool:
-    """One transpose pass over rank ``r``: couple flips, then adjacent-unit swaps (dot's ``transpose``).
+    """One transpose pass over rank ``r``: atom reversals, then adjacent-unit swaps (dot's ``transpose``).
 
-    Every move is priced by the local ``_swap_gain`` — the exact change in ``_neighbour_cost`` — and accepted
-    on a strict crossing decrease. On a crossing tie, an adjacent swap is taken when it strictly reduces
-    birth-order inversions (``_birth_gain``), and a couple standing in non-canonical order (reversed from the
-    IR's partner order) is restored. So among equal-crossing orders birth order, then the IR's partner order,
-    are the weak preferences. Terminates: each accepted move strictly decreases (crossings, inversions) except
-    a canonical restore, which fires at most once per couple between such moves.
+    Every move is priced by the local ``_swap_gain`` — the exact change in ``_neighbour_cost``; a reversal's is
+    the sum over its member pairs — and accepted on a strict crossing decrease. On a crossing tie, a move is
+    taken when it strictly reduces birth-order inversions, and an atom standing reversed from its canonical
+    orientation (fewest inversions, then identity) is restored. So among equal-crossing orders birth order,
+    then identity, are the weak preferences. Terminates: each accepted move strictly decreases (crossings,
+    inversions, atoms out of canonical orientation), and a canonical atom never has more inversions than its
+    reverse, so a birth repair and a canonical restore cannot undo each other.
     """
     improved = False
     units = _rank_units(model, order_map, r)
@@ -515,13 +533,21 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
         adj_pos.append((model.up, _positions(order_map, r - 1)))
     if r < model.max_rank:
         adj_pos.append((model.down, _positions(order_map, r + 1)))
-    for u, unit in enumerate(units):  # couple flips
-        if len(unit) != 2:
+    for u, unit in enumerate(units):  # atom reversals (a couple flip is the two-member case)
+        if len(unit) < 2:
             continue
-        gain = _swap_gain(model, adj_pos, (unit[0],), (unit[1],))
+        # Reversing a unit flips the relative order of every pair in it, and a crossing depends only on relative
+        # order, so the reversal's crossing change is the sum of its pairwise swap gains.
+        gain = sum(
+            _swap_gain(model, adj_pos, (unit[a],), (unit[b],))
+            for a in range(len(unit))
+            for b in range(a + 1, len(unit))
+        )
+        flipped = tuple(reversed(unit))
         canonical = unit == model.atom_of[unit[0]]
-        if gain > 0 or (gain == 0 and not canonical):
-            units[u] = (unit[1], unit[0])
+        birth_gain = _inversions(birth, unit) - _inversions(birth, flipped)
+        if gain > 0 or (gain == 0 and (birth_gain > 0 or (birth_gain == 0 and not canonical))):
+            units[u] = flipped
             improved = True
     for k in range(len(units) - 1):  # adjacent-unit swaps
         gain = _swap_gain(model, adj_pos, units[k], units[k + 1])
@@ -535,24 +561,26 @@ def _transpose_rank(model: _Model, order_map: dict[int, list[int]], r: int, birt
 def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
     """Exact per-rank search on ranks with few atoms.
 
-    Enumerate atom permutations and couple flips, keep the min-crossing order (tie-broken by the smallest
-    identity sequence). Makes small boundary-bridge ranks provably optimal and their choice deterministic.
+    Enumerate atom permutations and reversals, keep the min-crossing order (tie-broken by fewer birth-order
+    inversions, then the smallest identity sequence — the objective's order, so the settled map is not thrown
+    away for trading birth order for identity). Makes small boundary-bridge ranks provably optimal and their
+    choice deterministic.
     """
     for _ in range(2):  # two settling passes; small and convergent
         for r in range(model.min_rank, model.max_rank + 1):
             units = _rank_units(model, order_map, r)
             if not units or len(units) > _EXACT_ATOM_CAP:
                 continue
-            variants = [[unit, (unit[1], unit[0])] if len(unit) == 2 else [unit] for unit in units]
+            variants = [[unit, tuple(reversed(unit))] if len(unit) >= 2 else [unit] for unit in units]
             best_order: list[int] | None = None
-            best_key: tuple[int, tuple[tuple[int, int], ...]] | None = None
+            best_key: tuple[int, int, tuple[tuple[int, int], ...]] | None = None
             for perm in itertools.permutations(range(len(units))):
                 for choice in itertools.product(*(range(len(v)) for v in variants)):
                     seq = [i for u in perm for i in variants[u][choice[u]]]
                     order_map[r] = seq
                     cost = _neighbour_cost(model, order_map, r)
                     ident = tuple(model.ident(i) for i in seq if not model.is_mating(i))
-                    key = (cost, ident)
+                    key = (cost, _inversions(model.birth, seq), ident)
                     if best_key is None or key < best_key:
                         best_key, best_order = key, list(seq)
             assert best_order is not None

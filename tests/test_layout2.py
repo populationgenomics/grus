@@ -531,3 +531,23 @@ def test_deferral_names_the_descent_not_a_passthrough() -> None:
     )
     with pytest.raises(render.DeferredFeatureError, match="'descent to 3-1'"):
         render.layout(p)
+
+
+def _married_twin(older: bool) -> pb.Pedigree:
+    """``twin_married`` with either twin marrying II-4."""
+    p = test_render._load("twin_married")
+    p.matings[1].partner_a.index = 1 if older else 2
+    return p
+
+
+@pytest.mark.parametrize(
+    ("older", "expected"), [(True, ["2-4", "2-1", "2-2", "2-3"]), (False, ["2-1", "2-2", "2-4", "2-3"])]
+)
+def test_married_twin_keeps_birth_order(older: bool, expected: list[str]) -> None:
+    # A twin pair joined to one twin's spouse is a three-member adjacency chain. It used to be oriented by identity
+    # alone and never reversed, so the older twin's marriage drew the twins younger-first with the spouse between
+    # siblings, although a zero-crossing order in birth order exists. Birth order is weak, but it only yields to
+    # what a mating forces, and this marriage forces nothing.
+    p = _married_twin(older)
+    lay = render.layout(p)
+    assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == expected
