@@ -13,7 +13,7 @@ solver in ``_layout2`` (``layout``), which reuses everything here. What lives he
 4. phantom partners (``_insert_phantoms``): a lone-parent mating becomes a couple with a synthetic, undrawn
    partner cell, so each lone-parent sibship hangs from its own marriage line to an omitted partner, as the
    literature draws it, and two sibships of one lone parent never share a drop. A count-collapsed parent (a
-   group drawn as one symbol) gets none: its sibship drops straight from the symbol, as the literature draws it;
+   group drawn as one symbol) with one lone sibship gets none: that sibship drops straight from the symbol;
 5. pass-throughs (``_insert_passthroughs``): a descent spanning several rows gets one synthetic cell on
    each row it crosses, the layered-drawing dummy node, so ordering, x-solve and ``_build`` see only
    adjacent-row edges and drawing emits one line through the crossed rows;
@@ -29,6 +29,7 @@ has zero partners (a founder sibship), one (a lone drawn parent), or two.
 
 from __future__ import annotations
 
+import collections
 import itertools
 from dataclasses import dataclass, field
 
@@ -473,10 +474,11 @@ def _insert_phantoms(g: _Graph) -> frozenset[int]:
     partners and co-twin already take both sides (a twin with a spouse) keeps its lone sibship as a drop from its
     own centre, marked in ``Layout.lone`` so drawing does not read it as the couple's.
 
-    A count-collapsed parent (``count`` > 1 or ``count_unspecified``: several people drawn as one symbol) gets no
-    phantom either. A marriage line to an omitted partner says one person had children by someone left out; a
-    group's offspring are drawn as a straight line down from the group symbol, so its sibship takes the same
-    own-centre drop.
+    A count-collapsed parent (``count`` > 1 or ``count_unspecified``: several people drawn as one symbol) with
+    exactly one lone sibship gets no phantom either. A marriage line to an omitted partner says one person had
+    children by someone left out; a group's offspring are drawn as a straight line down from the group symbol, so
+    its sibship takes the same own-centre drop. A group with several lone sibships keeps a phantom for each, as any
+    parent does: they need distinct drops, and the symbol has one centre.
 
     Mutates ``g`` in place (appends the phantoms, rewrites each lone-parent mating's partners and its children's
     parent pointers); returns the phantom indices. Runs after ``_rank`` and before ``_insert_passthroughs``, so
@@ -491,13 +493,16 @@ def _insert_phantoms(g: _Graph) -> frozenset[int]:
     sides = {  # neighbours each individual already needs on its row: its partners, and a co-twin
         i: sum(1 for m in g.matings_of[i] if len(m.partners) == 2) + (1 if i in cotwin else 0) for i in range(g.n)
     }
+    lone_sibships = collections.Counter(
+        mr.partners[0] for mr in g.matings if len(mr.partners) == 1 and mr.offspring
+    )  # per parent, its lone-parent matings with offspring
     phantom: set[int] = set()
     for mi, mr in enumerate(list(g.matings)):
         if len(mr.partners) != 1 or not mr.offspring:
             continue
         (parent,) = mr.partners
-        if _labels.count_text(g.individuals[parent]) is not None:
-            continue  # a group symbol: its sibship drops straight from the symbol's centre (Layout.lone)
+        if _labels.count_text(g.individuals[parent]) is not None and lone_sibships[parent] == 1:
+            continue  # a group symbol's one sibship drops straight from the symbol's centre (Layout.lone)
         if sides[parent] >= 2:
             continue  # no free side: this sibship drops from the parent's own centre (Layout.lone)
         sides[parent] += 1

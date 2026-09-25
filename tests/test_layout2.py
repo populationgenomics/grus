@@ -663,6 +663,34 @@ def test_a_count_collapsed_parent_drops_from_its_own_centre() -> None:
     assert starts == {"III-1", "III-2", "III-4", "III-5"}, "only a label with a line through its centre moves"
 
 
+def test_a_group_with_two_lone_sibships_keeps_a_line_for_each() -> None:
+    # A group parent's one lone sibship drops from its centre, but two cannot share that one drop: they deferred as a
+    # torn sibship. With more than one, each keeps its own line to an omitted partner, as for any lone parent.
+    man, woman, unknown = pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_UNKNOWN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=man, count=3),
+            pb.Individual(generation=2, index=2, gender=woman),
+            pb.Individual(generation=3, index=1, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=2, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=3, gender=man),
+        ]
+    )
+    top = p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2))
+    top.offspring.add(child=_pos(2, 1))
+    top.offspring.add(child=_pos(2, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 1))
+    second = p.matings.add(partner_a=_pos(2, 1))
+    second.offspring.add(child=_pos(3, 2))
+    second.offspring.add(child=_pos(3, 3))
+    svg = render.render_svg(p)
+    assert re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg) == ["II-1", "II-1"]
+    drawn = set(re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)"', svg))
+    assert {s for s in drawn if s[1].startswith("III")} == {("II-1", "III-1"), ("II-1", "III-2 III-3")}
+
+
 def test_crossing_descents_turn_on_their_own_tracks() -> None:
     # A fuzzed pedigree, minimised. The order puts II-2 x II-6 left of II-3 x II-4 but its twins right of their
     # children, so the descents cross; the drops used to run along each other's bars at bar height and the row read
