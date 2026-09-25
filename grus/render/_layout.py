@@ -37,6 +37,7 @@ from grus.models import pedigree_pb2 as pb
 from grus.render import _labels
 
 Key = tuple[int, int]
+Ident = tuple[int, ...]  # see ``_Graph.ident``
 
 # Childlessness values that draw a glyph (by choice / infertility); NONE and UNSPECIFIED draw nothing.
 _CHILDLESS_DRAWN = frozenset({int(pb.CHILDLESSNESS_BY_CHOICE), int(pb.CHILDLESSNESS_INFERTILITY)})
@@ -115,10 +116,12 @@ class Layout:
             Empty for tier-1/2 pedigrees. A ghost index is ``>= len(Pedigree.individuals)``.
         founder_sibships: each ``(level, columns)`` a sibship whose parents are undrawn (a partnerless mating).
             Drawing hangs these from an implied hanger stub with a sib bar and no parent cells (they carry no
-            ``fam`` entry). ``columns`` are cell columns on ``level``, left to right. Empty when none.
+            ``fam`` entry). ``columns`` are cell columns on ``level``, left to right; the list is in ``(level,
+            columns)`` order. Empty when none.
         routed: matings drawn as routed edges rather than adjacent straight lines (a >2-mate individual's
             overflow mating — the partners cannot both be its neighbour). Empty for v1 and for every
-            adjacency-drawable shape, so it never perturbs existing output. See ``RoutedMating``.
+            adjacency-drawable shape, so it never perturbs existing output. In ``(a, b)`` order. See
+            ``RoutedMating``.
         first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
             ``first_generation + L``. Rows between the first and last generation are kept even when empty
             (a detached branch several generations down).
@@ -227,6 +230,29 @@ class _Mating:
         return self.partners[1] if x == self.partners[0] else self.partners[0]
 
 
+@dataclass(frozen=True, order=True)
+class GhostKey:
+    """A ghost's identity, from the pedigree's content alone: the join it is drawn for.
+
+    Attributes:
+        real: ``(generation, index)`` of the real individual the ghost duplicates.
+        partner: ``(generation, index)`` of the partner it marries.
+        first_child: ``(generation, index)`` of the join's first child; ``NO_CHILD`` for a childless join, so keys
+            stay totally ordered.
+        occurrence: 0, or the rank among joins agreeing on the fields above (repeated matings of one pair, told
+            apart by their content with the partners' order ignored; content-identical ones are interchangeable).
+    """
+
+    real: Key
+    partner: Key
+    first_child: Key
+    occurrence: int
+
+
+NO_CHILD: Key = (0, 0)
+"""``GhostKey.first_child`` of a childless join: below every ``Position``, whose components are >= 1."""
+
+
 @dataclass
 class _Graph:
     """The pedigree as index-based adjacency the layout works over."""
@@ -240,11 +266,26 @@ class _Graph:
     foundersib_members: set[int] = field(default_factory=set)  # individuals grouped by a partnerless mating
     level: list[int] = field(default_factory=list)
     passthrough_to: dict[int, int] = field(default_factory=dict)  # pass-through -> first real child it leads to
+    ghost_key: dict[int, GhostKey] = field(default_factory=dict)  # ghost -> its identity (see GhostKey)
     phantom_of: dict[int, int] = field(default_factory=dict)  # phantom partner -> the lone parent it partners
+    synthetic_ident: dict[int, Ident] = field(default_factory=dict)  # synthetic cell -> its identity (see ``ident``)
 
     @property
     def n(self) -> int:
         return len(self.individuals)
+
+    def ident(self, i: int) -> Ident:
+        """The stable identity every tie-break uses: from the pedigree's content, never from input order.
+
+        A real individual is ``(generation, 0, index)``. A synthetic cell carries a tag in second place that no real
+        individual has, so no valid ``Position.index`` can compare equal to it or reorder it: a phantom ``(generation,
+        -2, first child's generation, index)`` and a pass-through ``(generation, -1, -first child's generation,
+        -index)`` sort before the real individuals of their row, a ghost ``(generation, 1, rank)`` after them.
+        """
+        if (tagged := self.synthetic_ident.get(i)) is not None:
+            return tagged
+        ind = self.individuals[i]
+        return (ind.generation, 0, ind.index)
 
     def label(self, i: int) -> str:
         """The drawn position of ``i``; a pass-through names the descent it carries, which is in the input."""
@@ -397,7 +438,7 @@ def _born_in(g: _Graph, i: int) -> bool:
     return i in g.parents or i in g.foundersib_members
 
 
-def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
+def _duplicate_cross_generation(g: _Graph, pedigree: pb.Pedigree) -> dict[int, int]:
     """Turn each genuine cross-generation join into a same-row couple by duplicating the shallower partner.
 
     A cross-lineage join whose two born-in partners sit on **different IR generations** is an avuncular
@@ -410,13 +451,17 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
     matings; drawing renders
     the ghost as a duplicate of the real individual with a dashed "same individual" link.
 
+    A ghost's identity is its ``GhostKey`` (the real individual, its partner, the join's first child), recorded in
+    ``g.ghost_key``; its ordering identity (``_Graph.ident``) is its rank among those keys, so every tie-break the
+    ordering takes on identity is independent of the input order.
+
     Returns ``{ghost_index: real_index}`` for the drawing step; mutates ``g`` in place (appends the ghost
     individual, rewrites the join's partners and its children's parent pointers). Same-generation cross joins
     are left untouched — the ordering brings their partners adjacent as an ordinary couple. A partner already
     ghosted for another join, or a join both of whose partners would need duplicating, is left for the loop
     defenses downstream (interlocking cases stay deferred).
     """
-    ghost_of: dict[int, int] = {}
+    joins: list[tuple[int, _Mating, int, int]] = []
     for mi, mr in enumerate(list(g.matings)):
         if mr.b is None or mr.a not in g.parents or mr.b not in g.parents:
             continue  # not a two-lineage join
@@ -424,8 +469,16 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
         if gen_a == gen_b:
             continue  # same-generation join: brought adjacent by the ordering, not duplicated
         shallow, deep = (mr.a, mr.b) if gen_a < gen_b else (mr.b, mr.a)
+        joins.append((mi, mr, shallow, deep))
+    keys = _ghost_keys(g, pedigree, joins)
+    rank = {key: k for k, key in enumerate(sorted(keys.values()))}
+    ghost_of: dict[int, int] = {}
+    for mi, mr, shallow, deep in joins:
         ghost = len(g.individuals)
-        g.individuals.append(pb.Individual(generation=g.individuals[deep].generation, index=10_000 + mi))
+        generation = g.individuals[deep].generation
+        g.individuals.append(pb.Individual(generation=generation))
+        g.ghost_key[ghost] = keys[mi]
+        g.synthetic_ident[ghost] = (generation, 1, rank[keys[mi]])  # after the real individuals of its row
         g.parents = dict(g.parents)  # ghost is parentless; real `shallow` keeps its parents
         new = _Mating(
             index=mi,
@@ -442,6 +495,38 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
             g.parents[k] = (ghost, deep)
         ghost_of[ghost] = shallow
     return ghost_of
+
+
+def _ghost_keys(g: _Graph, pedigree: pb.Pedigree, joins: list[tuple[int, _Mating, int, int]]) -> dict[int, GhostKey]:
+    """Each join's ``GhostKey`` by mating index; repeated joins of one pair rank by their mating's content."""
+
+    def pos(i: int) -> Key:
+        ind = g.individuals[i]
+        return (ind.generation, ind.index)
+
+    base: dict[int, tuple[Key, Key, Key]] = {}
+    for mi, mr, shallow, deep in joins:
+        first = pos(mr.offspring[0].child) if mr.offspring else NO_CHILD
+        base[mi] = (pos(shallow), pos(deep), first)
+    groups: dict[tuple[Key, Key, Key], list[int]] = {}
+    for mi, b in base.items():
+        groups.setdefault(b, []).append(mi)
+    out: dict[int, GhostKey] = {}
+    for b, mis in groups.items():
+        # Content-identical repeats tie here; they are interchangeable, so either rank draws the same figure.
+        mis.sort(key=lambda mi: _content_without_partners(pedigree.matings[mi]))
+        for occurrence, mi in enumerate(mis):
+            out[mi] = GhostKey(*b, occurrence)
+    return out
+
+
+def _content_without_partners(m: pb.Mating) -> bytes:
+    """A mating's content, independent of which partner is ``partner_a``; the pair is the same across one group."""
+    rest = pb.Mating()
+    rest.CopyFrom(m)
+    rest.ClearField("partner_a")
+    rest.ClearField("partner_b")
+    return rest.SerializeToString(deterministic=True)
 
 
 def _rank(g: _Graph) -> int:
@@ -477,11 +562,10 @@ def _insert_phantoms(g: _Graph) -> frozenset[int]:
     line from the parent to nothing, the descent dropping from that line, so a parent with two such sibships
     (half-sibships by different, undrawn partners) draws two lines and two drops, never one merged bar. With a
     phantom as its second partner the mating is an ordinary couple to the ordering, the x-solve and ``_build``;
-    drawing omits the phantom's symbol. A phantom's identity is ``(parent generation, -2_000_000_000 +
-    1_000_000 * child generation + child index)`` from the sibship's first child: stable under a shuffle of the
-    input, negative so it never equals a real individual's, below every pass-through's, and increasing with the
-    first child, so where only identity decides (half-sibships are not ranked by birth order) a lone parent's
-    sibships follow the IR's numbering.
+    drawing omits the phantom's symbol. A phantom's identity (``_Graph.ident``) is its row, a tag below every
+    other cell's, and the sibship's first child: stable under a shuffle of the input, never equal to a real
+    individual's, below every pass-through's, and increasing with the first child, so where only identity decides
+    (half-sibships are not ranked by birth order) a lone parent's sibships follow the IR's numbering.
 
     A phantom takes one of the parent's two sides on its row, so it is added only while one is free: a parent whose
     partners and co-twin already take both sides (a twin with a spouse) keeps its lone sibship as a drop from its
@@ -521,13 +605,9 @@ def _insert_phantoms(g: _Graph) -> frozenset[int]:
         sides[parent] += 1
         first_child = g.individuals[mr.offspring[0].child]
         cell = len(g.individuals)
-        g.individuals.append(
-            pb.Individual(
-                generation=g.individuals[parent].generation,
-                index=-2_000_000_000 + 1_000_000 * first_child.generation + first_child.index,
-                gender=pb.GENDER_UNKNOWN,
-            )
-        )
+        generation = g.individuals[parent].generation
+        g.individuals.append(pb.Individual(generation=generation, gender=pb.GENDER_UNKNOWN))
+        g.synthetic_ident[cell] = (generation, -2, first_child.generation, first_child.index)
         g.level.append(g.level[parent])
         couple = _Mating(
             index=mi,
@@ -553,9 +633,9 @@ def _insert_passthroughs(g: _Graph) -> frozenset[int]:
     sibship's), the mating's offspring become one pass-through on the next row; each pass-through is the lone
     parent of the next; the last is the lone parent of the real children, keeping their birth order and twin
     groups. After this every parent -> child edge joins adjacent rows, which is all the ordering, x-solve and
-    ``_build`` handle. A pass-through's identity is ``(row generation, -(1_000_000 * child generation + child
-    index))`` from the sibship's first child: stable under a shuffle of the input, and negative, so it can never
-    equal a real individual's (indexes are >= 1) and the ordering's tie-break stays deterministic.
+    ``_build`` handle. A pass-through's identity (``_Graph.ident``) is its row, a tag below every real
+    individual's, and the sibship's first child: stable under a shuffle of the input and never equal to a real
+    individual's, so the ordering's tie-break stays deterministic.
 
     Mutates ``g`` in place (appends the pass-through individuals and their lone-parent matings, rewrites the
     spanning mating's offspring and the parent pointers); returns the pass-through indices.
@@ -572,12 +652,9 @@ def _insert_passthroughs(g: _Graph) -> frozenset[int]:
         chain: list[int] = []
         for row in range(top + 1, top + gap):
             cell = len(g.individuals)
-            g.individuals.append(
-                pb.Individual(
-                    generation=first_child.generation - (top + gap - row),
-                    index=-(1_000_000 * first_child.generation + first_child.index),
-                )
-            )
+            generation = first_child.generation - (top + gap - row)
+            g.individuals.append(pb.Individual(generation=generation))
+            g.synthetic_ident[cell] = (generation, -1, -first_child.generation, -first_child.index)
             g.level.append(row)
             g.matings_of[cell] = []
             g.passthrough_to[cell] = mr.offspring[0].child
@@ -699,6 +776,7 @@ def _build(
             )
         (lvl,) = levels
         founder_sibships.append((lvl, tuple(sorted(colof[i] for i in group))))
+    founder_sibships.sort()  # layout order, not the input's mating order, so drawing is independent of the latter
 
     return Layout(
         n=n,

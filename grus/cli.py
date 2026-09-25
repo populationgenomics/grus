@@ -8,6 +8,14 @@ entry points and are not dispatched from here.
 Input is a ``PedigreeSet`` or a bare ``Pedigree`` in either text surface (pbtxt / proto3-JSON); the
 surface is taken from the file suffix (``.json`` -> JSON, anything else -> pbtxt) unless ``--format``
 says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure.
+
+``layout`` writes an IR file's stored layout (a ``PedigreeLayout``, or a ``PedigreeSetLayout`` for a set) in the
+same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
+(docs/design/layout-store.md).
+
+Exit status: 0 on success; 1 when an input file cannot be used — an IR file that is unreadable, not UTF-8,
+unparseable or invalid, or a ``--layout`` file that is any of those, the wrong kind for the input (a set's layout for a
+single pedigree or the reverse), or stale — reported as one line naming the file and the cause; 2 for a usage error.
 """
 
 from __future__ import annotations
@@ -17,9 +25,11 @@ import pathlib
 import sys
 from typing import Literal
 
+import protovalidate
 from google.protobuf import json_format, text_format
 
 from grus import convert, ir, render
+from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 
 TextFormat = Literal["pbtxt", "json"]
@@ -37,7 +47,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
     A set is tried first because its top-level field (``pedigrees``) is disjoint from a pedigree's; a
     text that parses as neither raises the *pedigree* parse error (the more common hand-authored shape).
     """
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     parse = json_format.Parse if fmt == "json" else text_format.Parse
     try:
         ps = parse(text, pb.PedigreeSet())
@@ -69,6 +79,23 @@ def _describe(e: BaseException) -> str:
     return "; ".join(parts)
 
 
+def _load_input(args: argparse.Namespace, command: str) -> pb.PedigreeSet | pb.Pedigree | None:
+    """``load_ir`` on the command's input, or ``None`` after reporting why it cannot be read, in one line."""
+    path: pathlib.Path = args.input
+    try:
+        return load_ir(path, _text_format(path, args.format))
+    except OSError as e:
+        cause = f"cannot read it: {e.strerror or e}"
+    except UnicodeDecodeError as e:
+        cause = f"not UTF-8 text: {e.reason} at byte {e.start}"
+    except (json_format.ParseError, text_format.ParseError) as e:
+        cause = f"not a pedigree IR: {e}"
+    except (ir.ValidationError, ir.IntegrityError) as e:
+        cause = f"invalid: {_describe(e)}"
+    print(f"grus {command}: error: {path}: {' '.join(cause.split())}", file=sys.stderr)
+    return None
+
+
 def _geometry(args: argparse.Namespace) -> render.Geometry:
     geom = render.DEFAULT_GEOMETRY
     if args.carrier_style:
@@ -90,15 +117,60 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+class _LayoutFileError(Exception):
+    """A ``--layout`` file that cannot be used: unreadable, unparseable, the wrong kind, or invalid."""
+
+
+def _read_layout[Stored: (lpb.PedigreeLayout, lpb.PedigreeSetLayout)](path: pathlib.Path, kind: type[Stored]) -> Stored:
+    """Parse and validate a stored-layout file of ``kind`` (a set's layout for a set input, else one pedigree's)."""
+    parse = json_format.Parse if _text_format(path, None) == "json" else text_format.Parse
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as e:
+        raise _LayoutFileError(f"cannot read it: {e.strerror or e}") from e
+    except UnicodeDecodeError as e:
+        raise _LayoutFileError(f"not UTF-8 text: {e.reason} at byte {e.start}") from e
+    try:
+        record = parse(text, kind())
+    except (json_format.ParseError, text_format.ParseError) as e:
+        other = lpb.PedigreeLayout if kind is lpb.PedigreeSetLayout else lpb.PedigreeSetLayout
+        try:
+            parse(text, other())
+        except (json_format.ParseError, text_format.ParseError):
+            raise _LayoutFileError(f"not a {kind.__name__}: {e}") from e
+        input_kind = "a pedigree set" if kind is lpb.PedigreeSetLayout else "a single pedigree"
+        raise _LayoutFileError(f"holds a {other.__name__}, but the input is {input_kind}") from e
+    try:
+        protovalidate.validate(record)
+    except protovalidate.ValidationError as e:
+        raise _LayoutFileError(f"invalid {kind.__name__}: {'; '.join(_violation(v) for v in e.violations)}") from e
+    return record
+
+
+def _violation(v: protovalidate.Violation) -> str:
+    path = v.proto.field
+    parts = [
+        el.field_name if el.subscript is None else f"{el.field_name}[{el.subscript.value}]"
+        for el in (path.elements if path is not None else [])
+    ]
+    return f"{'.'.join(parts) or '(message)'}: {v.proto.message}"
+
+
 def _cmd_render(args: argparse.Namespace) -> int:
-    loaded = load_ir(args.input, _text_format(args.input, args.format))
+    loaded = _load_input(args, "render")
+    if loaded is None:
+        return 1
     geom = _geometry(args)
     try:
-        svg = (
-            render.render_set_svg(loaded, geom, id_prefix=args.id_prefix)
-            if isinstance(loaded, pb.PedigreeSet)
-            else render.render_svg(loaded, geom, id_prefix=args.id_prefix)
-        )
+        if isinstance(loaded, pb.PedigreeSet):
+            layouts = list(_read_layout(args.layout, lpb.PedigreeSetLayout).pedigrees) if args.layout else None
+            svg = render.render_set_svg(loaded, geom, id_prefix=args.id_prefix, stored_layouts=layouts)
+        else:
+            one = _read_layout(args.layout, lpb.PedigreeLayout) if args.layout else None
+            svg = render.render_svg(loaded, geom, id_prefix=args.id_prefix, stored_layout=one)
+    except (_LayoutFileError, render.StaleLayoutError) as e:  # the stored layout cannot be drawn from
+        print(f"grus render: error: {args.layout}: {e}", file=sys.stderr)
+        return 1
     except ValueError as e:  # the renderer's argument checks (id_prefix), reported as a usage error
         print(f"grus render: error: {e}", file=sys.stderr)
         return 2
@@ -117,6 +189,26 @@ def _cmd_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_layout(args: argparse.Namespace) -> int:
+    loaded = _load_input(args, "layout")
+    if loaded is None:
+        return 1
+    geom = _geometry(args)
+    record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
+        lpb.PedigreeSetLayout(pedigrees=[render.store_layout(p, geom) for p in loaded.pedigrees])
+        if isinstance(loaded, pb.PedigreeSet)
+        else render.store_layout(loaded, geom)
+    )
+    out: pathlib.Path | None = args.output
+    fmt = args.to or (_text_format(out, None) if out is not None else "pbtxt")
+    text = json_format.MessageToJson(record) if fmt == "json" else text_format.MessageToString(record)
+    if out is None:
+        sys.stdout.write(text)
+    else:
+        out.write_text(text)
+    return 0
+
+
 def _cmd_import(args: argparse.Namespace) -> int:
     ps = convert.import_file(args.input, fmt=args.from_format)
     text = ir.dump_set_json(ps) if args.to == "json" else ir.dump_set_pbtxt(ps)
@@ -128,8 +220,8 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the ``grus`` argument parser with its validate / render / import subcommands."""
-    parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, import.")
+    """Build the ``grus`` argument parser with its validate / render / layout / import subcommands."""
+    parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, layout, import.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     validate = sub.add_parser("validate", help="parse + validate IR files (pbtxt / JSON), report each")
@@ -153,7 +245,21 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[s.value for s in render.CarrierStyle],
         help="carrier glyph convention (default: inheritance_glyph)",
     )
+    render_cmd.add_argument(
+        "--layout",
+        type=pathlib.Path,
+        help="draw from this stored layout (from `grus layout`) instead of laying out; exit 1 if unusable or stale",
+    )
     render_cmd.set_defaults(func=_cmd_render)
+
+    layout_cmd = sub.add_parser("layout", help="lay an IR file out once and write the stored layout")
+    layout_cmd.add_argument("input", type=pathlib.Path)
+    layout_cmd.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
+    layout_cmd.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
+    layout_cmd.add_argument(
+        "--to", choices=("pbtxt", "json"), help="text surface to write (default: from the output suffix, else pbtxt)"
+    )
+    layout_cmd.set_defaults(func=_cmd_layout, carrier_style=None)
 
     imp = sub.add_parser("import", help="convert an external pedigree file into the IR")
     imp.add_argument("input", type=pathlib.Path)

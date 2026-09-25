@@ -123,3 +123,140 @@ def test_render_rejects_an_unsafe_id_prefix(tmp_path: pathlib.Path, capsys: pyte
     out = tmp_path / "out.svg"
     assert cli.main(["render", str(src), "--id-prefix", 'bad"prefix', "-o", str(out)]) == 2
     assert "id_prefix" in capsys.readouterr().err and not out.exists()
+
+
+@pytest.mark.parametrize("suffix", [".pbtxt", ".json"])
+def test_layout_then_render_from_it_matches_a_fresh_render(tmp_path: pathlib.Path, suffix: str) -> None:
+    from grus.render import render_svg
+
+    p = ir.load_pbtxt((_GOLDENS / "lone_parent_sibships.pbtxt").read_text())
+    src = tmp_path / "p.pbtxt"
+    src.write_text(ir.dump_pbtxt(p))
+    stored = tmp_path / f"p.layout{suffix}"
+    out = tmp_path / "p.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_svg(p)
+
+
+def test_layout_of_a_set_renders_the_figure(tmp_path: pathlib.Path) -> None:
+    from grus.render import render_set_svg
+
+    ps = pb.PedigreeSet(pedigrees=[_trio(), ir.load_pbtxt((_GOLDENS / "twins.pbtxt").read_text())])
+    src = tmp_path / "s.pbtxt"
+    src.write_text(ir.dump_set_pbtxt(ps))
+    stored = tmp_path / "s.layout.pbtxt"
+    out = tmp_path / "s.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_set_svg(ps)
+
+
+def test_render_refuses_a_stale_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    src = tmp_path / "p.pbtxt"
+    src.write_text(ir.dump_pbtxt(_trio()))
+    stored = tmp_path / "p.layout.pbtxt"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    edited = _trio()
+    edited.individuals[0].deceased = not edited.individuals[0].deceased
+    src.write_text(ir.dump_pbtxt(edited))
+    assert cli.main(["render", str(src), "--layout", str(stored)]) == 1
+    assert "digest" in capsys.readouterr().err
+
+
+def test_layout_of_a_set_with_repeated_avuncular_marriages(tmp_path: pathlib.Path) -> None:
+    import test_layout2
+
+    from grus.render import render_set_svg
+
+    ps = pb.PedigreeSet(pedigrees=list(test_layout2.GHOST_PEDIGREES.values()))
+    src = tmp_path / "s.pbtxt"
+    src.write_text(ir.dump_set_pbtxt(ps))
+    stored = tmp_path / "s.layout.pbtxt"
+    out = tmp_path / "s.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_set_svg(ps)
+
+
+def _layout_files(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+    """A pedigree, a set, and each one's stored layout."""
+    one, many = tmp_path / "p.pbtxt", tmp_path / "s.pbtxt"
+    one.write_text(ir.dump_pbtxt(_trio()))
+    many.write_text(ir.dump_set_pbtxt(pb.PedigreeSet(pedigrees=[_trio()])))
+    one_layout, many_layout = tmp_path / "p.layout.pbtxt", tmp_path / "s.layout.pbtxt"
+    assert cli.main(["layout", str(one), "-o", str(one_layout)]) == 0
+    assert cli.main(["layout", str(many), "-o", str(many_layout)]) == 0
+    return one, many, one_layout, many_layout
+
+
+def _render_error(capsys: pytest.CaptureFixture[str], argv: list[str]) -> str:
+    assert cli.main(argv) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and err.startswith("grus render: error: ")
+    return err
+
+
+def test_render_reports_a_layout_of_the_wrong_kind(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, many, one_layout, many_layout = _layout_files(tmp_path)
+    err = _render_error(capsys, ["render", str(one), "--layout", str(many_layout)])
+    assert str(many_layout) in err and "holds a PedigreeSetLayout, but the input is a single pedigree" in err
+    err = _render_error(capsys, ["render", str(many), "--layout", str(one_layout)])
+    assert "holds a PedigreeLayout, but the input is a pedigree set" in err
+
+
+def test_render_reports_an_invalid_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, many, one_layout, many_layout = _layout_files(tmp_path)
+    one_layout.write_text(one_layout.read_text().replace("algorithm_version: 1", "algorithm_version: 0"))
+    err = _render_error(capsys, ["render", str(one), "--layout", str(one_layout)])
+    assert "invalid PedigreeLayout: key.algorithm_version:" in err
+    many_layout.write_text("pedigrees {}\n")
+    err = _render_error(capsys, ["render", str(many), "--layout", str(many_layout)])
+    assert "pedigrees[0].key: value is required" in err
+
+
+def test_render_reports_a_missing_or_garbled_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, _, _, _ = _layout_files(tmp_path)
+    missing = tmp_path / "nope.pbtxt"
+    err = _render_error(capsys, ["render", str(one), "--layout", str(missing)])
+    assert str(missing) in err and "cannot read it" in err
+    garbled = tmp_path / "garbled.pbtxt"
+    garbled.write_text("this is not a layout")
+    err = _render_error(capsys, ["render", str(one), "--layout", str(garbled)])
+    assert "not a PedigreeLayout" in err
+
+
+def test_render_reports_a_layout_that_is_not_text(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, _, _, _ = _layout_files(tmp_path)
+    binary = tmp_path / "binary.pbtxt"
+    binary.write_bytes(b"\xff\xfe\x00garbage")
+    err = _render_error(capsys, ["render", str(one), "--layout", str(binary)])
+    assert str(binary) in err and "not UTF-8 text" in err
+    err = _render_error(capsys, ["render", str(one), "--layout", str(tmp_path)])
+    assert str(tmp_path) in err and "cannot read it" in err
+
+
+@pytest.mark.parametrize("command", ["render", "layout"])
+@pytest.mark.parametrize(
+    ("content", "cause"),
+    [
+        (b"\xff\xfe\x00garbage", "not UTF-8 text"),
+        (b"no such field: 1\n", "not a pedigree IR"),
+        (
+            b"individuals { generation: 1 index: 1 gender: GENDER_MAN }\n"
+            b"matings { partner_a { generation: 9 index: 9 } }\n",
+            "invalid",
+        ),
+    ],
+)
+def test_an_unusable_input_is_reported_in_one_line(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str], command: str, content: bytes, cause: str
+) -> None:
+    src = tmp_path / "in.pbtxt"
+    src.write_bytes(content)
+    assert cli.main([command, str(src)]) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and err.startswith(f"grus {command}: error: {src}: {cause}")
+    missing = tmp_path / "missing.pbtxt"
+    assert cli.main([command, str(missing)]) == 1
+    assert "cannot read it" in capsys.readouterr().err

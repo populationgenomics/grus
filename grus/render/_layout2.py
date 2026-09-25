@@ -135,7 +135,7 @@ def _prepare(p: pb.Pedigree) -> _Prepared:
     """
     ir.validate(p)
     g = _layout._derive(p)
-    ghost_of = _layout._duplicate_cross_generation(g)
+    ghost_of = _layout._duplicate_cross_generation(g, p)
     cross = _layout._cross_matings(g)
     _layout._detect_loops(g, cross)
     first_generation = _layout._rank(g)
@@ -169,6 +169,7 @@ def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[in
                 children=tuple(cellof[k] for k in mr.kids if k in cellof),
             )
         )
+    out.sort(key=lambda rm: (rm.a, rm.b))  # layout order, not the input's mating order
     return out
 
 

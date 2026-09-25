@@ -126,17 +126,16 @@ class _Model:
     def is_mating(self, node: int) -> bool:
         return node >= self.mat_base
 
-    def mating_key(self, mr: _layout._Mating) -> tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]]:
+    def mating_key(self, mr: _layout._Mating) -> tuple[tuple[_layout.Ident, ...], tuple[_layout.Ident, ...]]:
         """Stable IR identity of a mating: its partners' then its children's identities, never its input position.
 
         Every tie between matings breaks on this, so a shuffle of ``Pedigree.matings`` cannot change the order.
         """
         return (tuple(sorted(self.ident(p) for p in mr.partners)), tuple(sorted(self.ident(k) for k in mr.kids)))
 
-    def ident(self, i: int) -> tuple[int, int]:
-        """Stable IR identity of an individual — used for every tie-break so the order is shuffle-invariant."""
-        ind = self.g.individuals[i]
-        return (ind.generation, ind.index)
+    def ident(self, i: int) -> _layout.Ident:
+        """Stable identity of a cell (``_Graph.ident``) — used for every tie-break so the order is shuffle-invariant."""
+        return self.g.ident(i)
 
     # -- overflow: an individual with >2 matings keeps its two heaviest; the rest route --
     def _resolve_overflow(self) -> None:
@@ -245,7 +244,7 @@ class _Model:
         ends = sorted((i for i in comp if len(adj[i]) <= 1), key=self.ident)
         if len(ends) != 2:  # not a simple path (a cycle or a branch) — Stage C; emit sorted, caller defers
             return tuple(sorted(comp, key=self.ident))
-        best: tuple[int, tuple[tuple[int, int], ...]] | None = None
+        best: tuple[int, tuple[_layout.Ident, ...]] | None = None
         best_path: tuple[int, ...] = ()
         for end in ends:
             path = [end]
@@ -297,7 +296,7 @@ def _init_order(model: _Model, kid_order: dict[int, list[int]] | None = None) ->
         for k in override.get(mr.index, mr.kids):  # birth order, unless a seed reorders them
             visit_ind(k)
 
-    for mr in sorted(g.partnerless, key=lambda mr: min((model.ident(k) for k in mr.kids), default=(0, 0))):
+    for mr in sorted(g.partnerless, key=lambda mr: min((model.ident(k) for k in mr.kids), default=(0, 0, 0))):
         if model._drawn(mr):
             visit_mat(mr)
     for i in sorted(range(g.n), key=model.ident):
@@ -481,7 +480,7 @@ def _placed_connectors(model: _Model, order_map: dict[int, list[int]], r: int) -
     up = _positions(order_map, r - 1) if r - 1 in order_map else {}
     dn = _positions(order_map, r + 1) if r + 1 in order_map else {}
 
-    def key(n: int) -> tuple[float, tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]]]:
+    def key(n: int) -> tuple[float, tuple[tuple[_layout.Ident, ...], tuple[_layout.Ident, ...]]]:
         ups = [up[v] for v in model.up.get(n, ()) if v in up]
         ps = ups or [dn[v] for v in model.down.get(n, ()) if v in dn]
         return (sum(ps) / len(ps) if ps else 0.0, model.mating_key(model.g.matings[n - model.mat_base]))
@@ -717,7 +716,7 @@ def _exact_ranks(model: _Model, order_map: dict[int, list[int]]) -> None:
             saved = {c: list(order_map[c]) for c in follow}
             best_order: list[int] | None = None
             best_conns: dict[int, list[int]] = saved
-            best_key: tuple[int, int, int, tuple[tuple[int, int], ...]] | None = None
+            best_key: tuple[int, int, int, tuple[_layout.Ident, ...]] | None = None
             for perm in itertools.permutations(range(len(units))):
                 for choice in itertools.product(*(range(len(v)) for v in variants)):
                     seq = [i for u in perm for i in variants[u][choice[u]]]

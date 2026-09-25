@@ -1,0 +1,152 @@
+// A stored layout: grus's own computed layout of one Pedigree, the whole layout -> drawing seam, so the pedigree is
+// laid out once and drawn many times, byte-identical to a fresh render (docs/design/layout-store.md).
+//
+// A read-only cache of grus output, never hand-authored: drawing trusts the stored relations. Every cell is keyed by
+// identity built from real Positions, never by index into Pedigree.individuals, so the record does not depend on input
+// order. Columns are positions within the stored rows (the layout's own coordinates).
+
+syntax = "proto3";
+package grus.models.layout;
+import "buf/validate/validate.proto";
+import "grus/models/pedigree.proto";
+
+message PedigreeLayout {
+  // Drawing refuses the record unless every part matches the pedigree and geometry in hand.
+  LayoutKey key = 1 [(buf.validate.field).required = true];
+  oneof outcome {
+    option (buf.validate.oneof).required = true;
+    Placement placement = 2;
+    // The layout declined to draw the pedigree (a DeferredFeatureError); the reason, verbatim. A figure render draws
+    // its placeholder tile from this without repeating the search.
+    string deferred = 3 [(buf.validate.field).string.min_len = 1];
+  }
+}
+
+// The stored layouts of a PedigreeSet's pedigrees, one per pedigree in the set's order.
+message PedigreeSetLayout {
+  repeated PedigreeLayout pedigrees = 1;
+}
+
+// What the layout depended on. A layout is valid for a pedigree + geometry only if all three match.
+message LayoutKey {
+  // grus's layout-algorithm version; bumped by any grus change that alters a layout.
+  uint32 algorithm_version = 1 [(buf.validate.field).uint32.gt = 0];
+  // SHA-256 of the pedigree's canonical serialization (input-order independent; covers the whole pedigree).
+  bytes pedigree_digest = 2 [(buf.validate.field).bytes.len = 32];
+  LayoutGeometry geometry = 3 [(buf.validate.field).required = true];
+}
+
+// The Geometry fields the layout reads; every other Geometry field is drawing-only and may vary freely.
+message LayoutGeometry {
+  double couple_gap = 1 [(buf.validate.field).double.finite = true];
+  double sib_gap = 2 [(buf.validate.field).double.finite = true];
+  double label_size = 3 [(buf.validate.field).double.finite = true];
+  double label_box_width = 4 [(buf.validate.field).double.finite = true];
+  double x_unit = 5 [(buf.validate.field).double.finite = true];
+  XSolver x_solver = 6 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  // A label moved beside a descent that drops from its cell's centre reserves label_gap beside the line; a count's size
+  // and reach scale with symbol_size; carrier_style decides whether a carrier's dot sends a count outside its symbol.
+  double label_gap = 7 [(buf.validate.field).double.finite = true];
+  double symbol_size = 8 [(buf.validate.field).double.finite = true];
+  CarrierStyle carrier_style = 9 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+}
+
+enum CarrierStyle {
+  CARRIER_STYLE_UNSPECIFIED = 0;
+  CARRIER_STYLE_INHERITANCE_GLYPH = 1;  // X-linked carrier as a central dot, else a region fill
+  CARRIER_STYLE_PARTITION_FILL = 2;     // NSGC 2022: every carrier a region fill
+}
+
+enum XSolver {
+  X_SOLVER_UNSPECIFIED = 0;
+  X_SOLVER_Z3 = 1;     // exact rationals
+  X_SOLVER_HIGHS = 2;  // floating point; agrees with Z3 up to the position quantum
+}
+
+// A drawn layout. Row r draws generation first_generation + r; rows between the first and last generation are kept
+// even when empty.
+message Placement {
+  int32 first_generation = 1 [(buf.validate.field).int32.gte = 1];
+  repeated Row rows = 2;
+  // Sibships whose parents are undrawn (a partnerless mating), hung from an implied stub.
+  repeated FounderSibship founder_sibships = 3;
+  // Matings drawn as orthogonal edges because their partners are not adjacent (a >2-mate individual's overflow).
+  repeated RoutedMating routed = 4;
+}
+
+message Row {
+  repeated Cell cells = 1;  // left to right
+}
+
+message Cell {
+  oneof identity {
+    option (buf.validate.oneof).required = true;
+    grus.models.pedigree.Position individual = 1;
+    Ghost ghost = 2;
+    Phantom phantom = 3;
+    PassThrough pass_through = 4;
+  }
+  // In layout units (drawing scales by Geometry.x_unit), on the layout's 1e-6 grid; the leftmost cell in the layout is
+  // at 0.
+  double x = 5 [(buf.validate.field).double.finite = true];
+  // The column, on the row above, of this cell's drawn parent: the left member of a couple, or a lone parent.
+  // Absent = no drawn parents.
+  optional int32 parent_column = 6 [(buf.validate.field).int32.gte = 0];
+  // The cell descends from the parent_column cell alone, not from the couple that cell heads.
+  bool lone = 7;
+  // This cell and its right-hand neighbour are a couple. Absent = not.
+  optional CoupleLine couple_right = 8 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  // This cell and its right-hand neighbour are co-twins of this zygosity. Absent = not.
+  optional grus.models.pedigree.ZygosityType twin_right = 9 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  // This cell is the left member of a childless couple drawn with the Bennett glyph (BY_CHOICE or INFERTILITY).
+  // Absent = no glyph.
+  optional grus.models.pedigree.Childlessness childless = 10 [(buf.validate.field).enum = {in: [2, 3]}];
+}
+
+enum CoupleLine {
+  COUPLE_LINE_UNSPECIFIED = 0;
+  COUPLE_LINE_SINGLE = 1;
+  COUPLE_LINE_DOUBLE = 2;  // consanguineous
+}
+
+// A duplicate of a real individual on its partner's row, drawn for an avuncular (cross-generation) marriage. Keyed by
+// that marriage: the pair, its first child, and a rank among repeated marriages of the pair.
+message Ghost {
+  grus.models.pedigree.Position real = 1 [(buf.validate.field).required = true];
+  grus.models.pedigree.Position partner = 2 [(buf.validate.field).required = true];  // whom the ghost marries
+  optional grus.models.pedigree.Position first_child = 3;  // the marriage's first child; absent = childless
+  // 0, or the rank (by the Mating's serialized content) among marriages agreeing on the fields above.
+  uint32 occurrence = 4;
+}
+
+// The omitted other parent of a lone-parent sibship; drawn as a marriage line to nothing.
+message Phantom {
+  grus.models.pedigree.Position parent = 1 [(buf.validate.field).required = true];
+  grus.models.pedigree.Position first_child = 2 [(buf.validate.field).required = true];  // the sibship's first child
+}
+
+// A cell on a row a descent crosses (children more than one generation below their parents); the row gives its
+// generation.
+message PassThrough {
+  grus.models.pedigree.Position first_child = 1 [(buf.validate.field).required = true];  // of the descent carried
+}
+
+message FounderSibship {
+  int32 row = 1 [(buf.validate.field).int32.gte = 0];
+  repeated int32 columns = 2 [(buf.validate.field).repeated = {
+    min_items: 1,
+    items: {int32: {gte: 0}}
+  }];
+}
+
+message RoutedMating {
+  CellRef a = 1 [(buf.validate.field).required = true];
+  CellRef b = 2 [(buf.validate.field).required = true];
+  bool consanguineous = 3;
+  repeated CellRef children = 4;
+}
+
+message CellRef {
+  int32 row = 1 [(buf.validate.field).int32.gte = 0];
+  int32 column = 2 [(buf.validate.field).int32.gte = 0];
+}

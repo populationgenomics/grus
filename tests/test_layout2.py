@@ -81,14 +81,14 @@ def _crossings(p: pb.Pedigree, ranks: list[list[int]]) -> int:
     return _ordering_mod.count_crossings(_prepared(p), ranks)
 
 
-def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, int]]]:
-    """Per-rank stable identities ``(generation, index)`` — the arrangement independent of row indexing.
+def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, ...]]]:
+    """Per-rank stable identities (``_Graph.ident``) — the arrangement independent of row indexing.
 
     Read from the prepared graph, so a pass-through cell has its synthetic identity (keyed on the sibship it
     leads to, not on the input order).
     """
-    individuals = _layout2_mod._prepare(p).graph.individuals
-    return [[(individuals[i].generation, individuals[i].index) for i in row] for row in ranks]
+    graph = _layout2_mod._prepare(p).graph
+    return [[graph.ident(i) for i in row] for row in ranks]
 
 
 def _shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
@@ -845,7 +845,7 @@ def test_facing_seeds_do_not_depend_on_input_order() -> None:
     from grus.render import _layout2 as l2
     from grus.render import _ordering
 
-    def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, int], ...], list[tuple[int, int]]]]:
+    def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, ...], ...], list[tuple[int, ...]]]]:
         prep = l2._prepare(p)
         model = _ordering._Model(prep.graph)
         by_index = {mr.index: mr for mr in prep.graph.matings}
@@ -885,3 +885,183 @@ def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
     assert len(ref) == 1
     for seed in range(8):
         assert routed(_shuffled(p, seed)) == ref
+
+
+def test_founder_sibships_and_routes_are_listed_in_layout_order() -> None:
+    # Both lists are drawn in order, so an order taken from the input's matings would reorder the SVG under a shuffle.
+    for p in (test_render._load("founder_sibship_marry_in"), _overflow_pedigree()):
+        lay = render.layout(p)
+        assert lay.founder_sibships == sorted(lay.founder_sibships)
+        assert lay.routed == sorted(lay.routed, key=lambda rm: (rm.a, rm.b))
+        for seed in range(4):
+            shuffled = render.layout(_shuffled(p, seed))
+            assert shuffled.founder_sibships == lay.founder_sibships
+            assert [(rm.a, rm.b) for rm in shuffled.routed] == [(rm.a, rm.b) for rm in lay.routed]
+
+
+def _ghost_ind(g: int, i: int, gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
+    return pb.Individual(generation=g, index=i, gender=gender)
+
+
+def _ghost_mating(a: tuple[int, int], b: tuple[int, int], *kids: tuple[int, int], consang: bool = False) -> pb.Mating:
+    return pb.Mating(
+        partner_a=pb.Position(generation=a[0], index=a[1]),
+        partner_b=pb.Position(generation=b[0], index=b[1]),
+        consanguineous=consang,
+        offspring=[pb.Offspring(child=pb.Position(generation=g, index=i)) for g, i in kids],
+    )
+
+
+def _niece_two_uncles(with_children: bool) -> pb.Pedigree:
+    """Niece III-1 marries both her uncles II-1 and II-4: two ghosts on row III, one per uncle."""
+    woman = pb.GENDER_WOMAN
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(2, 4), _ghost_ind(3, 1, woman)]
+    kids: tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]] = ((), ())
+    if with_children:
+        people += [_ghost_ind(4, 1), _ghost_ind(4, 2, woman)]
+        kids = (((4, 1),), ((4, 2),))
+    matings = [
+        _ghost_mating((1, 1), (1, 2), (2, 1), (2, 2), (2, 4)),
+        _ghost_mating((2, 2), (2, 3), (3, 1)),
+        _ghost_mating((2, 1), (3, 1), *kids[0], consang=True),
+        _ghost_mating((2, 4), (3, 1), *kids[1], consang=True),
+    ]
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+def _uncle_niece_twice() -> pb.Pedigree:
+    """Uncle II-1 and niece III-1 with two matings (children IV-1, IV-2): two ghosts of II-1 marrying III-1."""
+    woman = pb.GENDER_WOMAN
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(3, 1, woman), _ghost_ind(4, 1), _ghost_ind(4, 2)]
+    matings = [
+        _ghost_mating((1, 1), (1, 2), (2, 1), (2, 2)),
+        _ghost_mating((2, 2), (2, 3), (3, 1)),
+        _ghost_mating((2, 1), (3, 1), (4, 1), consang=True),
+        _ghost_mating((2, 1), (3, 1), (4, 2), consang=True),
+    ]
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+def _uncle_niece_repeated(*children: tuple[tuple[int, int], ...], childless: tuple[int, ...] = ()) -> pb.Pedigree:
+    """Uncle II-1 and niece III-1 with one mating per entry of ``children`` (``()`` for a childless one).
+
+    ``childless`` gives each childless mating's ``Childlessness``; the second of them lists the niece as ``partner_a``,
+    so only the partner order and the childlessness tell the repeats apart.
+    """
+    woman = pb.GENDER_WOMAN
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(3, 1, woman)] + [_ghost_ind(g, i) for kids in children for g, i in kids]
+    matings = [_ghost_mating((1, 1), (1, 2), (2, 1), (2, 2)), _ghost_mating((2, 2), (2, 3), (3, 1))]
+    reasons = iter(childless)
+    for kids in children:
+        m = _ghost_mating((2, 1), (3, 1), *kids, consang=True)
+        if not kids and (reason := next(reasons, None)) is not None:
+            m.childlessness = reason  # type: ignore[assignment]
+            if reason == pb.CHILDLESSNESS_INFERTILITY:
+                m.partner_a.CopyFrom(pb.Position(generation=3, index=1))
+                m.partner_b.CopyFrom(pb.Position(generation=2, index=1))
+        matings.append(m)
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+GHOST_PEDIGREES = {
+    "niece_two_uncles": _niece_two_uncles(with_children=False),
+    "niece_two_uncles_children": _niece_two_uncles(with_children=True),
+    "uncle_niece_twice": _uncle_niece_twice(),
+    "uncle_niece_with_and_without_children": _uncle_niece_repeated(((4, 1),), ()),
+    "uncle_niece_three_times": _uncle_niece_repeated(((4, 1),), ((4, 2),), ()),
+    "uncle_niece_childless_twice": _uncle_niece_repeated(
+        (), (), childless=(pb.CHILDLESSNESS_BY_CHOICE, pb.CHILDLESSNESS_INFERTILITY)
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(GHOST_PEDIGREES))
+def test_ghost_drawing_is_independent_of_mating_order(name: str) -> None:
+    # A ghost's identity feeds the ordering's tie-breaks, so it must come from the join it is drawn for, never from
+    # its mating's input position: every permutation of the matings draws the same bytes.
+    p = GHOST_PEDIGREES[name]
+    assert render.layout(p).ghost_of
+    svgs = set()
+    for perm in itertools.permutations(p.matings):
+        q = pb.Pedigree()
+        q.CopyFrom(p)
+        del q.matings[:]
+        q.matings.extend(perm)
+        svgs.add(render.render_svg(q))
+    assert len(svgs) == 1
+
+
+@pytest.mark.parametrize("name", sorted(GHOST_PEDIGREES))
+def test_ghost_drawing_is_independent_of_partner_order(name: str) -> None:
+    # Which partner a mating lists first is not meaning: every combination of swapped partners draws the same bytes.
+    p = GHOST_PEDIGREES[name]
+    couples = [k for k, m in enumerate(p.matings) if m.HasField("partner_b")]
+    svgs = set()
+    for flips in itertools.product((False, True), repeat=len(couples)):
+        q = pb.Pedigree()
+        q.CopyFrom(p)
+        for k, flip in zip(couples, flips, strict=True):
+            if flip:
+                a = pb.Position()
+                a.CopyFrom(q.matings[k].partner_a)
+                q.matings[k].partner_a.CopyFrom(q.matings[k].partner_b)
+                q.matings[k].partner_b.CopyFrom(a)
+        svgs.add(render.render_svg(q))
+    assert len(svgs) == 1
+
+
+def _two_condition_carriers() -> pb.Pedigree:
+    """Two carriers of different named conditions, listed so input order and Position order disagree."""
+
+    def carrier(i: int, name: str) -> pb.Individual:
+        ind = _ghost_ind(1, i)
+        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER)
+        return ind
+
+    return pb.Pedigree(individuals=[carrier(2, "beta"), carrier(1, "alpha")])
+
+
+@pytest.mark.parametrize("name", [*_DRAWABLE, *sorted(GHOST_PEDIGREES), "two_condition_carriers"])
+def test_render_is_shuffle_invariant(name: str) -> None:
+    # Everything drawn depends on the pedigree, not on how the IR lists it: the whole SVG, including the condition
+    # legend that keys each carrier's fill region, is byte-identical under a shuffle.
+    if name in GHOST_PEDIGREES:
+        p = GHOST_PEDIGREES[name]
+    elif name == "two_condition_carriers":
+        p = _two_condition_carriers()
+    else:
+        p = test_render._load(name)
+    ref = render.render_svg(p)
+    for seed in range(4):
+        assert render.render_svg(_shuffled(p, seed)) == ref
+
+
+def _two_nieces(offset: int) -> pb.Pedigree:
+    """Uncle II-1 marries nieces III-1 and III-2 (two ghosts on row III); ``offset`` is added to row III's indexes."""
+    woman = pb.GENDER_WOMAN
+    niece = [(3, 1 + offset), (3, 2 + offset)]
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(2, 4), _ghost_ind(*niece[0], woman), _ghost_ind(*niece[1], woman)]
+    people += [_ghost_ind(4, 1), _ghost_ind(4, 2)]
+    matings = [
+        _ghost_mating((1, 1), (1, 2), (2, 1), (2, 2), (2, 4)),
+        _ghost_mating((2, 2), (2, 3), *niece),
+        _ghost_mating((2, 1), niece[0], (4, 1), consang=True),
+        _ghost_mating((2, 1), niece[1], (4, 2), consang=True),
+    ]
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
+def test_no_valid_index_reorders_a_ghost() -> None:
+    # A ghost's identity is tagged, not a large number, so a real index anywhere in the valid range (up to 2**31 - 1)
+    # neither collides with it nor changes where it stands.
+    def arrangement(p: pb.Pedigree) -> list[list[str]]:
+        lay = render.layout(p)
+        return [["ghost" if i in lay.ghost_of else f"{p.individuals[i].generation}" for i in row] for row in lay.nid]
+
+    ref = arrangement(_two_nieces(0))
+    for offset in (999_999_999, 1_000_000_000, 2**31 - 3):
+        assert arrangement(_two_nieces(offset)) == ref
