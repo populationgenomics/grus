@@ -10,7 +10,7 @@ import hashlib
 import random
 import time
 
-from grus import render
+from grus import ir, render
 from grus.models import pedigree_pb2 as pb
 from tools.fuzz import corpus
 
@@ -75,6 +75,19 @@ def measure(case: corpus.Case, highs: bool) -> Result:
     return Result(case.key, seconds, _drawn(p, lay, render.render_svg(p, geom)), None)
 
 
+def outcome_of(data: bytes, highs: bool) -> str:
+    """The serialized pedigree's SVG digest if it draws, else ``defer: <reason>``, or ``invalid: <error>``."""
+    p = pb.Pedigree.FromString(data)
+    try:
+        ir.validate(p)
+    except (ir.ValidationError, ir.IntegrityError) as e:
+        return f"invalid: {e}"
+    try:
+        return hashlib.sha1(render.render_svg(p, geometry(highs)).encode()).hexdigest()
+    except render.DeferredFeatureError as e:
+        return f"defer: {e}"
+
+
 def shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
     """``p`` with its individuals and matings in a seeded random order; offspring keep theirs, which is birth order."""
     rng = random.Random(seed)
@@ -101,6 +114,16 @@ def shuffle_outcomes(p: pb.Pedigree, shuffles: int, highs: bool) -> list[str]:
         except render.DeferredFeatureError:
             out.append("defer")
     return out
+
+
+def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool) -> list[str]:
+    """``shuffle_outcomes`` of a serialized pedigree; ``["invalid"]`` if it is not valid IR."""
+    p = pb.Pedigree.FromString(data)
+    try:
+        ir.validate(p)
+    except (ir.ValidationError, ir.IntegrityError):
+        return ["invalid"]
+    return shuffle_outcomes(p, shuffles, highs)
 
 
 def shuffle_case(case: corpus.Case, shuffles: int, highs: bool) -> tuple[str, list[str]]:
