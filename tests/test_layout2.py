@@ -714,3 +714,13 @@ def test_a_drop_on_its_bar_by_rounding_draws_no_elbow() -> None:
     svg = render.render_svg(p)
     assert "<path d=" not in svg
     assert render.render_svg(p) == svg
+
+
+def test_cousins_across_a_middle_sibling_start_at_facing_ends() -> None:
+    # IV-1's son and IV-3's daughter marry; IV-2's family stands between them in birth order. Local moves reached
+    # an order with a torn sibship and the pedigree deferred. A run seeded with the two lines adjacent and the
+    # cousins at their facing ends finds the clean order: IV-2's family moves aside and V-1 = V-4 face each other.
+    p = test_render._load("cousins_across_middle_sibling")
+    lay = render.layout(p)
+    row = [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[4] if i < len(p.individuals)]
+    assert abs(row.index("5-1") - row.index("5-4")) == 1

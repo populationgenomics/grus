@@ -88,10 +88,12 @@ stages:
    leaves a tear that local moves cannot repair. Pricing moves by tears first was tried and rejected: it traded
    crossings without limit and stopped searches early on shapes that were already clean. The exact search ranks
    crossings before tears too: the tear measure sees a lone child as a point, so moving one past another family counts
-   only as a crossing, though its descent then runs along that family's bar and the drawing reads as one sibship with
-   two sets of parents. A tear the search cannot avoid still defers; for cousins whose families sit far apart the fix is
-   the routed consanguineous marriage (below), not reordering. Crossing minimization is the *weak*-strength tie-breaker
-   among orders the stronger constraints leave free — never overriding contiguity or adjacency.
+   only as a crossing, and ranking tears first chose such orders over clean ones. When a tear remains, the loop is also
+   seeded once per marriage between relatives: the two lines start adjacent at the mating where they split, each line's
+   child toward the marriage at the facing end, so first cousins across a middle sibling's family start where the clean
+   order has them (`_facing_seeds`). A tear no run avoids still defers; the routed consanguineous marriage (below) is
+   the fix for what remains. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger
+   constraints leave free — never overriding contiguity or adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
    program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a twin group, a founder-sib
    floater with its sibling, or a couple whose partners mate once and are bonded to no one else; a hinge's couples and a

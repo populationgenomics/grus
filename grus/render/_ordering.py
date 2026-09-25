@@ -79,6 +79,24 @@ def order(g: _layout._Graph, cross: set[int]) -> Ordering:
         retry = _mincross(model, _reversed_atoms(model, init))
         if _objective(model, retry) < _objective(model, order_map):
             order_map = retry
+    if _total_overlaps(model, order_map):
+        # A marriage between relatives whose families start apart (first cousins across a middle sibling's family)
+        # needs the two lines brought to facing ends, several ranks at once. Seed a run per such marriage with the
+        # two lines adjacent at the mating where they split, each line's child toward the marriage at the facing
+        # end; keep the best. Runs only while a tear remains.
+        # The seeded runs skip the exact search, which is most of a run's cost on a large rank; only the best
+        # seeded order is settled by it.
+        best_seed: dict[int, list[int]] | None = None
+        for seed in _facing_seeds(model)[:_MAX_FACING_SEEDS]:
+            trial = _mincross(model, _init_order(model, seed), settle=False)
+            if best_seed is None or _objective(model, trial) < _objective(model, best_seed):
+                best_seed = trial
+            if not _total_overlaps(model, trial):
+                break
+        if best_seed is not None and _objective(model, best_seed) < _objective(model, order_map):
+            settled = _settle(model, best_seed)
+            if _objective(model, settled) < _objective(model, order_map):
+                order_map = settled
     ranks = [order_map.get(2 * lvl, []) for lvl in range(model.nlevels)]
     return Ordering(ranks=[list(r) for r in ranks], routed=frozenset(routed))
 
@@ -241,12 +259,13 @@ class _Model:
 # --- init_order: birth-order DFS from founders ------------------------------------------------------------
 
 
-def _init_order(model: _Model) -> dict[int, list[int]]:
+def _init_order(model: _Model, kid_order: dict[int, list[int]] | None = None) -> dict[int, list[int]]:
     """First-appearance order per rank from a DFS, regrouped so each atom is contiguous.
 
     Founders in ``(generation, index)`` order, descending into each mating's children in birth
-    (``Mating.offspring``) order.
+    (``Mating.offspring``) order, or in ``kid_order[mating index]`` where given (a facing-ends seed).
     """
+    override = kid_order or {}
     g = model.g
     seen_i: set[int] = set()
     seen_m: set[int] = set()
@@ -268,7 +287,7 @@ def _init_order(model: _Model) -> dict[int, list[int]]:
         appear[model.rank[model.mnode(mr.index)]].append(model.mnode(mr.index))
         for pk in sorted(mr.partners, key=model.ident):
             visit_ind(pk)
-        for k in mr.kids:  # birth order
+        for k in override.get(mr.index, mr.kids):  # birth order, unless a seed reorders them
             visit_ind(k)
 
     for mr in sorted(g.partnerless, key=lambda mr: min((model.ident(k) for k in mr.kids), default=(0, 0))):
@@ -278,6 +297,67 @@ def _init_order(model: _Model) -> dict[int, list[int]]:
         visit_ind(i)
 
     return _regroup(model, appear)
+
+
+_MAX_FACING_SEEDS = 6  # seeded runs per pedigree, each a full mincross; only while a tear remains
+
+
+def _facing_seeds(model: _Model) -> list[dict[int, list[int]]]:
+    """One child-order override per same-row marriage between relatives, bringing their two lines to facing ends.
+
+    For partners ``x`` and ``y`` with a common ancestor, the nearest mating ``M`` with distinct children ``a_x``
+    (``x`` or an ancestor of ``x``) and ``a_y`` (likewise for ``y``) is where the lines split. The seed puts ``a_y``
+    right after ``a_x`` among ``M``'s children, and at every mating below on ``x``'s line the child toward ``x``
+    last, on ``y``'s line the child toward ``y`` first, so the first-appearance order starts with the two
+    families side by side and the partners at their facing ends. Deterministic: matings in index order.
+    """
+    g = model.g
+    mating_of = {k: mr for mr in g.matings for k in mr.kids}
+
+    def line(i: int) -> dict[int, list[int]]:
+        """Each ancestor-or-self of ``i`` -> the path from it down to ``i`` (itself first)."""
+        out: dict[int, list[int]] = {i: [i]}
+        frontier = [i]
+        while frontier:
+            nxt: list[int] = []
+            for c in frontier:
+                mr = mating_of.get(c)
+                if mr is None:
+                    continue
+                for p in mr.partners:
+                    if p not in out:
+                        out[p] = [p, *out[c]]
+                        nxt.append(p)
+            frontier = nxt
+        return out
+
+    seeds: list[dict[int, list[int]]] = []
+    for mr in g.matings:
+        if len(mr.partners) != 2 or not all(p in mating_of for p in mr.partners):
+            continue
+        x, y = sorted(mr.partners, key=model.ident)
+        up_x, up_y = line(x), line(y)
+        best: tuple[int, _layout._Mating, int, int] | None = None
+        for m in g.matings:
+            ax = [k for k in m.kids if k in up_x]
+            ay = [k for k in m.kids if k in up_y]
+            if ax and ay and ax[0] != ay[0]:
+                depth = model.rank[m.kids[0]]
+                if best is None or depth > best[0]:
+                    best = (depth, m, ax[0], ay[0])
+        if best is None:
+            continue  # not relatives: an ordinary couple
+        _, top, ax, ay = best
+        kids = [k for k in top.kids if k != ay]
+        kids.insert(kids.index(ax) + 1, ay)
+        seed = {top.index: kids}
+        for path, at_end in ((up_x[ax], True), (up_y[ay], False)):
+            for child in path[1:]:
+                m = mating_of[child]
+                rest = [k for k in m.kids if k != child]
+                seed[m.index] = [*rest, child] if at_end else [child, *rest]
+        seeds.append(seed)
+    return seeds
 
 
 def _reversed_atoms(model: _Model, order_map: dict[int, list[int]]) -> dict[int, list[int]]:
@@ -720,13 +800,14 @@ def _objective(model: _Model, order_map: dict[int, list[int]]) -> tuple[int, int
     )
 
 
-def _mincross(model: _Model, init: dict[int, list[int]]) -> dict[int, list[int]]:
+def _mincross(model: _Model, init: dict[int, list[int]], *, settle: bool = True) -> dict[int, list[int]]:
     """Dot's mincross loop, then a tiny exact search on small ranks.
 
     Alternate ``wmedian`` (down/up) and ``transpose``, keep the best order under the lexicographic objective
     (torn sibships, crossings, birth-order inversions, edge length) on strict improvement — no drift on ties, so the
     result is deterministic; stop when a down+up round leaves the order unchanged. The exact search then settles small
-    ranks and fixes their tie-break.
+    ranks and fixes their tie-break (``_settle``); ``settle=False`` skips it, for a trial run whose winner alone is
+    settled.
     """
     best = {r: list(nodes) for r, nodes in init.items()}
     best_key = _objective(model, best)
@@ -741,8 +822,11 @@ def _mincross(model: _Model, init: dict[int, list[int]]) -> dict[int, list[int]]
             best = {r: list(nodes) for r, nodes in cur.items()}
         if cur == before and it % 2 == 1:  # a full down+up round changed nothing: converged
             break
-    settled = {r: list(nodes) for r, nodes in best.items()}
+    return _settle(model, best) if settle else best
+
+
+def _settle(model: _Model, order_map: dict[int, list[int]]) -> dict[int, list[int]]:
+    """The exact search on small ranks, kept unless it scores worse under the objective (the settle guard)."""
+    settled = {r: list(nodes) for r, nodes in order_map.items()}
     _exact_ranks(model, settled)
-    if _objective(model, settled) <= best_key:
-        best = settled
-    return best
+    return settled if _objective(model, settled) <= _objective(model, order_map) else order_map
