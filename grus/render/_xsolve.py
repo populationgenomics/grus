@@ -123,11 +123,14 @@ def _q(v: float) -> fractions.Fraction:
 def _solve_z3(model: Model) -> dict[int, float]:
     import z3
 
-    x = {c: z3.Real(f"x{c}") for c in model.cells}
+    # A private context per solve: z3's default context is process-global and not thread-safe, so two layouts
+    # solving at once in one process would otherwise mix their terms ("context mismatch").
+    ctx = z3.Context()
+    x = {c: z3.Real(f"x{c}", ctx) for c in model.cells}
 
     def val(f: fractions.Fraction | int) -> z3.ArithRef:
         f = fractions.Fraction(f)
-        return z3.RealVal(f"{f.numerator}/{f.denominator}")
+        return z3.RealVal(f"{f.numerator}/{f.denominator}", ctx)
 
     cons = [x[c] >= 0 for c in model.cells]
     cons += [x[right] - x[left] >= val(_q(sep)) for left, right, sep in model.gaps]
@@ -136,21 +139,21 @@ def _solve_z3(model: Model) -> dict[int, float]:
     for s_, (parents, children) in enumerate(model.sibships):
         mid = z3.Sum([x[p] for p in parents]) / len(parents)
         centroid = z3.Sum([x[c] for c in children]) / len(children)
-        o, dev = z3.Real(f"out{s_}"), z3.Real(f"dev{s_}")
+        o, dev = z3.Real(f"out{s_}", ctx), z3.Real(f"dev{s_}", ctx)
         cons += [o >= 0, o >= x[children[0]] - mid, o >= mid - x[children[-1]]]
         cons += [dev >= mid - centroid, dev >= centroid - mid]
         outside.append(o)
         devs.append(dev)
     stretch = []
     for q, (left, right, gap, allowance) in enumerate(model.couples):
-        over = z3.Real(f"over{q}")
+        over = z3.Real(f"over{q}", ctx)
         spread = x[right] - x[left] - val(_q(gap))
         cons += [over >= 0, over >= spread - val(_q(allowance))]
         stretch.append(z3.Sum([val(_STRETCH_SLOPE) * spread, val(_OVERSTRETCH_EXTRA) * over]))
     excess = [x[right] - x[left] - val(_q(sep)) for left, right, sep in model.gaps]
-    worst = z3.Real("worst")
+    worst = z3.Real("worst", ctx)
     cons += [worst >= e for e in excess]
-    zero = z3.RealVal(0)
+    zero = z3.RealVal(0, ctx)
     objectives = [
         z3.Sum(outside) if outside else zero,
         z3.Sum(devs + stretch) if devs or stretch else zero,
@@ -161,7 +164,7 @@ def _solve_z3(model: Model) -> dict[int, float]:
     held = []
     m: z3.ModelRef | None = None
     for k, objective in enumerate(objectives):
-        opt = z3.Optimize()
+        opt = z3.Optimize(ctx=ctx)
         opt.add(*cons, *held)
         handle = opt.minimize(objective)
         if opt.check() != z3.sat:

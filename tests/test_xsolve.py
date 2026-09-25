@@ -129,3 +129,15 @@ def test_parts_with_no_descent_link_are_anchored(backend: render.XSolver) -> Non
     p.matings.add(partner_a=_p(3, 1), partner_b=_p(3, 2), offspring=[pb.Offspring(child=_p(4, 1))])
     lay = render.layout(p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=backend))
     assert lay.pos == [[0.0, 1.0], [0.5], [0.0, 1.0], [0.5]]
+
+
+def test_concurrent_layouts_in_threads_agree_with_sequential() -> None:
+    # z3's default context is process-global; layouts solving in several threads at once raised "context
+    # mismatch" (a ladder harness rendering in a thread pool). Each solve now has its own context.
+    import concurrent.futures
+
+    names = test_render._NAMES
+    sequential = [render.layout(test_render._load(n)).pos for n in names]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        threaded = list(pool.map(lambda n: render.layout(test_render._load(n)).pos, names * 3))
+    assert threaded == sequential * 3
