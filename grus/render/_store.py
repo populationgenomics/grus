@@ -9,6 +9,7 @@ yields the exact ``Layout`` a fresh layout would, synthetic indices included.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 
 import protovalidate
@@ -106,7 +107,9 @@ def load_layout(
     _check_key(stored.key, p, geom)
     if stored.WhichOneof("outcome") == "deferred":
         raise _layout.DeferredFeatureError(stored.deferred)
-    return from_proto(p, stored.placement)
+    if stored.placement_digest != _digest(stored.placement):
+        raise StaleLayoutError("stored placement does not match its digest: it was edited after grus wrote it")
+    return from_proto(p, stored.placement, geom)
 
 
 def _check_key(key: lpb.LayoutKey, p: pb.Pedigree, geom: _geometry.Geometry) -> None:
@@ -147,15 +150,25 @@ def to_proto(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> l
         placement.routed.add(
             a=_ref(rm.a), b=_ref(rm.b), consanguineous=rm.consanguineous, children=[_ref(c) for c in rm.children]
         )
-    return lpb.PedigreeLayout(key=layout_key(p, geom), placement=placement)
+    return lpb.PedigreeLayout(key=layout_key(p, geom), placement=placement, placement_digest=_digest(placement))
 
 
-def from_proto(p: pb.Pedigree, placement: lpb.Placement) -> _layout.Layout:
-    """The ``Layout`` a stored placement of ``p`` records — equal to the fresh layout it was taken from.
+def _digest(placement: lpb.Placement) -> bytes:
+    return hashlib.sha256(placement.SerializeToString(deterministic=True)).digest()
+
+
+def from_proto(p: pb.Pedigree, placement: lpb.Placement, geom: _geometry.Geometry) -> _layout.Layout:
+    """The ``Layout`` a stored placement of ``p`` under ``geom`` records — equal to the fresh layout it was taken from.
+
+    Verified, not trusted: the cells are exactly the cells ``p`` lays out, row for row; ``first_generation``; every
+    relation (parent columns, couple, twin and childless flags, ``lone``, founder sibships, routed matings), rebuilt
+    from the stored row order and x and required to equal the stored values; each row's x in order and every adjacent
+    pair at least its separation (label clearance included); and no two sibships' bars overlapping. Trusted: that the
+    order and the x are the ones grus's search and solve chose — a record edited within all of the above draws a
+    correct figure of ``p``, though not grus's.
 
     Raises:
-        StaleLayoutError: the placement's cells are not exactly the cells ``p`` lays out, row for row, or a column
-            reference falls outside its row.
+        StaleLayoutError: any check above fails.
     """
     prep = _layout2._prepare(p)
     g = prep.graph
@@ -183,7 +196,7 @@ def from_proto(p: pb.Pedigree, placement: lpb.Placement) -> _layout.Layout:
     _check_columns(placement)
 
     rows = [list(row.cells) for row in placement.rows]
-    return _layout.Layout(
+    stored = _layout.Layout(
         n=[len(row) for row in nid],
         nid=nid,
         pos=[[c.x for c in row] for row in rows],
@@ -207,6 +220,71 @@ def from_proto(p: pb.Pedigree, placement: lpb.Placement) -> _layout.Layout:
         phantom=prep.phantom,
         lone=[[c.lone for c in row] for row in rows],
     )
+    _verify(p, prep, stored, geom)
+    return stored
+
+
+# Two neighbours may stand this much (layout units) closer than their separation: the quantum the layout rounds
+# positions to, since rounding each of two positions can close their gap by up to one quantum.
+_SEPARATION_SLACK = 10.0**-_layout2._POS_QUANTUM
+
+
+def _verify(p: pb.Pedigree, prep: _layout2._Prepared, stored: _layout.Layout, geom: _geometry.Geometry) -> None:
+    """Rebuild what the stored order and x determine and check what they must satisfy (see ``from_proto``)."""
+    g = prep.graph
+    if stored.first_generation != prep.first_generation:
+        raise StaleLayoutError(
+            f"stored first_generation is {stored.first_generation}; this pedigree's is {prep.first_generation}"
+        )
+    xpos = {idx: x for row, xs in zip(stored.nid, stored.pos, strict=True) for idx, x in zip(row, xs, strict=True)}
+    try:
+        built = _layout._build(
+            g,
+            xpos,
+            prep.ghost_of,
+            [mr.kids for mr in g.partnerless],
+            first_generation=prep.first_generation,
+            passthrough=prep.passthrough,
+            phantom=prep.phantom,
+        )
+    except _layout.DeferredFeatureError as e:
+        raise StaleLayoutError(f"the stored order cannot be drawn: {e}") from e
+    if built.nid != stored.nid or built.pos != stored.pos:
+        raise StaleLayoutError("a stored row is not in increasing x, or its leftmost cell is not at 0")
+    built = dataclasses.replace(built, routed=_layout2._routed_matings(g, built, _routed_indices(g, stored)))
+    for name in ("fam", "spouse", "twins", "childless", "lone", "founder_sibships", "routed"):
+        if getattr(built, name) != getattr(stored, name):
+            raise StaleLayoutError(f"the stored {name} relations are not the ones the stored order implies")
+    seps = _layout2._row_seps(built, geom.couple_gap, geom.sib_gap, _layout2._label_clearance(p, built, geom))
+    for level, xs in enumerate(stored.pos):
+        for k in range(len(xs) - 1):
+            gap, need = xs[k + 1] - xs[k], seps[level][k]
+            if gap < need - _SEPARATION_SLACK:
+                raise StaleLayoutError(f"cells {k} and {k + 1} on row {level} stand {gap:g} apart; they need {need:g}")
+    if (why := _layout2._overlapping_sibships(g, built)) is not None:
+        raise StaleLayoutError(f"the stored layout draws wrongly: {why}")
+
+
+def _routed_indices(g: _layout._Graph, stored: _layout.Layout) -> frozenset[int]:
+    """The matings a placement routes: the stored routed pairs, which must include every non-adjacent couple."""
+    cell = {(level, k): idx for level, row in enumerate(stored.nid) for k, idx in enumerate(row)}
+    col = {idx: (level, k) for (level, k), idx in cell.items()}
+    by_pair: dict[frozenset[int], list[int]] = {}
+    for mr in g.matings:
+        if mr.b is not None:
+            by_pair.setdefault(frozenset(mr.partners), []).append(mr.index)
+    routed: set[int] = set()
+    for rm in stored.routed:
+        pair = frozenset((cell[rm.a], cell[rm.b]))
+        if pair not in by_pair:
+            raise StaleLayoutError("a stored routed mating joins two cells that are not partners")
+        routed.update(by_pair[pair])
+    for pair, matings in by_pair.items():
+        (la, ka), (lb, kb) = sorted(col[i] for i in pair)
+        adjacent = la == lb and kb == ka + 1
+        if not adjacent and not set(matings) <= routed:
+            raise StaleLayoutError("a couple whose partners are not adjacent is neither adjacent nor routed")
+    return frozenset(routed)
 
 
 def _cell_keys(p: pb.Pedigree, prep: _layout2._Prepared) -> dict[int, _CellKey]:

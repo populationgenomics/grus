@@ -28,14 +28,16 @@ COUPLE_LINE_SINGLE: CoupleLine
 COUPLE_LINE_DOUBLE: CoupleLine
 
 class PedigreeLayout(_message.Message):
-    __slots__ = ("key", "placement", "deferred")
+    __slots__ = ("key", "placement", "deferred", "placement_digest")
     KEY_FIELD_NUMBER: _ClassVar[int]
     PLACEMENT_FIELD_NUMBER: _ClassVar[int]
     DEFERRED_FIELD_NUMBER: _ClassVar[int]
+    PLACEMENT_DIGEST_FIELD_NUMBER: _ClassVar[int]
     key: LayoutKey
     placement: Placement
     deferred: str
-    def __init__(self, key: _Optional[_Union[LayoutKey, _Mapping]] = ..., placement: _Optional[_Union[Placement, _Mapping]] = ..., deferred: _Optional[str] = ...) -> None: ...
+    placement_digest: bytes
+    def __init__(self, key: _Optional[_Union[LayoutKey, _Mapping]] = ..., placement: _Optional[_Union[Placement, _Mapping]] = ..., deferred: _Optional[str] = ..., placement_digest: _Optional[bytes] = ...) -> None: ...
 
 class PedigreeSetLayout(_message.Message):
     __slots__ = ("pedigrees",)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import itertools
+from collections.abc import Callable
 
 import protovalidate
 import pytest
@@ -62,7 +63,7 @@ def test_round_trip_is_lossless(name: str) -> None:
     record = _store.to_proto(p, lay, _GEOM)
     protovalidate.validate(record)
     back = lpb.PedigreeLayout.FromString(record.SerializeToString())
-    assert _store.from_proto(p, back.placement) == lay
+    assert _store.from_proto(p, back.placement, _GEOM) == lay
 
 
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
@@ -99,7 +100,7 @@ def test_record_reads_back_into_a_shuffled_pedigree() -> None:
     p = _FIXTURES["two_ghosts"]
     record = _record(p)
     q = test_layout2._shuffled(p, 1)
-    assert _store.from_proto(q, record.placement) == render.layout(q, _GEOM)
+    assert _store.from_proto(q, record.placement, _GEOM) == render.layout(q, _GEOM)
 
 
 def test_digest_ignores_order_but_not_content() -> None:
@@ -126,7 +127,7 @@ def test_a_cell_the_pedigree_does_not_lay_out_is_refused() -> None:
     record = _record(p)
     record.placement.rows[0].cells[0].individual.index = 99
     with pytest.raises(_store.StaleLayoutError, match="does not lay out"):
-        _store.from_proto(p, record.placement)
+        _store.from_proto(p, record.placement, _GEOM)
 
 
 def test_a_missing_cell_is_refused() -> None:
@@ -134,7 +135,7 @@ def test_a_missing_cell_is_refused() -> None:
     record = _record(p)
     del record.placement.rows[-1].cells[-1]
     with pytest.raises(_store.StaleLayoutError, match="missing"):
-        _store.from_proto(p, record.placement)
+        _store.from_proto(p, record.placement, _GEOM)
 
 
 def test_a_column_outside_its_row_is_refused() -> None:
@@ -142,12 +143,12 @@ def test_a_column_outside_its_row_is_refused() -> None:
     record = _record(p)
     record.placement.rows[1].cells[0].parent_column = 7
     with pytest.raises(_store.StaleLayoutError, match="parent column 7"):
-        _store.from_proto(p, record.placement)
+        _store.from_proto(p, record.placement, _GEOM)
 
 
 # --- drawing from a stored layout ---------------------------------------------------------------------------------
 
-# sha256 over every golden's stored layout (key cleared), keyed by the layout-algorithm version that produced it.
+# sha256 over every golden's stored layout (key and placement digest cleared), by the layout-algorithm version.
 _PINNED_GOLDEN_LAYOUTS = {1: "33719c940f8a49273c7d8f00b0520f68c3d41c156e396872e3827d5d27bb7560"}
 
 
@@ -156,6 +157,7 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes() -> None:
     for name in test_render._NAMES:
         record = render.store_layout(test_render._load(name))
         record.ClearField("key")
+        record.ClearField("placement_digest")
         digest.update(record.SerializeToString(deterministic=True))
     assert _PINNED_GOLDEN_LAYOUTS.get(render.LAYOUT_VERSION) == digest.hexdigest(), (
         "a golden's layout changed: bump LAYOUT_VERSION (stored layouts from the old algorithm must read as stale) "
@@ -239,6 +241,84 @@ def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
     ps = pb.PedigreeSet(pedigrees=[_FIXTURES["trio"], _FIXTURES["sibship"]])
     with pytest.raises(render.StaleLayoutError, match="1 stored layouts for a set of 2"):
         render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0])])
+
+
+# --- a record edited after grus wrote it -----------------------------------------------------------------------------
+
+
+def _edited(name: str, edit: Callable[[lpb.Placement], None], *, redigest: bool = True) -> lpb.PedigreeLayout:
+    """``name``'s stored layout with ``edit`` applied.
+
+    ``redigest`` recomputes the placement digest, as a deliberate editor would, so the structural checks behind it are
+    what refuse the record.
+    """
+    record = render.store_layout(_FIXTURES[name])
+    edit(record.placement)
+    if redigest:
+        record.placement_digest = hashlib.sha256(record.placement.SerializeToString(deterministic=True)).digest()
+    return record
+
+
+def _swap_identities(row: lpb.Row, a: int, b: int) -> None:
+    first, second = lpb.Cell(), lpb.Cell()
+    first.CopyFrom(row.cells[a])
+    second.CopyFrom(row.cells[b])
+    row.cells[a].individual.CopyFrom(second.individual)
+    row.cells[b].individual.CopyFrom(first.individual)
+
+
+def _bump_first_generation(pl: lpb.Placement) -> None:
+    pl.first_generation += 1
+
+
+def _move_left_child_past_its_sibling(pl: lpb.Placement) -> None:
+    pl.rows[2].cells[0].x += 7
+
+
+def _couple_two_siblings(pl: lpb.Placement) -> None:
+    pl.rows[2].cells[0].couple_right = lpb.COUPLE_LINE_DOUBLE
+
+
+def _orphan_a_child(pl: lpb.Placement) -> None:
+    pl.rows[2].cells[1].ClearField("parent_column")
+
+
+def _flip_lone(pl: lpb.Placement) -> None:
+    pl.rows[2].cells[0].lone = True
+
+
+def _crowd_a_couple(pl: lpb.Placement) -> None:
+    pl.rows[0].cells[1].x = 0.5
+
+
+_EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
+    "first_generation": ("three_generation", _bump_first_generation, "first_generation"),
+    "swapped_couple": ("three_generation", lambda pl: _swap_identities(pl.rows[1], 0, 1), "fam"),
+    "moved_x": ("three_generation", _move_left_child_past_its_sibling, "increasing x"),
+    "added_couple": ("three_generation", _couple_two_siblings, "spouse"),
+    "dropped_parent": ("three_generation", _orphan_a_child, "fam"),
+    "flipped_lone": ("three_generation", _flip_lone, "lone"),
+    "crowded": ("three_generation", _crowd_a_couple, "need"),
+    "dropped_founder_sibship": ("founder_sibship", lambda pl: pl.ClearField("founder_sibships"), "founder_sibships"),
+    "dropped_route": ("routed", lambda pl: pl.ClearField("routed"), "neither adjacent nor routed"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_EDITS))
+def test_an_edited_record_is_refused_even_with_a_matching_digest(case: str) -> None:
+    name, edit, why = _EDITS[case]
+    with pytest.raises(render.StaleLayoutError, match=why):
+        render.render_svg(_FIXTURES[name], stored_layout=_edited(name, edit))
+
+
+def test_an_edit_the_structure_allows_is_refused_by_the_digest() -> None:
+    # Two unrelated founders swapped, or a child nudged right: still a correct drawing of the pedigree, and so beyond
+    # the structural checks, but not grus's. The placement digest refuses it.
+    unrelated = _edited("carrier_inheritance", lambda pl: _swap_identities(pl.rows[0], 0, 2), redigest=False)
+    nudged = _edited("three_generation", lambda pl: setattr(pl.rows[2].cells[1], "x", 9.0), redigest=False)
+    for name, record in (("carrier_inheritance", unrelated), ("three_generation", nudged)):
+        with pytest.raises(render.StaleLayoutError, match="digest"):
+            render.render_svg(_FIXTURES[name], stored_layout=record)
 
 
 def _deferred_pedigree() -> pb.Pedigree:
