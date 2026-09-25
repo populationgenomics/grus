@@ -144,6 +144,49 @@ def test_state_classes_mirror_the_ir() -> None:
     assert marks == ["mark deceased", "mark proband"]
 
 
+def _centre(shape: ET.Element) -> tuple[float, float]:
+    """The centre of a symbol outline: a circle's, a square's, or a diamond's (top point's x, right point's y)."""
+    if shape.tag == f"{_SVG}circle":
+        return float(shape.get("cx", "nan")), float(shape.get("cy", "nan"))
+    if shape.tag == f"{_SVG}rect":
+        half = float(shape.get("width", "nan")) / 2
+        return float(shape.get("x", "nan")) + half, float(shape.get("y", "nan")) + half
+    top, right = shape.get("points", "").split()[:2]
+    return float(top.split(",")[0]), float(right.split(",")[1])
+
+
+def test_count_is_a_data_attribute_and_a_mark_inside_the_symbol() -> None:
+    # A count-collapsed symbol draws its number, or n for an unknown number, centred inside it (Bennett); one
+    # person (count absent or 1) draws none. The value rides on the group, so [data-count] selects every group.
+    root = _parse(render.render_svg(_load("counts")))
+    drawn: dict[str, tuple[str | None, str | None, str | None]] = {}
+    for g in _groups(root, "individual"):
+        marks = [c for c in g if _classes(c) == ["mark", "count"]]
+        assert len(marks) <= 1
+        if marks:
+            mark_at = (float(marks[0].get("x", "nan")), float(marks[0].get("y", "nan")))
+            assert mark_at == _centre(next(c for c in g if "symbol" in _classes(c)))
+        text = marks[0].text if marks else None
+        drawn[g.get("data-position", "")] = (g.get("data-count"), text, marks[0].get("fill") if marks else None)
+    assert drawn == {
+        "I-1": (None, None, None),
+        "I-2": (None, None, None),
+        "II-1": ("3", "3", "#000000"),
+        "II-2": ("12", "12", "#ffffff"),  # white on the solid fill of an affected group
+        "II-3": (None, None, None),  # count 1 is one person
+        "II-4": ("n", "n", "#000000"),
+    }
+
+
+@pytest.mark.parametrize(
+    ("fields", "match"), [({"count": 0}, "count must be >= 1"), ({"count": 2, "count_unspecified": True}, "both set")]
+)
+def test_an_impossible_count_fails_loudly(fields: dict[str, object], match: str) -> None:
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, **fields)  # pyright: ignore[reportArgumentType]
+    with pytest.raises(ValueError, match=match):
+        render.render_svg(pb.Pedigree(individuals=[ind]))
+
+
 # --- connectors ------------------------------------------------------------------------------------------
 
 

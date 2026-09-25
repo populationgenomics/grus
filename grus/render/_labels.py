@@ -58,6 +58,25 @@ def label_lines(ind: pb.Individual) -> list[str]:
     return out
 
 
+def count_text(ind: pb.Individual) -> str | None:
+    """The text drawn inside a count-collapsed symbol: ``"n"`` for an unknown number, else the count; None for one.
+
+    Bennett draws a group of individuals as one symbol with the number (or ``n``) centred inside it. ``count``
+    absent or 1 is one person and draws nothing.
+
+    Raises:
+        ValueError: ``count`` is below 1, or is set together with ``count_unspecified`` (a known and an unknown
+            number at once).
+    """
+    if ind.HasField("count") and ind.count < 1:
+        raise ValueError(f"{position(ind)}: count must be >= 1, got {ind.count}")
+    if ind.count_unspecified:
+        if ind.HasField("count"):
+            raise ValueError(f"{position(ind)}: count {ind.count} and count_unspecified are both set")
+        return "n"
+    return str(ind.count) if ind.count > 1 else None
+
+
 def label_width(ind: pb.Individual, geom: _geometry.Geometry) -> float:
     """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
 

@@ -1,0 +1,9 @@
+id: "counts"
+labels { text: "Count-collapsed siblings: a number or n inside the symbol, white on an affected one" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_WOMAN count: 3 }
+individuals { generation: 2 index: 2 gender: GENDER_MAN count: 12 conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 3 gender: GENDER_MAN count: 1 }
+individuals { generation: 2 index: 4 gender: GENDER_UNKNOWN count_unspecified: true }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } offspring { child { generation: 2 index: 2 } } offspring { child { generation: 2 index: 3 } } offspring { child { generation: 2 index: 4 } } }
