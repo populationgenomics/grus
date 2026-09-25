@@ -51,6 +51,24 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
     return p
 
 
+def _describe(e: BaseException) -> str:
+    """The error's message, plus each protovalidate violation (``individuals[0].count: must be … [int32.gte]``).
+
+    A protovalidate ``ValidationError`` says only "invalid Pedigree"; the violations name the field and rule. A set's
+    per-pedigree failure wraps the pedigree's error, so the cause is described too.
+    """
+    parts = [str(e)]
+    for err in (e, e.__cause__):
+        if isinstance(err, ir.ValidationError):
+            for v in err.violations:
+                path = ".".join(
+                    el.field_name + (f"[{el.subscript.value}]" if el.subscript is not None else "")
+                    for el in (v.proto.field.elements if v.proto.field is not None else [])
+                )
+                parts.append(f"{path or '(message)'}: {v.proto.message} [{v.proto.rule_id}]")
+    return "; ".join(parts)
+
+
 def _geometry(args: argparse.Namespace) -> render.Geometry:
     geom = render.DEFAULT_GEOMETRY
     if args.carrier_style:
@@ -65,7 +83,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
             loaded = load_ir(path, _text_format(path, args.format))
         except Exception as e:  # report every failure, keep going
             failures += 1
-            print(f"{path}: INVALID: {e}", file=sys.stderr)
+            print(f"{path}: INVALID: {_describe(e)}", file=sys.stderr)
             continue
         n = len(loaded.pedigrees) if isinstance(loaded, pb.PedigreeSet) else 1
         print(f"{path}: ok ({n} pedigree{'s' if n != 1 else ''})")

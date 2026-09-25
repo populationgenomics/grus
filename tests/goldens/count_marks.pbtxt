@@ -1,0 +1,78 @@
+id: "count_marks"
+labels { text: "Counts 3, 12, 100 and n on every status and mark: inside when the centre is free, beside the upper right when a mark runs through it" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN count: 3 }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN count: 12 }
+individuals { generation: 1 index: 3 gender: GENDER_UNKNOWN count: 100 }
+individuals { generation: 1 index: 4 gender: GENDER_MAN count_unspecified: true }
+individuals { generation: 1 index: 5 gender: GENDER_WOMAN count: 3 deceased: true }
+individuals { generation: 1 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true }
+individuals { generation: 1 index: 7 gender: GENDER_MAN count: 100 deceased: true }
+individuals { generation: 1 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true }
+individuals { generation: 1 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true }
+individuals { generation: 1 index: 10 gender: GENDER_MAN count: 12 proband: true }
+individuals { generation: 1 index: 11 gender: GENDER_WOMAN count: 100 proband: true }
+individuals { generation: 1 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true }
+individuals { generation: 2 index: 1 gender: GENDER_MAN count: 3 conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 3 gender: GENDER_UNKNOWN count: 100 conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 4 gender: GENDER_MAN count_unspecified: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 5 gender: GENDER_WOMAN count: 3 deceased: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 7 gender: GENDER_MAN count: 100 deceased: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 10 gender: GENDER_MAN count: 12 proband: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 11 gender: GENDER_WOMAN count: 100 proband: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 1 gender: GENDER_MAN count: 3 conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 3 gender: GENDER_UNKNOWN count: 100 conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 4 gender: GENDER_MAN count_unspecified: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 5 gender: GENDER_WOMAN count: 3 deceased: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 7 gender: GENDER_MAN count: 100 deceased: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 10 gender: GENDER_MAN count: 12 proband: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 11 gender: GENDER_WOMAN count: 100 proband: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true conditions { status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 4 index: 1 gender: GENDER_MAN count: 3 conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 3 gender: GENDER_UNKNOWN count: 100 conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 4 gender: GENDER_MAN count_unspecified: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 5 gender: GENDER_WOMAN count: 3 deceased: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 7 gender: GENDER_MAN count: 100 deceased: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 10 gender: GENDER_MAN count: 12 proband: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 11 gender: GENDER_WOMAN count: 100 proband: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 4 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 5 index: 1 gender: GENDER_MAN count: 3 conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 3 gender: GENDER_UNKNOWN count: 100 conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 4 gender: GENDER_MAN count_unspecified: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 5 gender: GENDER_WOMAN count: 3 deceased: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 7 gender: GENDER_MAN count: 100 deceased: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 10 gender: GENDER_MAN count: 12 proband: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 11 gender: GENDER_WOMAN count: 100 proband: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 5 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true conditions { status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 6 index: 1 gender: GENDER_MAN count: 3 conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 3 gender: GENDER_UNKNOWN count: 100 conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 4 gender: GENDER_MAN count_unspecified: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 5 gender: GENDER_WOMAN count: 3 deceased: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 6 gender: GENDER_UNKNOWN count: 12 deceased: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 7 gender: GENDER_MAN count: 100 deceased: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 8 gender: GENDER_WOMAN count_unspecified: true deceased: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 9 gender: GENDER_UNKNOWN count: 3 proband: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 10 gender: GENDER_MAN count: 12 proband: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 11 gender: GENDER_WOMAN count: 100 proband: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 6 index: 12 gender: GENDER_UNKNOWN count_unspecified: true proband: true conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 7 index: 1 gender: GENDER_MAN count: 100 deceased: true }
+individuals { generation: 7 index: 2 gender: GENDER_WOMAN count: 12 conditions { status: CONDITION_STATUS_UNKNOWN } }
+individuals { generation: 8 index: 1 gender: GENDER_UNKNOWN count_unspecified: true }
+matings { partner_a { generation: 7 index: 1 } partner_b { generation: 7 index: 2 } consanguineous: true offspring { child { generation: 8 index: 1 } } }

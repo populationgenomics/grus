@@ -75,17 +75,26 @@ retired): every carrier is a region fill regardless of inheritance. A region fil
 via a per-symbol `clipPath`, so one code path covers □ ○ ◇; the region is keyed to the carried condition's index in the
 pedigree's condition legend (distinct names, phenotype labels first) — so two carriers of *different* named variants
 fill *opposite* halves (a compound het reads as opposite sides), while a single or unnamed carrier is the plain left
-half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. Connectors: **mating line**
-(horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only
-from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line**
-(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its
-children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with
-rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's
-landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib
-bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to
-one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating
-midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for
-`CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
+half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. A **count-collapsed** symbol (a
+group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its number, or `n` for an unknown number;
+`count` absent or 1 is one person and draws none (`ir.validate` rejects `count` < 1 and `count` with
+`count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
+centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
+for a circle, 0.5 for a diamond), white on an affected symbol's solid fill and black otherwise. When a mark runs through
+the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the deceased slash — it moves beside
+the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side, clear of
+the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the count clears both its label and
+its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over a carrier's region fill. A ghost
+places its count as the real cell does. Connectors: **mating line** (horizontal between partners; doubled for
+consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit `Mating.consanguineous`
+flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop from the mating midpoint →
+horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a crossing or a cousin standing
+beside its mate, turns at its own elbow track above the bars with rounded corners and lands on its bar's near end, and
+elbows sharing a row gap stagger, a drop standing over another's landing leg turning higher), a **founder sibship**'s
+implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point
+instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless
+glyph** (a couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
+`CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;
@@ -97,7 +106,11 @@ the single-condition affected/carrier fills above are drawn, the multi-region ca
 `ANNOTATION_TYPE_INDIVIDUAL_NUMBER` annotation is **skipped** — it is the bare arabic index ("2") already carried by
 `local_id` ("II-2"), so drawing it would duplicate the id. De-duplication additionally collapses any annotation whose
 text equals a line already present (e.g. an extractor that repeats the id). The deprecated `label` field is never drawn.
-Lines use `LABEL_SIZE`, separated by `LABEL_LINE_GAP`; the first line sits `LABEL_GAP` below the symbol's bottom edge.
+Lines use `LABEL_SIZE`, separated by `LABEL_LINE_GAP`; the first line sits `LABEL_GAP` below the symbol's bottom edge. A
+symbol whose descent drops from its own centre (a count-collapsed parent, or a lone parent with no free side for a
+phantom) would have that line run through a centred stack, so its stack moves beside the line, `LABEL_GAP` from it, on
+the side no couple line (and its descent) leaves: left when the cell's partner is on its right, else right. With couples
+on both sides it stays right, and a couple's drop on that side can still cross it.
 
 **Generation markers.** A Roman numeral (the row's IR generation, so a pedigree whose top row is `II` starts there) is
 drawn once per row in a reserved **left gutter** of width `GEN_MARKER_GUTTER`, at the gutter's horizontal centre and on
@@ -114,13 +127,15 @@ sized from the actual pedigree, not a fixed band:
   `SYMBOL_SIZE + band + LABEL_GAP + SIB_STUB` so a parent's stack clears the sib bar and descent lines of the row below.
 - *Horizontal.* SVG text width isn't measurable at build time, so a line's width is estimated conservatively as
   `0.6·LABEL_SIZE` px per character (a sans-serif average advance) (`_labels.py`). Label widening is **local** and lives
-  in the x-solve: each adjacent same-row pair's minimum separation is the larger of its geometric gap and
-  `(width_left + width_right)/2 + LABEL_SIZE`, in layout units, so only the gaps whose labels would overlap widen and
-  one wide annotation does not inflate the whole figure's pitch. Drawing then maps layout-x to pixel-x by one scale,
-  `X_UNIT` px per unit. A widening applied after the solve (it used to be) keeps lines vertical but moves every midpoint
-  off the one the solve centred. The canvas width and origin are sized from true content bounds (symbol half or label
-  half, whichever reaches further per cell), so an outermost label wider than its symbol is not clipped. All
-  deterministic functions of the pedigree, keeping golden bytes stable.
+  in the x-solve: each adjacent same-row pair's minimum separation is the larger of its geometric gap and the left
+  cell's right label reach plus the right cell's left reach plus `LABEL_SIZE`
+  (`(width_left + width_right)/2 + LABEL_SIZE` for two centred stacks; a stack beside its drop reaches to one side
+  only), in layout units, so only the gaps whose labels would overlap widen and one wide annotation does not inflate the
+  whole figure's pitch. Drawing then maps layout-x to pixel-x by one scale, `X_UNIT` px per unit. A widening applied
+  after the solve (it used to be) keeps lines vertical but moves every midpoint off the one the solve centred. The
+  canvas width and origin are sized from true content bounds (symbol half or label reach, whichever is further per side
+  of each cell), so an outermost label wider than its symbol is not clipped. All deterministic functions of the
+  pedigree, keeping golden bytes stable.
 
 Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, `SIB_GAP`, `SIB_STUB`,
 `DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`.

@@ -63,6 +63,13 @@ one of the parent's two sides, so it is added only while one is free: a twin wit
 side) keeps a lone sibship as a drop from its own centre, which `Layout.lone` marks so drawing does not read it as the
 couple's.
 
+A **count-collapsed parent** — `count` > 1 or `count_unspecified`, the same test that draws its number — gets no
+phantom: a line to an omitted partner says one person had children by someone left out, while a group's offspring
+(typically an `n` diamond) hang from a straight line down from the group symbol. Its lone sibship takes the same
+own-centre drop, marked in `Layout.lone`. This holds for a group with exactly one lone sibship; a group with several
+keeps a phantom line for each, as any lone parent does, since the sibships need distinct drops and the symbol has one
+centre. A group with a drawn partner is an ordinary couple.
+
 ### The solve (x-positions)
 
 Continuous x per individual and per mating node (a mating node sits between its partners; descent drops from it). Three

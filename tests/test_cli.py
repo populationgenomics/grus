@@ -45,6 +45,24 @@ def test_validate_reports_ok_and_invalid(tmp_path: pathlib.Path, capsys: pytest.
     assert "bad.pbtxt: INVALID" in err
 
 
+@pytest.mark.parametrize(
+    ("fields", "rule"),
+    [
+        ("count: 0", "count"),
+        ("count: -2", "count"),
+        ("count: 3 count_unspecified: true", "individual.count_exclusive"),
+    ],
+)
+def test_validate_reports_an_invalid_count(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str], fields: str, rule: str
+) -> None:
+    bad = tmp_path / "bad.pbtxt"
+    bad.write_text(f"individuals {{ generation: 1 index: 1 gender: GENDER_MAN {fields} }}\n")
+    assert cli.main(["validate", str(bad)]) == 1
+    _, err = capsys.readouterr()
+    assert "bad.pbtxt: INVALID" in err and rule in err
+
+
 def test_render_writes_svg_file_and_matches_library(tmp_path: pathlib.Path) -> None:
     from grus.render import render_svg
 

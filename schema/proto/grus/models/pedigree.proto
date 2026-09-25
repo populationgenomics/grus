@@ -100,6 +100,10 @@ message Individual {
   option (buf.validate.message).cel = {
     id: "individual.gender_specified", message: "gender must be a real value", expression: "this.gender != 0"
   };
+  option (buf.validate.message).cel = {
+    id: "individual.count_exclusive", message: "count and count_unspecified are mutually exclusive",
+    expression: "!(has(this.count) && this.count_unspecified)"
+  };
   int32 generation = 1 [(buf.validate.field).int32.gte = 1];  // identity + reference key
   int32 index = 2 [(buf.validate.field).int32.gte = 1];
   Gender gender = 3;
@@ -110,7 +114,7 @@ message Individual {
   bool consultand = 8;                                         // arrow, no P
   optional ReproductiveOutcome reproductive_outcome = 9;       // absent = LIVE
   optional ReproductiveRole reproductive_role = 10;            // absent = SELF
-  optional int32 count = 11;                                   // collapsed sibship "5"; absent = 1
+  optional int32 count = 11 [(buf.validate.field).int32.gte = 1];  // collapsed sibship "5"; absent = 1 = one person
   bool count_unspecified = 12;                                 // drawn as "n" (unknown multiple)
   repeated Annotation annotations = 13;                        // remaining as-drawn text (below)
   optional string external_id = 14;                            // opaque external/study id printed for this person;

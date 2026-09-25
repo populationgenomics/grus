@@ -124,7 +124,9 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 ### Validation, split by what protobuf can express
 
 - **Field-local / single-message** rules are **protovalidate** options on the `.proto`: `Position` components ≥ 1;
-  `gender` and `Condition.status` are real values not the zero sentinel; `twin_type` set iff `twin_group` present.
+  `gender` and `Condition.status` are real values not the zero sentinel; `twin_type` set iff `twin_group` present;
+  `Individual.count` ≥ 1 when set (1 is one person, the same as absent) and never together with `count_unspecified` (a
+  known and an unknown number at once).
 - **Graph invariants** live in the `grus.ir` loader, which fails loud: every referenced `Position` exists among the
   pedigree's individuals; `(generation, index)` is unique per pedigree; a mating's two partners are distinct; offspring
   exist; a child's generation exceeds each parent's, and one mating's offspring share a generation. Generation is the

@@ -166,6 +166,7 @@ _SHUFFLED_GOLDENS = (
     "cousins_across_middle_sibling",
     "crossing_descents",
     "lone_parent_sibships",
+    "count_collapsed_parents",
     "twins_marry_chain_stretches",
     "twins_marry_cousins_apart",
 )
@@ -633,6 +634,106 @@ def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple
     assert "ind-III-4" not in svg and svg.count('class="individual') == len(
         _lone_parent_pedigree(with_mate).individuals
     )
+
+
+def test_a_count_collapsed_parent_drops_from_its_own_centre() -> None:
+    # A phantom partner drew a group symbol ("3" sisters) as one person with children by an omitted partner. The
+    # literature drops a straight line from the group symbol to its offspring (review-set figure c05): no phantom,
+    # the drop leaves the symbol's centre, and the label stack moves beside the line. An ordinary lone parent keeps
+    # its line to the omitted partner.
+    p = test_render._load("count_collapsed_parents")
+    lay = render.layout(p)
+    svg = render.render_svg(p)
+    at = {
+        (i.generation, i.index): (lv, k)
+        for lv, row in enumerate(lay.nid)
+        for k, c in enumerate(row)
+        if c < len(p.individuals)
+        for i in [p.individuals[c]]
+    }
+    assert len(lay.phantom) == 1
+    assert re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg) == ["III-3"]
+    for parent, child in (((3, 1), (4, 1)), ((3, 2), (4, 2)), ((3, 4), (4, 5)), ((3, 5), (4, 6))):
+        (plv, pk), (clv, ck) = at[parent], at[child]
+        assert lay.fam[clv][ck] == pk and lay.descends_from_one(clv, ck)
+        assert lay.drops_from_centre(plv, pk)
+        assert lay.pos[plv][pk] == lay.pos[clv][ck], "the drop runs straight down from the group to its offspring"
+    assert not lay.drops_from_centre(*at[(3, 3)])
+    starts = set(re.findall(r'<text class="label" [^>]*text-anchor="start"[^>]*>([^<]*)</text>', svg))
+    assert starts == {"III-1", "III-2", "III-4", "III-5"}, "only a label with a line through its centre moves"
+
+
+def test_a_group_with_two_lone_sibships_keeps_a_line_for_each() -> None:
+    # A group parent's one lone sibship drops from its centre, but two cannot share that one drop: they deferred as a
+    # torn sibship. With more than one, each keeps its own line to an omitted partner, as for any lone parent.
+    man, woman, unknown = pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_UNKNOWN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=man, count=3),
+            pb.Individual(generation=2, index=2, gender=woman),
+            pb.Individual(generation=3, index=1, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=2, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=3, gender=man),
+        ]
+    )
+    top = p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2))
+    top.offspring.add(child=_pos(2, 1))
+    top.offspring.add(child=_pos(2, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 1))
+    second = p.matings.add(partner_a=_pos(2, 1))
+    second.offspring.add(child=_pos(3, 2))
+    second.offspring.add(child=_pos(3, 3))
+    svg = render.render_svg(p)
+    assert re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg) == ["II-1", "II-1"]
+    drawn = set(re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)"', svg))
+    assert {s for s in drawn if s[1].startswith("III")} == {("II-1", "III-1"), ("II-1", "III-2 III-3")}
+
+
+def test_a_label_beside_the_drop_takes_the_side_no_couple_leaves() -> None:
+    # II-1 (a group of 3) has a lone sibship, dropped from its centre, and a drawn partner II-3 on its right, whose
+    # couple's drop leaves that side. The label stack moved beside the drop always went right, so the couple's drop
+    # ran through it; it now goes left, with its reach reserved on that side.
+    man, woman, unknown = pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_UNKNOWN
+    note = pb.Annotation(text="a long annotation here", type=pb.ANNOTATION_TYPE_OTHER)
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=man, count=3, annotations=[note]),
+            pb.Individual(generation=2, index=2, gender=woman),
+            pb.Individual(generation=2, index=3, gender=woman),
+            pb.Individual(generation=3, index=1, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=2, gender=man),
+            pb.Individual(generation=3, index=3, gender=woman),
+        ]
+    )
+    top = p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2))
+    top.offspring.add(child=_pos(2, 1))
+    top.offspring.add(child=_pos(2, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 1))
+    couple = p.matings.add(partner_a=_pos(2, 1), partner_b=_pos(2, 3))
+    couple.offspring.add(child=_pos(3, 2))
+    couple.offspring.add(child=_pos(3, 3))
+    lay = render.layout(p)
+    (level, k), (_, mate) = [
+        (lv, row.index(i))
+        for lv, row in enumerate(lay.nid)
+        for i, ind in enumerate(p.individuals)
+        if i in row and (ind.generation, ind.index) in ((2, 1), (2, 3))
+    ]
+    assert mate == k + 1 and lay.spouse[level][k], "the partner is on the right"
+    assert lay.label_side(level, k) == -1
+    svg = render.render_svg(p)
+    g = re.search(r'<g id="ind-II-1" class="individual.*?</g>', svg, re.S)
+    assert g is not None
+    anchors = re.findall(r'<text class="label" [^>]*text-anchor="(\w+)"', g.group(0))
+    assert anchors == ["end", "end"]
+    drop = re.search(r'<g class="sibship" data-parents="II-1 II-3"[^>]*>\s*(?:<line x1="|<path d="M)([-0-9.]+)', svg)
+    assert drop is not None
+    (right,) = [r for _l, r, _y, s in test_render._label_spans(svg) if s == note.text]
+    assert right < float(drop.group(1)), "the label stays clear of the couple's drop"
 
 
 def test_crossing_descents_turn_on_their_own_tracks() -> None:

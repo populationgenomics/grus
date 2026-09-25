@@ -26,7 +26,7 @@ import pytest
 
 from grus import ir, render
 from grus.models import pedigree_pb2 as pb
-from grus.render import _labels
+from grus.render import _draw, _labels
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 _NAMES = sorted(path.stem for path in _GOLDENS.glob("*.pbtxt"))
@@ -89,6 +89,22 @@ def _label_lines(svg: str) -> list[tuple[float, float, str]]:
     """Just the label-stack lines (font size == label_size): ``(x, y, content)``."""
     size = render.DEFAULT_GEOMETRY.label_size
     return [(x, y, s) for x, y, sz, s in _texts(svg) if sz == size]
+
+
+_LABEL_RE = re.compile(
+    r'<text class="label" x="([-0-9.]+)" y="([-0-9.]+)" [^>]*text-anchor="(middle|start|end)"[^>]*>([^<]*)</text>'
+)
+
+
+def _label_spans(svg: str) -> list[tuple[float, float, float, str]]:
+    """Each label line's estimated horizontal extent: ``(left, right, y, content)``, by its text anchor."""
+    size = render.DEFAULT_GEOMETRY.label_size
+    out: list[tuple[float, float, float, str]] = []
+    for x, y, anchor, s in _LABEL_RE.findall(svg):
+        w = 0.6 * size * len(s)
+        left = {"start": float(x), "end": float(x) - w}.get(anchor, float(x) - w / 2)
+        out.append((left, left + w, float(y), s))
+    return out
 
 
 _ROMAN_RE = re.compile(r"^[IVXLCDM]+$")
@@ -204,6 +220,8 @@ def test_children_lie_within_parent_span(name: str) -> None:
         parent_x = [at[idx[_pos(m.partner_a)]][2]]
         if m.HasField("partner_b"):
             parent_x.append(at[idx[_pos(m.partner_b)]][2])
+        elif lay.descends_from_one(*at[idx[_pos(m.offspring[0].child)]][:2]):
+            pass  # a count-collapsed (or sideless) lone parent's descent drops from its own centre
         else:  # a lone parent's descent drops from its line to the omitted partner, the phantom beside it
             level, col, _ = at[idx[_pos(m.partner_a)]]
             mate = [c for c in (col - 1, col + 1) if 0 <= c < lay.n[level] and lay.nid[level][c] in lay.phantom]
@@ -216,7 +234,8 @@ def test_children_lie_within_parent_span(name: str) -> None:
             parent_x.append(lay.pos[level][phantom_col])
         midpoint = sum(parent_x) / len(parent_x)
         child_x = [at[idx[_pos(o.child)]][2] for o in m.offspring]
-        if min(child_x) - _EPS <= midpoint <= max(child_x) + _EPS:
+        meet = _draw._MEET_EPS  # the drawer's tolerance: a midpoint of two rounded positions may sit a quantum off
+        if min(child_x) - meet <= midpoint <= max(child_x) + meet:
             continue
         # Off its bar only where the order forces it (a crossing descent), and then drawn with an elbow, never
         # along another bar.
@@ -229,15 +248,14 @@ def test_label_lines_do_not_overlap(name: str) -> None:
     # The node pitch widens for label width, so no two label lines sharing a baseline collide. Estimate
     # each line's drawn width with the renderer's own heuristic (0.6*label_size px per character) and
     # require the boxes of consecutive lines on a row to clear each other.
-    size = render.DEFAULT_GEOMETRY.label_size
-    rows: dict[float, list[tuple[float, str]]] = {}
-    for x, y, s in _label_lines(render.render_svg(_load(name))):
-        rows.setdefault(round(y, 3), []).append((x, s))
+    rows: dict[float, list[tuple[float, float, str]]] = {}
+    svg = render.render_svg(_load(name))
+    for left, right, y, s in _label_spans(svg):
+        rows.setdefault(round(y, 3), []).append((left, right, s))
+    assert sum(len(row) for row in rows.values()) == len(_label_lines(svg))
     for row in rows.values():
         row.sort()
-        for (x1, s1), (x2, s2) in itertools.pairwise(row):
-            right_of_left = x1 + 0.6 * size * len(s1) / 2
-            left_of_right = x2 - 0.6 * size * len(s2) / 2
+        for (_, right_of_left, s1), (left_of_right, _, s2) in itertools.pairwise(row):
             assert left_of_right - right_of_left >= -_EPS, f"labels {s1!r} and {s2!r} overlap in {name}"
 
 

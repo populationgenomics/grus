@@ -6,6 +6,8 @@ reserve each label box. One estimate serves both, so what the layout spaced for 
 
 from __future__ import annotations
 
+import dataclasses
+
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry
 
@@ -56,6 +58,104 @@ def label_lines(ind: pb.Individual) -> list[str]:
         if line and line not in out:
             out.append(line)
     return out
+
+
+def count_text(ind: pb.Individual) -> str | None:
+    """The text drawn inside a count-collapsed symbol: ``"n"`` for an unknown number, else the count; None for one.
+
+    Bennett draws a group of individuals as one symbol with the number (or ``n``) inside it. ``count`` absent or 1
+    is one person and draws nothing. The IR's protovalidate rules guarantee ``count >= 1`` when set and never
+    together with ``count_unspecified``; the renderer validates before drawing.
+    """
+    if ind.count_unspecified:
+        return "n"
+    return str(ind.count) if ind.count > 1 else None
+
+
+# Inside a symbol, the count's font is COUNT_SCALE of the symbol size, shrunk so its estimated width fits the
+# shape's width at mid-height less a margin: most of a square, less of a circle, half a diamond's diagonal.
+COUNT_SCALE = 0.45
+_COUNT_FIT = {pb.GENDER_MAN: 0.8, pb.GENDER_WOMAN: 0.7}
+_COUNT_FIT_DIAMOND = 0.5
+# Outside a symbol, the count sits beside its upper right: COUNT_OUTSIDE_SCALE of the symbol size, COUNT_OUTSIDE_DX
+# pixels right of the edge (past the deceased slash's tip, 0.4 of the half-size beyond the corner), top-aligned with
+# the symbol so it stays above a mating line leaving the right side.
+COUNT_OUTSIDE_SCALE = 0.35
+COUNT_OUTSIDE_DX = 8.0
+_X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
+
+
+@dataclasses.dataclass(frozen=True)
+class CountMark:
+    """Where and how large a count-collapsed symbol's number is drawn.
+
+    Attributes:
+        text: the number, or ``n`` for an unknown number.
+        size: font size in pixels.
+        inside: centred inside the symbol; else beside its upper right, left-aligned.
+    """
+
+    text: str
+    size: float
+    inside: bool
+
+
+def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
+    """Whether drawing puts a mark through the symbol's centre, where the count would go.
+
+    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), the presymptomatic
+    line and the deceased slash — the same conditions under which ``_draw`` emits them.
+    """
+    statuses = {c.status for c in ind.conditions}
+    affected = pb.CONDITION_STATUS_AFFECTED in statuses
+    x_linked_dot = (
+        geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
+        and not affected
+        and any(c.status == pb.CONDITION_STATUS_CARRIER and c.inheritance in _X_LINKED for c in ind.conditions)
+    )
+    return (
+        ind.deceased
+        or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
+        or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
+        or x_linked_dot
+    )
+
+
+def count_mark(ind: pb.Individual, geom: _geometry.Geometry) -> CountMark | None:
+    """The count's placement: inside the symbol, shrunk to fit, unless a centre mark is there; None for one person.
+
+    The count never overprints another mark: with one through the centre (``has_centre_mark``) it moves beside the
+    symbol's upper right, clear of the slash (which leaves the upper-right corner above the symbol), the arrow (lower
+    left), the labels (below) and a mating line (at centre height).
+    """
+    text = count_text(ind)
+    if text is None:
+        return None
+    if has_centre_mark(ind, geom):
+        return CountMark(text, COUNT_OUTSIDE_SCALE * geom.symbol_size, inside=False)
+    fit = _COUNT_FIT.get(ind.gender, _COUNT_FIT_DIAMOND) * geom.symbol_size
+    return CountMark(text, min(COUNT_SCALE * geom.symbol_size, fit / (0.6 * len(text))), inside=True)
+
+
+def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int) -> tuple[float, float]:
+    """How far ``ind``'s drawing reaches left and right of its symbol's centre, in pixels: labels and count.
+
+    ``side`` is ``Layout.label_side``: 0 for a stack centred under its symbol; for a symbol whose descent drops from
+    its own centre (a count-collapsed or sideless lone parent), which would run through a centred stack, 1 for a
+    stack aligned ``label_gap`` right of the line and -1 for one ``label_gap`` left of it. A count placed outside
+    the symbol reaches right (``outside_count_reach``).
+    """
+    w = label_width(ind, geom)
+    left, right = {0: (w / 2, w / 2), 1: (0.0, geom.label_gap + w), -1: (geom.label_gap + w, 0.0)}[side]
+    return left, max(right, outside_count_reach(ind, geom))
+
+
+def outside_count_reach(ind: pb.Individual, geom: _geometry.Geometry) -> float:
+    """How far right of the symbol's centre a count placed beside the symbol reaches, in pixels; 0.0 if none."""
+    mark = count_mark(ind, geom)
+    if mark is None or mark.inside:
+        return 0.0
+    return geom.symbol_size / 2 + COUNT_OUTSIDE_DX + 0.6 * mark.size * len(mark.text)
 
 
 def label_width(ind: pb.Individual, geom: _geometry.Geometry) -> float:

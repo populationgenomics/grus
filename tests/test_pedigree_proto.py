@@ -113,8 +113,23 @@ def test_prior_art_audit_fields_round_trip_and_validate() -> None:
         pb.Offspring(child=pb.Position(generation=2, index=1), twin_group=1),  # twin_group set without twin_type
         pb.Annotation(text="N/M"),  # type == ANNOTATION_TYPE_UNSPECIFIED sentinel
         pb.Annotation(type=pb.ANNOTATION_TYPE_GENOTYPE),  # empty text
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=0),  # a group of no one
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=-2),
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=3, count_unspecified=True),  # known + unknown
     ],
 )
 def test_invalid_messages_rejected(msg: message.Message) -> None:
     with pytest.raises(protovalidate.ValidationError):
         protovalidate.validate(msg)
+
+
+@pytest.mark.parametrize(
+    "ind",
+    [
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=1),  # one person, the same as absent
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=3),
+        pb.Individual(generation=1, index=1, gender=pb.GENDER_UNKNOWN, count_unspecified=True),
+    ],
+)
+def test_counts_accepted(ind: pb.Individual) -> None:
+    protovalidate.validate(ind)

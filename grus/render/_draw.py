@@ -1,13 +1,13 @@
 """Drawing: a ``Layout`` grid -> a Bennett-standard SVG pedigree (docs/design/renderer.md).
 
-Reads only the per-level arrays (the geometry seam) plus each individual's symbol attributes from the
-IR. Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are
-stable. Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); filled by an affected
-condition, with a carrier dot, presymptomatic vertical line, deceased slash, and proband/consultand
-arrow. Connectors: mating line (doubled for consanguinity; a lone single parent has none), descent +
-sibship bar with per-child stubs, a founder sibship's implied hanger stub (a bar with no parents, for
-siblings via an undrawn couple), and twin convergence (MZ joining bar). A generation marker (Roman
-numeral) is drawn once per row in a reserved left gutter.
+Reads only the per-level arrays (the geometry seam) plus each individual's symbol attributes from the IR.
+Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are stable.
+Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); filled by an affected condition, with
+a carrier dot, presymptomatic vertical line, deceased slash, proband/consultand arrow, and a count-collapsed
+symbol's number (or ``n``) centred inside it. Connectors: mating line (doubled for consanguinity; a lone
+single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
+(a bar with no parents, for siblings via an undrawn couple), and twin convergence (MZ joining bar). A
+generation marker (Roman numeral) is drawn once per row in a reserved left gutter.
 
 **Document structure** (docs/design/svg-output.md). Every drawn element belongs to a group that names the IR
 fact it draws, so a consumer can select and restyle parts without reading coordinates:
@@ -19,20 +19,22 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   deferred``.
 * ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
   ``data-generation``, ``data-index``, ``data-gender`` (man / woman / nonbinary / unknown),
-  ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
+  ``data-count`` on a count-collapsed symbol (the number, or ``n`` for an unknown number; absent for one
+  person), ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
   (affected / carrier / presymptomatic / unknown / …; same-named conditions share a slot and their statuses
   join space-separated, so select one with ``[data-condition-0~="carrier"]``). State classes mirror the IR,
   not the subset of marks the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``,
   ``deceased``, ``proband``, ``consultand``. A cross-generation duplicate is ``individual ghost`` with the
   same classes and data attributes as its real cell and id ``{prefix}ghost-{position}`` (``-2``, ``-3``, …
   when one individual is ghosted more than once), so ``[data-position]`` lights both and
-  ``.individual:not(.ghost)`` counts people.
-  Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape —
-  the whole shape when affected, a legend-keyed region or the X-linked ``dot`` when a carrier — each with
-  ``data-condition`` naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …``
-  (``deceased``, ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group), ``label`` (one
-  ``<text>`` per line), then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol, its
-  reserved label box and the arrow when one is drawn: the one element a consumer needs for hover and click.
+  ``.individual:not(.ghost)`` counts drawn symbols.
+  Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape — the whole
+  shape when affected, a legend-keyed region or the X-linked ``dot`` when a carrier — each with ``data-condition``
+  naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …`` (``count``, a count-collapsed
+  symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``, ``presymptomatic``, ``unknown``,
+  ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line), then ``hit`` — an invisible
+  ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow when one is drawn: the one
+  element a consumer needs for hover and click.
 * ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``, ``routed``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
@@ -74,6 +76,7 @@ _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
+_HALO = 3.0  # stroke width of the contrasting outline behind a count, so it reads over any fill or line
 # The proband's 'P': font size, and its offset left of and below the arrow tail (_arrow, _arrow_bottom, _hit_rect).
 _ARROW_LABEL_SIZE = 15.0
 _ARROW_LABEL_DX = 8.0
@@ -333,6 +336,10 @@ class _Draw:
                     self._ghost_cell[idx] = (level, k)
                     seen[lay.ghost_of[idx]] += 1
                     self._ghost_ordinal[idx] = seen[lay.ghost_of[idx]]
+        # Each cell's label side: beside the line when its descent drops from its own centre (Layout.label_side).
+        self._side = {
+            lay.nid[level][k]: lay.label_side(level, k) for level in range(len(lay.nid)) for k in range(lay.n[level])
+        }
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
         self._elbow = self._assign_elbows()
@@ -387,14 +394,14 @@ class _Draw:
         """The individual in cell ``idx`` — resolving a synthetic ghost (cross-generation duplicate) to its real."""
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
-    def _cell_w(self, idx: int) -> float:
-        """The width cell ``idx``'s label stack reserves; a pass-through or phantom is a line only and reserves none."""
+    def _cell_reach(self, idx: int) -> tuple[float, float]:
+        """How far cell ``idx``'s label stack reaches left and right; a pass-through or phantom reaches nowhere."""
         if idx in self.lay.passthrough or idx in self.lay.phantom:
-            return 0.0
-        return self._label_w(self._ind_at(idx))
+            return (0.0, 0.0)
+        return self._label_reach(self._ind_at(idx), side=self._side[idx])
 
-    def _label_w(self, ind: pb.Individual) -> float:
-        return _labels.label_width(ind, self.geom)
+    def _label_reach(self, ind: pb.Individual, *, side: int) -> tuple[float, float]:
+        return _labels.label_reach(ind, self.geom, side=side)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
@@ -406,20 +413,24 @@ class _Draw:
         return {v: v * self.geom.x_unit for row in self.lay.pos for v in row}
 
     def _content_bounds(self) -> tuple[float, float]:
-        """Leftmost / rightmost pixel offset touched by any symbol *or* its centred label stack.
+        """Leftmost / rightmost pixel offset touched by any symbol *or* its label stack.
 
-        A label is centred on its symbol and can be wider than it, so it — not the symbol — sets the
-        canvas edge. Returns the min/max content edge in ``_px`` offset units (symbol half or label
-        half, whichever reaches further from each cell's centre).
+        A label can be wider than its symbol, so it — not the symbol — sets the canvas edge. Returns the min/max
+        content edge in ``_px`` offset units (symbol half or label reach, whichever is further from each cell's
+        centre).
         """
         los: list[float] = []
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
             for k, x in enumerate(row):
                 idx = self.lay.nid[level][k]
-                extent = 0.0 if idx in self.lay.phantom else max(self.half, self._cell_w(idx) / 2)
-                los.append(self._px[x] - extent)
-                his.append(self._px[x] + extent)
+                if idx in self.lay.phantom:
+                    los.append(self._px[x])
+                    his.append(self._px[x])
+                    continue
+                left, right = self._cell_reach(idx)
+                los.append(self._px[x] - max(self.half, left))
+                his.append(self._px[x] + max(self.half, right))
         return (min(los), max(his)) if los else (0.0, 0.0)
 
     def px(self, x: float) -> float:
@@ -806,26 +817,29 @@ class _Draw:
                     continue  # an omitted partner: only its marriage line is drawn, by _matings
                 cx, cy = self.px(self.lay.pos[level][k]), self.py(level)
                 real = self.lay.ghost_of.get(idx)
+                side = self._side[idx]
                 if real is not None:
-                    out += self._ghost_symbol(self.p.individuals[real], cx, cy, self._ghost_ordinal[idx])
+                    out += self._ghost_symbol(self.p.individuals[real], cx, cy, self._ghost_ordinal[idx], side=side)
                 else:
-                    out += self._symbol(self.p.individuals[idx], cx, cy)
+                    out += self._symbol(self.p.individuals[idx], cx, cy, side=side)
         return out
 
-    def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float, ordinal: int) -> list[str]:
+    def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float, ordinal: int, *, side: int) -> list[str]:
         """A duplicated individual (cross-generation join).
 
-        The same shape/affection and id label as the real one, but no arrow, annotations, or status marks —
-        those belong to the primary instance. The dashed link (``_ghost_links``) ties it back to that instance.
+        The same shape/affection, count (placed as the real cell's, so both reserve one width) and id label as the
+        real one, but no arrow, annotations, or status marks — those belong to the primary instance. The dashed link
+        (``_ghost_links``) ties it back to that instance.
         """
         out = [self._open_individual(ind, ghost=ordinal)]
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         out += self._affected_fill(ind, cx, cy)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
+        out += self._count_mark(ind, cx, cy)
         lines, ys = _label_lines(ind), self._line_ys(ind)
         if lines:
-            out.append(_text(cx, cy + self.half + ys[0], _escape(lines[0]), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy, arrow=False))
+            out.append(self._label(lines[0], cx, cy + self.half + ys[0], side=side))
+        out.append(self._hit_rect(ind, cx, cy, arrow=False, side=side))
         out.append("</g>")
         return out
 
@@ -856,6 +870,8 @@ class _Draw:
             "data-index": str(ind.index),
             "data-gender": _enum_word(pb.Gender, ind.gender, "GENDER_"),
         }
+        if (count := _labels.count_text(ind)) is not None:
+            attrs["data-count"] = count
         if ind.HasField("external_id"):
             attrs["data-external-id"] = ind.external_id
         # Same-named conditions share a legend slot; their statuses join space-separated (CSS ``~=`` selects one).
@@ -876,13 +892,14 @@ class _Draw:
         idx = self._data_legend.index(affected[0].name)
         return [self._shape(ind.gender, cx, cy, _STROKE, stroke=False, cls="fill", extra=f'data-condition="{idx}"')]
 
-    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool) -> str:
+    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool, side: int) -> str:
         """The invisible pointer target: the symbol, its reserved label box, and the arrow when one is drawn.
 
-        ``arrow`` is whether this cell draws the proband/consultand arrow (a ghost never does).
+        ``arrow`` is whether this cell draws the proband/consultand arrow (a ghost never does); ``side`` where its
+        label stack sits (``Layout.label_side``).
         """
-        w = max(self.geom.symbol_size, self._label_w(ind))
-        left, right = cx - w / 2, cx + w / 2
+        reach_left, reach_right = self._label_reach(ind, side=side)
+        left, right = cx - max(self.half, reach_left), cx + max(self.half, reach_right)
         bottom = cy + self.half + self.label_band
         if arrow and (ind.proband or ind.consultand):
             # The arrow's tail sits symbol_size/sqrt(2) beyond the lower-left corner; a proband's 'P' hangs
@@ -917,7 +934,7 @@ class _Draw:
             out.append("</g>")
         return out
 
-    def _symbol(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
+    def _symbol(self, ind: pb.Individual, cx: float, cy: float, *, side: int) -> list[str]:
         """One ``individual`` group: backing, status fill, outline, marks, label lines, hit — in that order."""
         statuses = {c.status for c in ind.conditions}
         affected = pb.CONDITION_STATUS_AFFECTED in statuses
@@ -927,6 +944,7 @@ class _Draw:
         if not affected and pb.CONDITION_STATUS_CARRIER in statuses:
             out += self._carrier_glyph(ind, cx, cy)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
+        out += self._count_mark(ind, cx, cy)
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
             out.append(_text(cx, cy, "?", 20.0, cls="mark unknown"))
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
@@ -940,10 +958,44 @@ class _Draw:
             out += ['<g class="mark consultand">', *self._arrow(cx, cy, label=None), "</g>"]
         base_y = cy + self.half
         for line, off in zip(_label_lines(ind), self._line_ys(ind), strict=True):
-            out.append(_text(cx, base_y + off, _escape(line), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy, arrow=True))
+            out.append(self._label(line, cx, base_y + off, side=side))
+        out.append(self._hit_rect(ind, cx, cy, arrow=True, side=side))
         out.append("</g>")
         return out
+
+    def _label(self, line: str, cx: float, y: float, *, side: int) -> str:
+        """One label line: centred under the symbol, or aligned ``label_gap`` beside an own-centre drop (``side``)."""
+        if side:
+            anchor = "start" if side > 0 else "end"
+            x = cx + side * self.geom.label_gap
+            return _text(x, y, _escape(line), self.geom.label_size, cls="label", anchor=anchor)
+        return _text(cx, y, _escape(line), self.geom.label_size, cls="label")
+
+    def _count_mark(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
+        """A count-collapsed symbol's number, or ``n`` for an unknown number, placed by ``_labels.count_mark``.
+
+        Inside, it is centred and shrunk to fit the shape, white on an affected (solid) symbol and black otherwise;
+        beside the upper right when a mark already runs through the centre. Either way it has a halo in the
+        contrasting colour, so it reads over a carrier's region fill or a line.
+        """
+        mark = _labels.count_mark(ind, self.geom)
+        if mark is None:
+            return []
+        if not mark.inside:
+            x, y = cx + self.half + _labels.COUNT_OUTSIDE_DX, cy - self.half + mark.size / 2
+            return [self._count_text(x, y, mark, _STROKE, "#ffffff", "mark count outside", anchor="start")]
+        affected = any(c.status == pb.CONDITION_STATUS_AFFECTED for c in ind.conditions)
+        fill, halo = ("#ffffff", _STROKE) if affected else (_STROKE, "#ffffff")
+        return [self._count_text(cx, cy, mark, fill, halo, "mark count", anchor="middle")]
+
+    def _count_text(
+        self, x: float, y: float, mark: _labels.CountMark, fill: str, halo: str, cls: str, *, anchor: str
+    ) -> str:
+        return (
+            f'<text class="{cls}" x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(mark.size)}" '
+            f'fill="{fill}" stroke="{halo}" stroke-width="{_num(_HALO)}" stroke-linejoin="round" paint-order="stroke" '
+            f'text-anchor="{anchor}" dominant-baseline="central">{mark.text}</text>'
+        )
 
     def _carrier_glyph(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
         """The carrier's ``fill`` parts, drawn under the outline.
@@ -1087,8 +1139,8 @@ def _hit_polyline(points: list[tuple[float, float]]) -> str:
     )
 
 
-def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "") -> str:
+def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "", anchor: str = "middle") -> str:
     return (
         f'<text {_cls(cls)}x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(size)}" '
-        f'fill="{fill}" text-anchor="middle" dominant-baseline="central">{s}</text>'
+        f'fill="{fill}" text-anchor="{anchor}" dominant-baseline="central">{s}</text>'
     )
