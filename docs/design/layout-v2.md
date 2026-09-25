@@ -90,21 +90,23 @@ stages:
    chain of both, such as twins joined to one twin's spouse or a partner standing between co-twins — Twins with
    partners, below); an atom starts in the orientation with fewer birth-order inversions. The moves are local, so a
    birth-order repair that needs two ranks to change together (a twin marrying into another family, whose parents'
-   couples would have to swap) is not found. When the best order still tears a sibship, the loop runs once more from
-   every atom reversed and keeps the better result: an atom that starts in birth order where a marriage below needs the
-   reverse (twins who both marry, one twin's child marrying a cousin) otherwise leaves a tear that local moves cannot
-   repair. Pricing moves by tears first was tried and rejected: it traded crossings without limit and stopped searches
-   early on shapes that were already clean. The exact search ranks crossings before tears too: the tear measure sees a
-   lone child as a point, so moving one past another family counts only as a crossing, and ranking tears first chose
-   such orders over clean ones. When a tear remains, the loop is also seeded once per marriage whose partners' lines
-   split at a mating: the two lines start adjacent there, each line's child toward the marriage at the facing end, so
-   first cousins across a middle sibling's family start where the clean order has them (`_facing_seeds`). At most six
-   seeds run, in the marriages' identity order, stopping at the first tear-free one; relatives only through one parent's
-   two matings (half-first-cousins) share no split mating and get no seed. Every tie between matings in the ordering
-   breaks on the mating's identity (its partners and children), never its input position, so neither the seeds nor the
-   search depend on input order. A tear no run avoids still defers; the routed consanguineous marriage (below) is the
-   fix for what remains. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger constraints
-   leave free — never overriding contiguity or adjacency.
+   couples would have to swap) is not found. When the first order tears a sibship, the loop runs again from other starts
+   and keeps the best order under the objective. One start has every atom reversed: an atom that starts in birth order
+   where a marriage below needs the reverse (twins who both marry, one twin's child marrying a cousin) otherwise leaves
+   a tear that local moves cannot repair. Pricing moves by tears first was tried and rejected: it traded crossings
+   without limit and stopped searches early on shapes that were already clean. The exact search ranks crossings before
+   tears too: the tear measure sees a lone child as a point, so moving one past another family counts only as a
+   crossing, and ranking tears first chose such orders over clean ones. The others are seeded, one per marriage whose
+   partners' lines split at a mating: the two lines start adjacent there, each line's child toward the marriage at the
+   facing end, so first cousins across a middle sibling's family start where the clean order has them (`_facing_seeds`).
+   At most six seeds run, in the marriages' identity order, stopping at the first that is tear-free and beats every
+   order so far. Stopping at the first untorn order was rejected: the reversed start can remove a tear with many
+   crossings (a fuzzed pedigree reached 18 where a seed reached 4, leaving six drops beside their bars); relatives only
+   through one parent's two matings (half-first-cousins) share no split mating and get no seed. Every tie between
+   matings in the ordering breaks on the mating's identity (its partners and children), never its input position, so
+   neither the seeds nor the search depend on input order. A tear no run avoids still defers. Crossing minimization is
+   the *weak*-strength tie-breaker among orders the stronger constraints leave free — never overriding contiguity or
+   adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
    program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a run of co-twins standing
    side by side, a founder-sib floater with its sibling, or a couple whose partners mate once and are bonded to no one

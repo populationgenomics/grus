@@ -74,25 +74,25 @@ def order(g: _layout._Graph, cross: set[int]) -> Ordering:
     init = _init_order(model)
     order_map = _mincross(model, init)
     if _total_overlaps(model, order_map):
+        # A torn order has two remedies, each a run from another start; keep whichever scores best, since a run that
+        # only removes the tear can buy it with crossings another start avoids.
         # Local moves cannot reverse an atom and re-sort the rank below it together, so an atom that starts in the
         # wrong orientation (birth order, where a marriage below needs the reverse) can leave a tear the search never
-        # repairs. Retry once from every atom reversed; keep the better. No cost when nothing is torn.
+        # repairs: retry once from every atom reversed.
         retry = _mincross(model, _reversed_atoms(model, init))
         if _objective(model, retry) < _objective(model, order_map):
             order_map = retry
-    if _total_overlaps(model, order_map):
         # A marriage between relatives whose families start apart (first cousins across a middle sibling's family)
         # needs the two lines brought to facing ends, several ranks at once. Seed a run per such marriage with the
         # two lines adjacent at the mating where they split, each line's child toward the marriage at the facing
-        # end; keep the best. Runs only while a tear remains.
-        # The seeded runs skip the exact search, which is most of a run's cost on a large rank; only the best
-        # seeded order is settled by it.
+        # end. The seeded runs skip the exact search, which is most of a run's cost on a large rank; only the best
+        # seeded order is settled by it. They stop at the first tear-free seed that beats every order so far.
         best_seed: dict[int, list[int]] | None = None
         for seed in _facing_seeds(model)[:_MAX_FACING_SEEDS]:
             trial = _mincross(model, _init_order(model, seed), settle=False)
             if best_seed is None or _objective(model, trial) < _objective(model, best_seed):
                 best_seed = trial
-            if not _total_overlaps(model, trial):
+            if not _total_overlaps(model, trial) and _objective(model, trial) < _objective(model, order_map):
                 break
         if best_seed is not None and _objective(model, best_seed) < _objective(model, order_map):
             settled = _settle(model, best_seed)
