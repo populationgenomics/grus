@@ -14,6 +14,9 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import itertools
+import json
+import os
+import pathlib
 from collections.abc import Callable
 
 import protovalidate
@@ -148,20 +151,39 @@ def test_a_column_outside_its_row_is_refused() -> None:
 
 # --- drawing from a stored layout ---------------------------------------------------------------------------------
 
-# sha256 over every golden's stored layout (key and placement digest cleared), by the layout-algorithm version.
-_PINNED_GOLDEN_LAYOUTS = {1: "33719c940f8a49273c7d8f00b0520f68c3d41c156e396872e3827d5d27bb7560"}
+# The layout-version pins: for each LAYOUT_VERSION and solver, "<golden>@<pedigree digest>" -> the SHA-256 of that
+# golden's stored placement. Append-only: an entry, once committed, never changes. A layout change that moves a golden
+# changes an existing entry's placement, so it takes a LAYOUT_VERSION bump (old stored layouts must read as stale) and
+# a new version's entries; a golden IR edit changes the pedigree digest, so it adds an entry instead.
+# GRUS_REPIN_LAYOUTS=1 adds missing entries and refuses to change an existing one.
+_PINS = pathlib.Path(__file__).parent / "layout_pins.json"
+_REPIN = os.environ.get("GRUS_REPIN_LAYOUTS") == "1"
+_SOLVERS = {"z3": render.XSolver.Z3, "highs": render.XSolver.HIGHS}
 
 
-def test_layout_version_is_bumped_when_a_golden_layout_changes() -> None:
-    digest = hashlib.sha256()
+@pytest.mark.parametrize("solver", sorted(_SOLVERS))
+def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> None:
+    if solver == "highs":
+        pytest.importorskip("highspy")
+    geom = dataclasses.replace(_GEOM, x_solver=_SOLVERS[solver])
+    pins = json.loads(_PINS.read_text())
+    pinned: dict[str, str] = pins.setdefault(str(render.LAYOUT_VERSION), {}).setdefault(solver, {})
+    changed: list[str] = []
     for name in test_render._NAMES:
-        record = render.store_layout(test_render._load(name))
-        record.ClearField("key")
-        record.ClearField("placement_digest")
-        digest.update(record.SerializeToString(deterministic=True))
-    assert _PINNED_GOLDEN_LAYOUTS.get(render.LAYOUT_VERSION) == digest.hexdigest(), (
-        "a golden's layout changed: bump LAYOUT_VERSION (stored layouts from the old algorithm must read as stale) "
-        "and pin the new digest under it; a golden IR edit needs only the re-pin"
+        p = test_render._load(name)
+        record = render.store_layout(p, geom)
+        key = f"{name}@{record.key.pedigree_digest.hex()}"
+        placement = hashlib.sha256(record.placement.SerializeToString(deterministic=True)).hexdigest()
+        if key not in pinned and _REPIN:
+            pinned[key] = placement
+        elif pinned.get(key) != placement:
+            changed.append(name if key in pinned else f"{name} (not pinned)")
+    if _REPIN:
+        _PINS.write_text(json.dumps(pins, indent=2, sort_keys=True) + "\n")
+    assert not changed, (
+        f"under LAYOUT_VERSION {render.LAYOUT_VERSION} with {solver}, these goldens' layouts differ from their pins: "
+        f"{changed}. A changed pin is a layout change: bump LAYOUT_VERSION and pin the new version with "
+        "GRUS_REPIN_LAYOUTS=1; an unpinned golden (new, or its IR edited) is pinned the same way"
     )
 
 

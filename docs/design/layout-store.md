@@ -109,8 +109,10 @@ input to the layout:
   mean the same solver). Everything else in `Geometry` — row height, symbol size, stubs, margins, carrier style — is
   read only by drawing and may vary freely.
 - **the layout-algorithm version**, an integer grus bumps whenever a change alters any layout. A test pins a digest of
-  every golden's stored layout to the current version, so a change that moves a golden's layout without a bump fails. A
-  layout change that touches no golden is not caught; the goldens are the coverage.
+  every golden's stored layout, under each x-solver, to the current version, so a change that moves a golden's layout
+  without a bump fails. The pins are append-only and keyed by the golden's pedigree digest: editing a golden's IR adds a
+  pin, and the only way a pin changes is a layout change, which takes a new version. A layout change that touches no
+  golden is not caught; the goldens are the coverage.
 
 Drawing from a stored layout checks all three and raises on the first mismatch, naming it. There is no fallback to a
 fresh layout: a caller who wants recompute-on-stale does it explicitly, and a silent recompute would hide a cache that
