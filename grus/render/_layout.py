@@ -115,10 +115,12 @@ class Layout:
             Empty for tier-1/2 pedigrees. A ghost index is ``>= len(Pedigree.individuals)``.
         founder_sibships: each ``(level, columns)`` a sibship whose parents are undrawn (a partnerless mating).
             Drawing hangs these from an implied hanger stub with a sib bar and no parent cells (they carry no
-            ``fam`` entry). ``columns`` are cell columns on ``level``, left to right. Empty when none.
+            ``fam`` entry). ``columns`` are cell columns on ``level``, left to right; the list is in ``(level,
+            columns)`` order. Empty when none.
         routed: matings drawn as routed edges rather than adjacent straight lines (a >2-mate individual's
             overflow mating — the partners cannot both be its neighbour). Empty for v1 and for every
-            adjacency-drawable shape, so it never perturbs existing output. See ``RoutedMating``.
+            adjacency-drawable shape, so it never perturbs existing output. In ``(a, b)`` order. See
+            ``RoutedMating``.
         first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
             ``first_generation + L``. Rows between the first and last generation are kept even when empty
             (a detached branch several generations down).
@@ -699,6 +701,7 @@ def _build(
             )
         (lvl,) = levels
         founder_sibships.append((lvl, tuple(sorted(colof[i] for i in group))))
+    founder_sibships.sort()  # layout order, not the input's mating order, so drawing is independent of the latter
 
     return Layout(
         n=n,

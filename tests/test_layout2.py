@@ -885,3 +885,15 @@ def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
     assert len(ref) == 1
     for seed in range(8):
         assert routed(_shuffled(p, seed)) == ref
+
+
+def test_founder_sibships_and_routes_are_listed_in_layout_order() -> None:
+    # Both lists are drawn in order, so an order taken from the input's matings would reorder the SVG under a shuffle.
+    for p in (test_render._load("founder_sibship_marry_in"), _overflow_pedigree()):
+        lay = render.layout(p)
+        assert lay.founder_sibships == sorted(lay.founder_sibships)
+        assert lay.routed == sorted(lay.routed, key=lambda rm: (rm.a, rm.b))
+        for seed in range(4):
+            shuffled = render.layout(_shuffled(p, seed))
+            assert shuffled.founder_sibships == lay.founder_sibships
+            assert [(rm.a, rm.b) for rm in shuffled.routed] == [(rm.a, rm.b) for rm in lay.routed]

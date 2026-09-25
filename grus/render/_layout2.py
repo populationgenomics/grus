@@ -169,6 +169,7 @@ def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[in
                 children=tuple(cellof[k] for k in mr.kids if k in cellof),
             )
         )
+    out.sort(key=lambda rm: (rm.a, rm.b))  # layout order, not the input's mating order
     return out
 
 
