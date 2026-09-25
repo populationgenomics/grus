@@ -16,6 +16,7 @@ from grus.render._layout import DeferredFeatureError, Layout
 from grus.render._layout2 import layout
 from grus.render._ordering import Ordering, order
 from grus.render._raster import rasterize
+from grus.render._xsolve import XSolver
 
 __all__ = [
     "DEFAULT_GEOMETRY",
@@ -24,6 +25,7 @@ __all__ = [
     "Geometry",
     "Layout",
     "Ordering",
+    "XSolver",
     "layout",
     "order",
     "rasterize",

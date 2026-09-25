@@ -49,12 +49,11 @@ Full spec in [`layout-v2.md`](layout-v2.md); the shape drawing depends on:
    (dot's `mincross`), couples and twin groups kept contiguous as adjacency atoms. A same-generation cross-lineage /
    loop marriage becomes an ordinary adjacent couple once ordering pulls each partner to its sibship end; an individual
    with >2 matings keeps its two heaviest adjacencies and **routes** the rest.
-1. **x-coordinate solve** — from the fixed order, a deterministic combinatorial assignment (Sugiyama down/up barycentre
-   sweeps + a per-row Pool-Adjacent-Violators isotonic resolve of the min-separation chain) minimizing the soft
-   objective (couple gap, child centering, compactness) subject to hard non-overlap. Contiguity **blocks** (an ordinary
-   couple, a twin group, a founder-sib run) translate as rigid bodies so they never split. `pos` is quantised to a fixed
-   grid so the iterative residual keeps the byte-compared goldens stable. Non-overlap is always satisfiable in 1-D, so
-   layout rarely fails.
+1. **x-coordinate solve** — from the fixed order, one lexicographic linear program: every descent on its own sib bar,
+   then centring (with a half-sibling hinge spreading at most `sib_gap`), then even spacing, then compactness, subject
+   to hard non-overlap. Contiguity **blocks** (an ordinary couple, a twin group, a founder-sib run) are rigid, so they
+   never split. The default backend (z3) solves over exact rationals, so positions are identical on every platform;
+   HiGHS is an optional alternative. Non-overlap is always satisfiable in 1-D, so layout rarely fails.
 1. **Line routing** — from the `(level, x)` grid, draw symbols and connectors (below), including a routed orthogonal
    polyline for each non-adjacent (overflow) mating.
 

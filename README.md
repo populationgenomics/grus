@@ -32,9 +32,10 @@ Phenopackets / GA4GH Pedigree as alternatives: [`docs/design/ir.md`](docs/design
 ## What the renderer does
 
 Ranks generations, orders each row to minimise crossings while keeping couples adjacent and sibships contiguous, solves
-x on a constraint model, and draws standard symbols and connectors — deterministically, so the same IR always yields the
-same bytes. Consanguineous loops, multiple mates and cross-lineage marriages route as edges rather than failing; the few
-shapes it still cannot draw raise `DeferredFeatureError` instead of drawing something wrong.
+x as an exact linear program (z3), and draws standard symbols and connectors — deterministically, so the same IR always
+yields the same bytes on every platform. `Geometry(x_solver=XSolver.HIGHS)` with the `highs` extra swaps in a
+floating-point solver. Consanguineous loops, multiple mates and cross-lineage marriages route as edges rather than
+failing; the few shapes it still cannot draw raise `DeferredFeatureError` instead of drawing something wrong.
 [`docs/design/renderer.md`](docs/design/renderer.md), [`docs/design/layout-v2.md`](docs/design/layout-v2.md).
 
 ## Importers

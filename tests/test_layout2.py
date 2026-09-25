@@ -17,6 +17,7 @@ These cover the properties specific to the v2 model, beyond the golden bytes and
 
 from __future__ import annotations
 
+import collections
 import itertools
 import pathlib
 import random
@@ -331,28 +332,23 @@ def test_review_set_deferral_count_is_zero() -> None:
 
 
 def _couple_gaps(lay: render.Layout) -> list[float]:
-    """Every drawn couple's x-distance (any mating flagged ``spouse``, childless included).
+    """Every ordinary drawn couple's x-distance (any mating flagged ``spouse``, childless included).
 
-    Except a couple heading a descent across rows, and any other couple of the same individual: the couple
-    centres over its pass-through, whose column the rows it crosses decide, and a hinge sits centred between
-    its matings, so their widths are set there (``test_couple_over_a_passthrough_centres_on_it``).
+    A hinge's couples (either partner mates more than once) are excluded: they are deliberately not rigid, and
+    their spread is whatever centres each of the hinge's families, which the rows can make wider than
+    ``sib_gap`` (``hinge_offcentre``). Their property is centring, tested directly
+    (``test_half_sibs_hinge_centres_over_both_sibships``).
     """
     xof = {c: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, c in enumerate(row)}
-    heads = {
-        (lay.nid[level - 1][lay.fam[level][k]], lay.nid[level - 1][lay.fam[level][k] + 1])
-        for level in range(1, len(lay.nid))
-        for k, c in enumerate(lay.nid[level])
-        if c in lay.passthrough and lay.spouse[level - 1][lay.fam[level][k]]
-    }
-    members = {c for couple in heads for c in couple}
-    return [abs(xof[a] - xof[b]) for a, b in _layout2_mod._couples(lay) if a not in members and b not in members]
+    couples = _layout2_mod._couples(lay)
+    mates = collections.Counter(c for couple in couples for c in couple)
+    return [abs(xof[a] - xof[b]) for a, b in couples if mates[a] == 1 and mates[b] == 1]
 
 
 @pytest.mark.parametrize("name", [*_DRAWABLE, "c05"])
 def test_drawn_couples_stay_tight(name: str) -> None:
-    # Couples-stay-tight invariant: no drawn couple stretches past sib_gap (a small multiple of couple_gap).
-    # A hinge couple spreads to at most sib_gap to centre over two sibships (half_sibs), which is the boundary —
-    # anything wider is a torn contiguity block.
+    # Couples-stay-tight invariant: no ordinary drawn couple stretches past sib_gap — anything wider is a torn
+    # contiguity block. (A hinge's couples spread to centre its families; see _couple_gaps.)
     lay = render.layout(test_render._load(name) if name in _DRAWABLE else _load_pair(name))
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"

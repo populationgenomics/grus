@@ -374,3 +374,47 @@ def test_ghost_hit_rect_has_no_arrow_extension_and_links_follow_layout_order() -
         del shuffled.individuals[:]
         shuffled.individuals.extend(reversed(list(p.individuals)))
         assert render.render_svg(shuffled) == svg, "ghost links and ordinals follow layout order, not input order"
+
+
+def _segments(group: ET.Element) -> list[tuple[float, float, float, float]]:
+    return [
+        tuple(float(e.get(a)) for a in ("x1", "y1", "x2", "y2"))  # type: ignore[misc]
+        for e in group.iter(f"{_SVG}line")
+        if "hit" not in (e.get("class") or "")
+    ]
+
+
+def _touch(p: tuple[float, float], s: tuple[float, float, float, float], eps: float = 1e-6) -> bool:
+    """Whether point ``p`` lies on segment ``s``."""
+    (px, py), (x1, y1, x2, y2) = p, s
+    cross = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1)
+    within = min(x1, x2) - eps <= px <= max(x1, x2) + eps and min(y1, y2) - eps <= py <= max(y1, y2) + eps
+    return abs(cross) <= eps * max(1.0, abs(x2 - x1) + abs(y2 - y1)) and within
+
+
+def _pieces(segs: list[tuple[float, float, float, float]]) -> int:
+    """How many separate pieces ``segs`` draw: segments join where an endpoint of one lies on the other."""
+    parent = list(range(len(segs)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            i = parent[i]
+        return i
+
+    for i, a in enumerate(segs):
+        for j, b in enumerate(segs):
+            if i != j and (_touch((a[0], a[1]), b) or _touch((a[2], a[3]), b)):
+                parent[find(i)] = find(j)
+    return len({find(i) for i in range(len(segs))})
+
+
+@pytest.mark.parametrize("name", _NAMES)
+def test_every_sibship_is_one_connected_drawing(name: str) -> None:
+    # A descent is one piece of ink: the drop from the parents, the sib bar and the child stubs all touch. A drop
+    # landing beside the bar (a hinge's couple that cannot centre over its children) reads as a line to nowhere.
+    root = ET.fromstring(render.render_svg(_load(name)))
+    for g in root.iter(f"{_SVG}g"):
+        if "sibship" not in (g.get("class") or "").split():
+            continue
+        segs = _segments(g)
+        assert _pieces(segs) == 1, f"{name}: {g.get('data-parents')} descent is in pieces"

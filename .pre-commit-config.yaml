@@ -31,7 +31,7 @@ repos:
       # Whole-project (pass_filenames: false); fires on any staged .py.
       - id: pyright
         name: pyright
-        entry: uv run --group lint pyright
+        entry: uv run --group lint --extra highs pyright
         language: system
         files: \.py$
         pass_filenames: false
