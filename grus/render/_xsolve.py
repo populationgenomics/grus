@@ -75,6 +75,9 @@ class Model:
         sibships: ``(parents, children)`` per drawn descent group.
         couples: ``(left, right, gap, allowance)`` per non-rigid couple: its minimum ``gap`` and the stretch
             beyond it that is cheap (``sib_gap - couple_gap``).
+        apart: ``(parents, cell, side, d)``: the parents' midpoint stands at least ``d`` to one side of ``cell``,
+            ``side * (mid - x[cell]) >= d``, ``side`` being +1 or -1. Keeps a drop that misses its bar out of the
+            column of another family's child, where its vertical would read as landing on that child.
     """
 
     cells: tuple[int, ...]
@@ -82,6 +85,7 @@ class Model:
     rigid: tuple[tuple[int, int, float], ...]
     sibships: tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]
     couples: tuple[tuple[int, int, float, float], ...] = ()
+    apart: tuple[tuple[tuple[int, ...], int, int, float], ...] = ()
 
 
 # Couple stretch cost per unit: within the allowance, and the extra beyond it (total slope 1). Spreading moves the
@@ -135,6 +139,9 @@ def _solve_z3(model: Model) -> dict[int, float]:
     cons = [x[c] >= 0 for c in model.cells]
     cons += [x[right] - x[left] >= val(_q(sep)) for left, right, sep in model.gaps]
     cons += [x[right] - x[left] == val(_q(d)) for left, right, d in model.rigid]
+    for parents, cell, side, d in model.apart:
+        total = z3.Sum([x[p] for p in parents])
+        cons.append(side * (total - len(parents) * x[cell]) >= len(parents) * val(_q(d)))
     outside, devs = [], []
     for s_, (parents, children) in enumerate(model.sibships):
         mid = z3.Sum([x[p] for p in parents]) / len(parents)
@@ -217,6 +224,11 @@ def _solve_highs(model: Model) -> dict[int, float]:
         row(-sep, inf, [(worst, 1.0), (col[right], -1.0), (col[left], 1.0)])  # worst >= x_r - x_l - sep
     for left, right, d in model.rigid:
         row(d, d, [(col[right], 1.0), (col[left], -1.0)])
+    for parents, cell, side, d in model.apart:
+        terms_a: dict[int, float] = {col[cell]: -float(side)}
+        for p in parents:
+            terms_a[col[p]] = terms_a.get(col[p], 0.0) + float(side) / len(parents)
+        row(d, inf, list(terms_a.items()))
     for s, (parents, children) in enumerate(model.sibships):
         dev = n + s
         terms: dict[int, float] = {}

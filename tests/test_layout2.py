@@ -634,3 +634,14 @@ def test_crossing_descents_turn_on_their_own_tracks() -> None:
     assert len(elbows) == 2
     (_, y_left), (_, y_right) = sorted((float(x), float(y)) for x, y in elbows)
     assert y_left < y_right, "the drop standing over the other's landing leg turns higher"
+    # And it stands clear of III-1, the other family's child it would otherwise sit exactly above.
+    p = test_render._load("crossing_descents")
+    lay = render.layout(p)
+    x = {
+        (i.generation, i.index): lay.pos[lv][k]
+        for lv, row in enumerate(lay.nid)
+        for k, c in enumerate(row)
+        if c < len(p.individuals)
+        for i in [p.individuals[c]]
+    }
+    assert abs((x[(2, 2)] + x[(2, 6)]) / 2 - x[(3, 1)]) >= _layout2_mod._APART_CLEAR - _EPS

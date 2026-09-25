@@ -97,7 +97,14 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     sibships = _relations(built)
     seps = _row_seps(built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom))
     blocks = _blocks(built, seps, sibships)
-    x = _xsolve.solve(_x_model(built, seps, sibships, blocks, geom), geom.x_solver)
+    model = _x_model(built, seps, sibships, blocks, geom)
+    x = _xsolve.solve(model, geom.x_solver)
+    for _ in range(_APART_PASSES):  # keep each drop that misses its bar out of other families' child columns
+        extra = _apart(built, sibships, x, model.apart)
+        if not extra:
+            break
+        model = dataclasses.replace(model, apart=model.apart + extra)
+        x = _xsolve.solve(model, geom.x_solver)
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
     result = dataclasses.replace(built, pos=pos, routed=routed)
@@ -230,6 +237,46 @@ def _couples(lay: _layout.Layout) -> list[tuple[int, int]]:
         for k in range(lay.n[level] - 1)
         if lay.spouse[level][k]
     ]
+
+
+# A drop that misses its bar stands at least this far (layout units, a third of the sibling gap) from another family's
+# child, so its vertical cannot be read as landing on that child; at most this many passes add such constraints.
+_APART_CLEAR = 0.5
+_APART_PASSES = 4
+
+
+def _apart(
+    lay: _layout.Layout,
+    sibships: list[_Sibship],
+    x: dict[int, float],
+    held: tuple[tuple[tuple[int, ...], int, int, float], ...],
+) -> tuple[tuple[tuple[int, ...], int, int, float], ...]:
+    """The keep-apart constraints ``x`` still violates.
+
+    Each drop that misses its bar, against each other family's child on its row (a pass-through included) standing
+    within ``_APART_CLEAR`` of it.
+
+    The side is the one ``x`` already has, or on an exact tie the side toward the drop's own bar, so the constraint
+    is linear and moves the drop the short way. Constraints only accumulate across passes, so a side once chosen holds.
+    """
+    have = {(parents, cell) for parents, cell, _, _ in held}
+    out: list[tuple[tuple[int, ...], int, int, float]] = []
+    level_of = {c: level for level, row in enumerate(lay.nid) for c in row}
+    for s in sibships:
+        drop = sum(x[p] for p in s.parents) / len(s.parents)
+        xs = [x[c] for c in s.children]
+        if min(xs) - 1e-9 <= drop <= max(xs) + 1e-9:
+            continue  # meets its own bar
+        toward = 1 if drop > max(xs) else -1  # +1: its bar is to the left, so moving left (drop - x_c < 0) is toward
+        own = set(s.children)
+        for c in lay.nid[level_of[s.children[0]]]:
+            if c in own or c in lay.phantom or lay.fam[level_of[c]][lay.nid[level_of[c]].index(c)] < 0:
+                continue  # only another family's child (a married-in partner has no line above it)
+            if (s.parents, c) in have or abs(drop - x[c]) >= _APART_CLEAR - 1e-9:
+                continue
+            side = (1 if drop > x[c] else -1) if abs(drop - x[c]) > 1e-9 else -toward
+            out.append((s.parents, c, side, _APART_CLEAR))
+    return tuple(out)
 
 
 def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
