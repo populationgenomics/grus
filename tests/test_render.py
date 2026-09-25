@@ -26,6 +26,7 @@ import pytest
 
 from grus import ir, render
 from grus.models import pedigree_pb2 as pb
+from grus.render import _labels
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 _NAMES = sorted(path.stem for path in _GOLDENS.glob("*.pbtxt"))
@@ -35,6 +36,11 @@ _EPS = 1e-9
 
 def _load(name: str) -> pb.Pedigree:
     return ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
+
+
+def _position_id(pos: pb.Position) -> str:
+    """The drawn position id of ``pos`` (``"III-2"``), as the SVG's data attributes name it."""
+    return f"{_labels.roman(pos.generation)}-{pos.index}"
 
 
 def _coords(lay: render.Layout) -> dict[int, tuple[int, int, float]]:
@@ -185,6 +191,11 @@ def test_couples_are_adjacent(name: str) -> None:
 def test_children_lie_within_parent_span(name: str) -> None:
     p = _load(name)
     lay = render.layout(p)
+    svg = render.render_svg(p)
+    groups = {
+        frozenset(kids.split()): body
+        for kids, body in re.findall(r'<g class="sibship"[^>]*data-children="([^"]*)">(.*?)</g>', svg, re.S)
+    }
     at = _coords(lay)
     idx = _index(p)
     for m in p.matings:
@@ -205,7 +216,12 @@ def test_children_lie_within_parent_span(name: str) -> None:
             parent_x.append(lay.pos[level][phantom_col])
         midpoint = sum(parent_x) / len(parent_x)
         child_x = [at[idx[_pos(o.child)]][2] for o in m.offspring]
-        assert min(child_x) - _EPS <= midpoint <= max(child_x) + _EPS
+        if min(child_x) - _EPS <= midpoint <= max(child_x) + _EPS:
+            continue
+        # Off its bar only where the order forces it (a crossing descent), and then drawn with an elbow, never
+        # along another bar.
+        children = frozenset(_position_id(o.child) for o in m.offspring)
+        assert '<path d="M' in groups[children], f"{name}: the descent to {sorted(children)} misses its bar, no elbow"
 
 
 @pytest.mark.parametrize("name", _NAMES)
@@ -516,7 +532,7 @@ def test_double_cousin_loop_still_defers() -> None:
     An interlocking loop the ordering cannot open as adjacent couples without tearing a sibship; the
     torn-sibship backstop fires.
     """
-    with pytest.raises(render.DeferredFeatureError, match="sib bars would meet"):
+    with pytest.raises(render.DeferredFeatureError, match="sib bars would overlap"):
         render.render_svg(_double_cousin_loop())
 
 
@@ -1604,10 +1620,14 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     assert abs(lay.pos[lvl][k] - (ii1[2] + ii2[2]) / 2) > 0.1, (
         "precondition: III-1 is offset from its parents' midpoint"
     )
-    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', draw.svg())
+    svg = draw.svg()
+    lines = re.findall(r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', svg)
+    starts = [(float(x), float(y)) for x, y in re.findall(r'<path d="M([-0-9.]+),([-0-9.]+)', svg)]  # elbows
     parent_y = draw.py(1)
     # a descent leg leaves the mating midpoint at the parents' row y (the bug emitted a leg only at the child x)
     assert any(
         abs(float(x1) - mid_px) < 0.5 and abs(float(x2) - mid_px) < 0.5 and min(float(y1), float(y2)) <= parent_y + 0.5
         for x1, y1, x2, y2 in lines
-    ), "the offset single-child descent must originate from the parents' mating midpoint"
+    ) or any(abs(x - mid_px) < 0.5 and y <= parent_y + 0.5 for x, y in starts), (
+        "the offset single-child descent must originate from the parents' mating midpoint"
+    )

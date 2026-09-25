@@ -624,10 +624,13 @@ def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple
     )
 
 
-def test_meeting_sib_bars_defer() -> None:
+def test_crossing_descents_turn_on_their_own_tracks() -> None:
     # A fuzzed pedigree, minimised. The order puts II-2 x II-6 left of II-3 x II-4 but its twins right of their
-    # children, so the two descents cross, and the crossing drop's jog ran along II-3 x II-4's bar: the row read as
-    # one family with several sets of parents. The layout defers on bars that meet, the drop's extension included.
-    p = ir.load_pbtxt((pathlib.Path(__file__).parent / "deferrals" / "sib_bars_meet.pbtxt").read_text())
-    with pytest.raises(render.DeferredFeatureError, match="sib bars would meet"):
-        render.layout(p)
+    # children, so the descents cross; the drops used to run along each other's bars at bar height and the row read
+    # as one family. Each now turns on its own elbow track above the bars, and II-2 x II-6's drop, which stands over
+    # II-3 x II-4's landing leg, turns on the higher track, so the two never run along one line.
+    svg = render.render_svg(test_render._load("crossing_descents"))
+    elbows = re.findall(r'<path d="M([-0-9.]+),[-0-9.]+L[-0-9.]+,([-0-9.]+)Q', svg)
+    assert len(elbows) == 2
+    (_, y_left), (_, y_right) = sorted((float(x), float(y)) for x, y in elbows)
+    assert y_left < y_right, "the drop standing over the other's landing leg turns higher"

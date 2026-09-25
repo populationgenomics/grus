@@ -172,10 +172,9 @@ def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
     * **a mixed group**: a drawn group whose children are not exactly one mating's, drawn from that mating's
       partners. ``fam`` records only the parent's column; phantom partners give each lone-parent mating its own
       couple, so this is a layout bug the check keeps from reaching a figure.
-    * **meeting bars**: two groups on a row whose bars overlap or touch. A drop beside its children extends its
-      bar toward them (``_draw._sibship``), and where it reaches a neighbouring bar the two read as one sibship
-      with two sets of parents. Children's spans alone never meet (ordering keeps sibships contiguous), so the
-      extension is what this catches.
+    * **overlapping bars**: two groups on a row whose children's spans overlap (a torn sibship), so a child
+      would read as the issue of several matings. A drop beside its children does not extend its bar: it turns
+      at its own elbow track above the bars (``_draw._sibship``), so only the children's spans can meet.
 
     ``layout`` defers on either rather than draw it.
     """
@@ -187,14 +186,13 @@ def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
         mi = next(iter(matings))
         if len(matings) != 1 or mi is None or set(g.matings[mi].partners) != set(s.parents):
             return "a lone parent's sibships would draw as one family, or from the wrong parents"
-        drop = sum(xof[q] for q in s.parents) / len(s.parents)
-        xs = [xof[c] for c in s.children] + [drop]
+        xs = [xof[c] for c in s.children]
         bars[g.level[s.children[0]]].append((min(xs), max(xs)))
     for row in bars.values():
         row.sort()
         for (_, hi), (lo, _) in itertools.pairwise(row):
             if lo <= hi + 1e-9:
-                return "two sibships' sib bars would meet and read as one family"
+                return "two sibships' sib bars would overlap and read as one family"
     return None
 
 

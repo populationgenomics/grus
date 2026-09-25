@@ -110,8 +110,10 @@ stages:
 Non-overlap is always satisfiable in 1-D, so layout **rarely fails**: the worst case is an ugly-but-correct routed
 drawing, a strictly better contract than v1's "detect and defer". The residual deferrals (`DeferredFeatureError`, drawn
 as a placeholder — never a wrong drawing) are listed in [`renderer.md`](renderer.md) "Deferred": an interlocking loop, a
-child of more than one mating, a routed union *with offspring*, sib bars that meet (a torn sibship, or a drop's bar
-extension reaching a neighbour's).
+child of more than one mating, a routed union *with offspring*, a torn sibship (two sibships' children interleaved). A
+crossing the ordering accepts is drawn, not deferred: a drop left beside its children turns at its own **elbow** track
+above the bars (`Geometry.elbow_gap`, rounded corners), so it crosses other descents at right angles and never runs
+along another sibship's bar.
 
 ### Soft constraints — a strength hierarchy, relaxed lexicographically (not a weighted sum)
 

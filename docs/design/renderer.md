@@ -78,11 +78,14 @@ fill *opposite* halves (a compound het reads as opposite sides), while a single 
 half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. Connectors: **mating line**
 (horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only
 from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line**
-(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs), a **founder sibship**'s implied hanger
-(a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point instead of a
-descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a
-couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
-`CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
+(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its
+children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with
+rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's
+landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib
+bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to
+one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating
+midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for
+`CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;
@@ -153,8 +156,7 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
   partner's row (`_rank`).
 - **A routed / overflow mating that *has* offspring** — descent from a non-adjacent parent pair is not yet drawn, so a
   > 2-mate individual whose overflow mating bears children defers rather than mislay the descent (`_build`).
-- **Sib bars that meet** — two sibships whose drawn bars overlap or touch on a row: a torn sibship, or a drop the
-  x-solve leaves beside its children whose bar extension reaches a neighbour's. Either reads as one sibship with several
+- **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).
 

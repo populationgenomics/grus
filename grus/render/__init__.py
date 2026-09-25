@@ -4,7 +4,7 @@ Two separable steps joined at the per-level array seam: ``layout`` ranks generat
 crossing minimization, and solves x on a constraint model (docs/design/layout-v2.md); ``render_svg`` draws
 Bennett-standard symbols and connectors from that grid. ``Geometry`` is the shared spacing bag. Non-overlap
 and generation rank are the only hard constraints, so layout rarely fails; the residual topologies it does
-not draw (an interlocking loop, a child of two matings, sib bars that would meet) raise ``DeferredFeatureError``
+not draw (an interlocking loop, a child of two matings, a torn sibship) raise ``DeferredFeatureError``
 rather than being mislaid out.
 """
 
