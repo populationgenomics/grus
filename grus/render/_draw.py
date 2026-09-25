@@ -52,20 +52,23 @@ overrides it.
 from __future__ import annotations
 
 import collections
-import itertools
 import json
 import math
 import re
 from typing import Protocol
 
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _layout, _layout2
+from grus.render import _geometry, _labels, _layout, _layout2
 
-_X_EPS = 1e-9  # float slack when clustering near-equal layout-x into one column
+_position = _labels.position
+_label_lines = _labels.label_lines
+_roman = _labels.roman
+
 
 _STROKE = "#000000"
 _WIDTH = 2.0
 _FONT = "sans-serif"
+_MEET_EPS = 1e-5  # layout units: a drop this close to its bar meets it (10x the position quantum)
 _GEN_MARKER_SIZE = 16.0
 _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
@@ -271,11 +274,6 @@ def _attr(s: str) -> str:
     return _escape(s).replace('"', "&quot;").replace("\n", "&#10;").replace("\r", "&#13;").replace("\t", "&#9;")
 
 
-def _position(ind: pb.Individual) -> str:
-    """The drawn position id, ``"II-3"`` — the individual's identity in the IR and in the document."""
-    return f"{_roman(ind.generation)}-{ind.index}"
-
-
 class _EnumNames(Protocol):
     """The one method of a generated protobuf enum wrapper the drawer uses."""
 
@@ -301,21 +299,6 @@ def _num(v: float) -> str:
     if r == 0:
         r = 0.0
     return f"{r:.3f}".rstrip("0").rstrip(".")
-
-
-def _label_lines(ind: pb.Individual) -> list[str]:
-    """Label stack for ``ind``: the as-drawn position id first, then each annotation's text.
-
-    Line 1 is the reconstructed position ``"II-2"`` (Roman ``generation`` + ``index``); then each
-    ``Annotation``'s verbatim text. Blanks and duplicates are dropped (first occurrence wins).
-    """
-    out: list[str] = []
-    lines = [_position(ind)]
-    lines += [a.text for a in ind.annotations]
-    for line in lines:
-        if line and line not in out:
-            out.append(line)
-    return out
 
 
 class _Draw:
@@ -352,6 +335,12 @@ class _Draw:
                     self._ghost_ordinal[idx] = seen[lay.ghost_of[idx]]
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
+        self._elbow = self._assign_elbows()
+        tracks = max(self._elbow.values(), default=-1) + 1
+        self.gen_height = max(
+            self.gen_height,
+            geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub + tracks * geom.elbow_gap,
+        )
 
     def _arrow_bottom(self, ind: pb.Individual) -> float:
         """How far a proband/consultand arrow reaches below the symbol's bottom edge (0.0 if none).
@@ -399,55 +388,22 @@ class _Draw:
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
     def _cell_w(self, idx: int) -> float:
-        """The width cell ``idx``'s label stack reserves; a pass-through draws a line only, and reserves none."""
-        return 0.0 if idx in self.lay.passthrough else self._label_w(self._ind_at(idx))
+        """The width cell ``idx``'s label stack reserves; a pass-through or phantom is a line only and reserves none."""
+        if idx in self.lay.passthrough or idx in self.lay.phantom:
+            return 0.0
+        return self._label_w(self._ind_at(idx))
 
     def _label_w(self, ind: pb.Individual) -> float:
-        """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
-
-        Floored by the minimum label box width, so a consumer may substitute label text up to that wide.
-        """
-        estimate = 0.6 * self.geom.label_size * max((len(line) for line in _label_lines(ind)), default=1)
-        return max(estimate, self.geom.label_box_width * self.geom.label_size)
+        return _labels.label_width(ind, self.geom)
 
     def _build_px_map(self) -> dict[float, float]:
-        """Map each layout-x to a pixel offset, widening only the gaps where wide labels would collide.
+        """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
 
-        A single global column pitch (``x_unit`` scaled to the widest label *anywhere*) spreads every
-        column to fit one wide annotation — the dominant source of horizontal whitespace. Instead keep
-        the geometric pitch (``x_unit`` per layout unit) as a floor and add width only across the gaps
-        whose two adjacent same-row labels would otherwise overlap. The result is a longest-path over
-        left-to-right constraints — the geometric floor between consecutive columns, plus a per-row
-        label-clearance between each adjacent pair — so it is monotonic and equal layout-x map to equal
-        pixel-x, keeping every descent drop and mating line vertical.
+        The layout already separates neighbours whose labels would collide (``_layout2._row_seps``), so no gap
+        needs widening here. A per-gap widening would keep lines vertical but move every midpoint off the one
+        the x-solve centred, which is why the clearance lives in the solve and this map is only a scale.
         """
-        xs = sorted({v for row in self.lay.pos for v in row})
-        if not xs:
-            return {}
-        cols: list[float] = [xs[0]]  # cluster near-equal x (float slack) into one column each
-        col_of: dict[float, int] = {xs[0]: 0}
-        for v in xs[1:]:
-            if v - cols[-1] > _X_EPS:
-                cols.append(v)
-            col_of[v] = len(cols) - 1
-        clearances: dict[int, list[tuple[int, float]]] = collections.defaultdict(
-            list
-        )  # right col -> [(left col, min gap px)]
-        for level, row in enumerate(self.lay.pos):
-            order = sorted(range(len(row)), key=lambda k: row[k])
-            for left, right in itertools.pairwise(order):
-                cl, cr = col_of[row[left]], col_of[row[right]]
-                if cl == cr:
-                    continue
-                wi = self._cell_w(self.lay.nid[level][left])
-                wj = self._cell_w(self.lay.nid[level][right])
-                clearances[cr].append((cl, (wi + wj) / 2 + self.geom.label_size))
-        offset = [0.0] * len(cols)
-        for c in range(1, len(cols)):
-            offset[c] = offset[c - 1] + (cols[c] - cols[c - 1]) * self.geom.x_unit
-            for cl, gap in clearances[c]:
-                offset[c] = max(offset[c], offset[cl] + gap)
-        return {v: offset[col_of[v]] for v in xs}
+        return {v: v * self.geom.x_unit for row in self.lay.pos for v in row}
 
     def _content_bounds(self) -> tuple[float, float]:
         """Leftmost / rightmost pixel offset touched by any symbol *or* its centred label stack.
@@ -460,7 +416,8 @@ class _Draw:
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
             for k, x in enumerate(row):
-                extent = max(self.half, self._cell_w(self.lay.nid[level][k]) / 2)
+                idx = self.lay.nid[level][k]
+                extent = 0.0 if idx in self.lay.phantom else max(self.half, self._cell_w(idx) / 2)
                 los.append(self._px[x] - extent)
                 his.append(self._px[x] + extent)
         return (min(los), max(his)) if los else (0.0, 0.0)
@@ -468,7 +425,7 @@ class _Draw:
     def px(self, x: float) -> float:
         # Shift so the leftmost content edge (symbol or overhanging label) sits at gutter + margin, so a
         # wide outermost label is not clipped into the gutter. Symbol-only figures keep _x_lo == -half.
-        return self.geom.gen_marker_gutter + self.geom.margin - self._x_lo + self._px[x]
+        return self.geom.gen_marker_gutter + self.geom.margin - self._x_lo + x * self.geom.x_unit  # _build_px_map
 
     def py(self, level: int) -> float:
         return self.geom.margin + self.half + level * self.gen_height
@@ -533,18 +490,23 @@ class _Draw:
                 if not kind:
                     continue
                 childless = self.lay.childless[level][k] if level < len(self.lay.childless) else 0
-                classes = ["mating"]
+                left, right = self.lay.nid[level][k], self.lay.nid[level][k + 1]
+                classes = ["mating"] + (["partner-omitted"] if {left, right} & self.lay.phantom else [])
                 if kind == 2:
                     classes.append("consanguineous")
                 if childless == int(pb.CHILDLESSNESS_BY_CHOICE):
                     classes.append("childless-by-choice")
                 elif childless == int(pb.CHILDLESSNESS_INFERTILITY):
                     classes.append("childless-infertility")
-                partners = f"{self._cell_position(level, k)} {self._cell_position(level, k + 1)}"
+                partners = " ".join(
+                    self._cell_position(level, c) for c in (k, k + 1) if self.lay.nid[level][c] not in self.lay.phantom
+                )
                 out.append(_open_g(classes, {"data-partners": partners}))
                 y = self.py(level)
-                x1 = self.px(self.lay.pos[level][k]) + self.half
-                x2 = self.px(self.lay.pos[level][k + 1]) - self.half
+                # A line leaves each drawn partner's edge; at an omitted partner it ends where that partner would
+                # stand (the phantom's centre), as the literature draws a partner left out of the figure.
+                x1 = self.px(self.lay.pos[level][k]) + (0.0 if left in self.lay.phantom else self.half)
+                x2 = self.px(self.lay.pos[level][k + 1]) - (0.0 if right in self.lay.phantom else self.half)
                 if kind == 2:
                     off = self.geom.double_line_offset / 2
                     out.append(_line(x1, y - off, x2, y - off))
@@ -617,6 +579,90 @@ class _Draw:
             out.append(_line(mid_x - half, bar2, mid_x + half, bar2))
         return out
 
+    def _descent_groups(self, level: int) -> dict[tuple[int, bool], list[int]]:
+        """The children on ``level`` by ``(parent column, lone)``, pass-throughs excluded (drawn as hops).
+
+        ``lone`` separates a lone parent's own sibship from the couple its column also heads (``descends_from_one``).
+        """
+        groups: dict[tuple[int, bool], list[int]] = {}
+        for k in range(self.lay.n[level]):
+            pc = self.lay.fam[level][k]
+            if pc >= 0 and self.lay.nid[level][k] not in self.lay.passthrough:
+                groups.setdefault((pc, self.lay.descends_from_one(level, k)), []).append(k)
+        return groups
+
+    def _descent_calls(self) -> list[tuple[int, int, tuple[int, ...]]]:
+        """Every ``(level, parent column, child columns)`` drawn as one drop, in drawing order.
+
+        Each sibship, and each hop into a pass-through on the way down to one.
+        """
+        out: list[tuple[int, int, tuple[int, ...]]] = []
+        for level in range(1, len(self.lay.nid)):
+            for (pc, _), cols in sorted(self._descent_groups(level).items()):
+                top_level, top_pc = level - 1, pc
+                hops: list[tuple[int, int, tuple[int, ...]]] = []
+                while self.lay.nid[top_level][top_pc] in self.lay.passthrough:
+                    hops.insert(0, (top_level, self.lay.fam[top_level][top_pc], (top_pc,)))
+                    top_pc = self.lay.fam[top_level][top_pc]
+                    top_level -= 1
+                out += [*hops, (level, pc, tuple(cols))]
+        return out
+
+    def _drop(self, level: int, pc: int, cols: tuple[int, ...]) -> tuple[float, float | None]:
+        """The drop's x and, when it misses its own bar, the bar end it lands on (``None`` when it meets its bar).
+
+        The drop leaves the parents' midpoint, or a lone parent's centre. A lone child's bar, and a lone twin
+        group's, is its one attach point.
+        """
+        row = self.lay.pos[level - 1]
+        # In layout units, with a tolerance above the position quantum: a midpoint of two rounded positions can sit
+        # a fraction of a quantum off a rounded child and must still read as meeting it.
+        mid = row[pc] if self.lay.descends_from_one(level, cols[0]) else (row[pc] + row[pc + 1]) / 2
+        attach = [sum(self.lay.pos[level][k] for k in g) / len(g) for g in self._child_groups(level, list(cols))]
+        lo, hi = min(attach), max(attach)
+        if lo - _MEET_EPS <= mid <= hi + _MEET_EPS:
+            return self.px(mid), None
+        return self.px(mid), self.px(lo if mid < lo else hi)
+
+    def _assign_elbows(self) -> dict[tuple[int, int, tuple[int, ...]], int]:
+        """Each drop that misses its bar -> its elbow track in its row gap (0 is nearest the bar).
+
+        Two elbows never share a stretch of one height: on a track, each ends at least ``elbow_gap`` before the next
+        begins. A drop standing over another elbow's landing leg turns on a higher track, so it has turned before
+        that leg begins and the two never run along one line. Elbows are placed in extent order, each above every
+        elbow it stands over, on the lowest free track. Deterministic: layout order only.
+        """
+        by_level: dict[int, list[tuple[float, float, float, float, tuple[int, int, tuple[int, ...]]]]] = (
+            collections.defaultdict(list)
+        )
+        for call in self._descent_calls():
+            mid_x, land = self._drop(*call)
+            if land is not None:
+                by_level[call[0]].append((min(mid_x, land), max(mid_x, land), mid_x, land, call))
+        gap = self.geom.elbow_gap
+        out: dict[tuple[int, int, tuple[int, ...]], int] = {}
+        for items in by_level.values():
+            items.sort()
+            below = {
+                a[4]: [b[4] for b in items if b is not a and abs(a[2] - b[3]) < gap] for a in items
+            }  # a stands over b's landing leg: a turns above b
+            placed: list[list[tuple[float, float]]] = []  # per track, the extents on it
+            pending = list(items)
+            while pending:
+                ready = [it for it in pending if all(b in out for b in below[it[4]])]
+                it = ready[0] if ready else pending[0]  # a cycle (each over the other's leg) breaks by extent order
+                pending.remove(it)
+                lo, hi, _, _, call = it
+                floor = max((out[b] + 1 for b in below[call] if b in out), default=0)
+                track = floor
+                while track < len(placed) and any(lo < e_hi + gap and e_lo < hi + gap for e_lo, e_hi in placed[track]):
+                    track += 1
+                while len(placed) <= track:
+                    placed.append([])
+                placed[track].append((lo, hi))
+                out[call] = track
+        return out
+
     def _descents(self) -> list[str]:
         """Descent drop + sibship bar + per-child stubs, grouping children by their parent (couple or lone).
 
@@ -626,64 +672,61 @@ class _Draw:
         """
         out: list[str] = []
         for level in range(1, len(self.lay.nid)):
-            groups: dict[int, list[int]] = {}
-            for k in range(self.lay.n[level]):
-                pc = self.lay.fam[level][k]
-                if pc >= 0 and self.lay.nid[level][k] not in self.lay.passthrough:
-                    groups.setdefault(pc, []).append(k)
-            for pc in sorted(groups):
+            groups = self._descent_groups(level)
+            for pc, lone in sorted(groups):
+                cols = groups[(pc, lone)]
                 hops: list[str] = []
                 top_level, top_pc = level - 1, pc
                 while self.lay.nid[top_level][top_pc] in self.lay.passthrough:
+                    lone = self.lay.descends_from_one(top_level, top_pc)  # whether the hop above is from one parent
                     through_y = self.py(top_level)
                     through_x = self.px(self.lay.pos[top_level][top_pc])
                     hops = [
-                        *self._sibship(top_level, self.lay.fam[top_level][top_pc], [top_pc]),
+                        *self._sibship(top_level, self.lay.fam[top_level][top_pc], (top_pc,)),
                         _line(through_x, through_y - self.half, through_x, through_y),
                         *hops,
                     ]
                     top_pc = self.lay.fam[top_level][top_pc]
                     top_level -= 1
-                parents = [self._cell_position(top_level, top_pc)]
-                if self.lay.spouse[top_level][top_pc]:
-                    parents.append(self._cell_position(top_level, top_pc + 1))
-                children = " ".join(self._cell_position(level, k) for k in groups[pc])
+                heads = [top_pc] if lone else [top_pc, top_pc + 1]
+                parents = [
+                    self._cell_position(top_level, c)
+                    for c in heads
+                    if self.lay.nid[top_level][c] not in self.lay.phantom
+                ]
+                children = " ".join(self._cell_position(level, k) for k in cols)
                 out.append(_open_g(["sibship"], {"data-parents": " ".join(parents), "data-children": children}))
                 out += hops
-                out += self._sibship(level, pc, groups[pc])
+                out += self._sibship(level, pc, tuple(cols))
                 out.append("</g>")
         return out
 
-    def _sibship(self, level: int, pc: int, cols: list[int]) -> list[str]:
+    def _sibship(self, level: int, pc: int, cols: tuple[int, ...]) -> list[str]:
+        """One descent: the drop from the parents, the sib bar across the children, and each child's stub.
+
+        A drop that meets its bar goes straight down to it. One that misses it (the order leaves the parents beside
+        their children: a crossing descent, or a cousin standing beside its mate) turns at its elbow track above the
+        bar, runs across and drops onto the bar's near end, so it crosses other descents at right angles and never
+        runs along another sibship's bar.
+        """
         top = self.py(level) - self.half
         parent_y = self.py(level - 1)
-        # fam names the parent column: a couple's left member (spouse!=0), or a lone single parent
-        # (spouse==0). The descent drops from the couple midpoint, or from the lone parent's centre.
-        if self.lay.spouse[level - 1][pc]:
-            mid_x = (self.px(self.lay.pos[level - 1][pc]) + self.px(self.lay.pos[level - 1][pc + 1])) / 2
-        else:
-            mid_x = self.px(self.lay.pos[level - 1][pc])
-        if len(cols) == 1:
-            cx = self.px(self.lay.pos[level][cols[0]])
-            parent_pos = self.lay.pos[level - 1]
-            mid_pos = (parent_pos[pc] + parent_pos[pc + 1]) / 2 if self.lay.spouse[level - 1][pc] else parent_pos[pc]
-            if abs(self.lay.pos[level][cols[0]] - mid_pos) < 1e-6:
-                return [_line(cx, parent_y, cx, top)]  # child centred under its parents: a straight drop
-            # v2 can pull a lone child off its parents' midpoint (e.g. a cousin who must sit beside its
-            # mate); route the descent from the mating midpoint down, across, and down to the child.
-            bar_y = top - self.geom.sib_stub
-            return [_line(mid_x, parent_y, mid_x, bar_y), _line(mid_x, bar_y, cx, bar_y), _line(cx, bar_y, cx, top)]
         bar_y = top - self.geom.sib_stub
-        groups = self._child_groups(level, cols)
+        mid_x, land = self._drop(level, pc, cols)
+        groups = self._child_groups(level, list(cols))
         attach = [sum(self.px(self.lay.pos[level][k]) for k in g) / len(g) for g in groups]
-        if len(groups) == 1:
-            return [_line(mid_x, parent_y, attach[0], bar_y), *self._twins(level, groups[0], bar_y, top)]
-        # The bar reaches the drop: a hinge's couple the rows keep from centring over its children drops beside
-        # them, and a bar spanning only the children would leave that drop ending in mid-air.
-        out = [
-            _line(mid_x, parent_y, mid_x, bar_y),
-            _line(min(*attach, mid_x), bar_y, max(*attach, mid_x), bar_y),
-        ]
+        lone = len(groups) == 1 and len(groups[0]) == 1  # a lone child: the drop runs on to its symbol, no bar
+        end_y = top if lone else bar_y
+        if land is None:
+            out = [_line(mid_x, parent_y, mid_x, end_y)]
+        else:
+            elbow_y = bar_y - self.geom.elbow_gap * (self._elbow[(level, pc, cols)] + 1)
+            corners = [(mid_x, parent_y), (mid_x, elbow_y), (land, elbow_y), (land, end_y)]
+            out = [_rounded_path(corners, self.geom.elbow_gap / 2)]
+        if lone:
+            return out
+        if len(groups) > 1:
+            out.append(_line(min(attach), bar_y, max(attach), bar_y))
         for group, ax in zip(groups, attach, strict=True):
             if len(group) == 1:
                 out.append(_line(ax, bar_y, ax, top))
@@ -759,6 +802,8 @@ class _Draw:
                 idx = self.lay.nid[level][k]
                 if idx in self.lay.passthrough:
                     continue  # a descent's line through this row, drawn by _descents
+                if idx in self.lay.phantom:
+                    continue  # an omitted partner: only its marriage line is drawn, by _matings
                 cx, cy = self.px(self.lay.pos[level][k]), self.py(level)
                 real = self.lay.ghost_of.get(idx)
                 if real is not None:
@@ -989,35 +1034,6 @@ class _Draw:
         return out
 
 
-_ROMAN = (
-    (1000, "M"),
-    (900, "CM"),
-    (500, "D"),
-    (400, "CD"),
-    (100, "C"),
-    (90, "XC"),
-    (50, "L"),
-    (40, "XL"),
-    (10, "X"),
-    (9, "IX"),
-    (5, "V"),
-    (4, "IV"),
-    (1, "I"),
-)
-
-
-def _roman(n: int) -> str:
-    """Roman numeral for a positive generation number ``n`` (deterministic; ``n`` is small)."""
-    if n < 1:
-        raise ValueError(f"generation number must be >= 1, got {n}")
-    out: list[str] = []
-    for value, sym in _ROMAN:
-        while n >= value:
-            out.append(sym)
-            n -= value
-    return "".join(out)
-
-
 def _cls(cls: str) -> str:
     return f'class="{cls}" ' if cls else ""
 
@@ -1040,6 +1056,27 @@ def _hit_line(x1: float, y1: float, x2: float, y2: float) -> str:
 def _polyline(points: list[tuple[float, float]]) -> str:
     pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in points)
     return f'<polyline points="{pts}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"/>'
+
+
+def _rounded_path(points: list[tuple[float, float]], radius: float) -> str:
+    """An orthogonal polyline whose interior corners are rounded, so the direction of every turn reads at a glance.
+
+    Each corner is a quarter curve of ``radius``, clamped to half of each adjoining leg.
+    """
+    d = [f"M{_num(points[0][0])},{_num(points[0][1])}"]
+    for (x0, y0), (x1, y1), (x2, y2) in zip(points, points[1:], points[2:], strict=False):
+        r = min(radius, math.hypot(x1 - x0, y1 - y0) / 2, math.hypot(x2 - x1, y2 - y1) / 2)
+        ax, ay = _toward(x1, y1, x0, y0, r)
+        bx, by = _toward(x1, y1, x2, y2, r)
+        d.append(f"L{_num(ax)},{_num(ay)}Q{_num(x1)},{_num(y1)} {_num(bx)},{_num(by)}")
+    d.append(f"L{_num(points[-1][0])},{_num(points[-1][1])}")
+    return f'<path d="{"".join(d)}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"/>'
+
+
+def _toward(x: float, y: float, tx: float, ty: float, r: float) -> tuple[float, float]:
+    """The point ``r`` from ``(x, y)`` toward ``(tx, ty)``."""
+    length = math.hypot(tx - x, ty - y)
+    return (x, y) if length == 0 else (x + (tx - x) * r / length, y + (ty - y) * r / length)
 
 
 def _hit_polyline(points: list[tuple[float, float]]) -> str:

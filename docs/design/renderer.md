@@ -78,11 +78,14 @@ fill *opposite* halves (a compound het reads as opposite sides), while a single 
 half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. Connectors: **mating line**
 (horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only
 from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line**
-(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs), a **founder sibship**'s implied hanger
-(a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point instead of a
-descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a
-couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
-`CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
+(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its
+children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with
+rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's
+landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib
+bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to
+one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating
+midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for
+`CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;
@@ -110,14 +113,14 @@ sized from the actual pedigree, not a fixed band:
   never clipped. `GEN_HEIGHT` is a floor: the effective row pitch is raised to
   `SYMBOL_SIZE + band + LABEL_GAP + SIB_STUB` so a parent's stack clears the sib bar and descent lines of the row below.
 - *Horizontal.* SVG text width isn't measurable at build time, so a line's width is estimated conservatively as
-  `0.6·LABEL_SIZE` px per character (a sans-serif average advance). `X_UNIT` sets the geometric column pitch (a floor);
-  label widening is **local**, not global — the layout-x→pixel-x map is a longest-path over left-to-right constraints:
-  the geometric floor between consecutive columns, plus, for each adjacent same-row pair, a clearance of
-  `(width_left + width_right)/2 + LABEL_SIZE` so their stacks don't collide. Only the gaps whose labels would overlap
-  widen; one wide annotation no longer inflates the whole figure's pitch. The map is monotonic (equal layout-x → equal
-  pixel-x), so descents and mating lines stay vertical. The canvas width and origin are sized from true content bounds
-  (symbol half or label half, whichever reaches further per cell), so an outermost label wider than its symbol is not
-  clipped. All deterministic functions of the pedigree, keeping golden bytes stable.
+  `0.6·LABEL_SIZE` px per character (a sans-serif average advance) (`_labels.py`). Label widening is **local** and lives
+  in the x-solve: each adjacent same-row pair's minimum separation is the larger of its geometric gap and
+  `(width_left + width_right)/2 + LABEL_SIZE`, in layout units, so only the gaps whose labels would overlap widen and
+  one wide annotation does not inflate the whole figure's pitch. Drawing then maps layout-x to pixel-x by one scale,
+  `X_UNIT` px per unit. A widening applied after the solve (it used to be) keeps lines vertical but moves every midpoint
+  off the one the solve centred. The canvas width and origin are sized from true content bounds (symbol half or label
+  half, whichever reaches further per cell), so an outermost label wider than its symbol is not clipped. All
+  deterministic functions of the pedigree, keeping golden bytes stable.
 
 Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, `SIB_GAP`, `SIB_STUB`,
 `DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`.
@@ -153,8 +156,9 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
   partner's row (`_rank`).
 - **A routed / overflow mating that *has* offspring** — descent from a non-adjacent parent pair is not yet drawn, so a
   > 2-mate individual whose overflow mating bears children defers rather than mislay the descent (`_build`).
-- **A torn sibship** — an order the ordering could not keep contiguous, so two sibships' descent bars would overlap;
-  deferred rather than draw a child as issue of several matings.
+- **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
+  sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
+  the check keeps from reaching a figure (`_overlapping_sibships`).
 
 ## Alternatives considered
 

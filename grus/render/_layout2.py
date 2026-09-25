@@ -21,7 +21,7 @@ import itertools
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _layout, _ordering, _xsolve
+from grus.render import _geometry, _labels, _layout, _ordering, _xsolve
 
 _POS_QUANTUM = 6  # decimal places the final x is rounded to, so a floating backend's residual can't tip a
 # rounding boundary — the goldens are byte-compared, so pos must be bit-stable across arch/compiler
@@ -90,21 +90,26 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
         foundersib_groups,
         first_generation=prep.first_generation,
         passthrough=prep.passthrough,
+        phantom=prep.phantom,
     )
 
     routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
-    seps = _row_seps(built, geom.couple_gap, geom.sib_gap)
+    seps = _row_seps(built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom))
     blocks = _blocks(built, seps, sibships)
-    x = _xsolve.solve(_x_model(built, seps, sibships, blocks, geom), geom.x_solver)
+    model = _x_model(built, seps, sibships, blocks, geom)
+    x = _xsolve.solve(model, geom.x_solver)
+    for _ in range(_APART_PASSES):  # keep each drop that misses its bar out of other families' child columns
+        extra = _apart(built, sibships, x, model.apart)
+        if not extra:
+            break
+        model = dataclasses.replace(model, apart=model.apart + extra)
+        x = _xsolve.solve(model, geom.x_solver)
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
     result = dataclasses.replace(built, pos=pos, routed=routed)
-    if _overlapping_sibships(g, result):
-        raise _layout.DeferredFeatureError(
-            "the ordering could not keep every sibship contiguous, so two sibships' descent bars overlap (a "
-            "child would read as issue of several matings) — an interlocking loop/multi-mate shape; deferred"
-        )
+    if (why := _overlapping_sibships(g, result)) is not None:
+        raise _layout.DeferredFeatureError(f"{why}; deferred")
     return result
 
 
@@ -117,10 +122,11 @@ class _Prepared:
     cross: set[int]
     first_generation: int
     passthrough: frozenset[int]
+    phantom: frozenset[int]
 
 
 def _prepare(p: pb.Pedigree) -> _Prepared:
-    """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, pass-throughs.
+    """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, phantoms, pass-throughs.
 
     Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
     couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
@@ -131,8 +137,9 @@ def _prepare(p: pb.Pedigree) -> _Prepared:
     cross = _layout._cross_matings(g)
     _layout._detect_loops(g, cross)
     first_generation = _layout._rank(g)
+    phantom = _layout._insert_phantoms(g)
     passthrough = _layout._insert_passthroughs(g)
-    return _Prepared(g, ghost_of, cross, first_generation, passthrough)
+    return _Prepared(g, ghost_of, cross, first_generation, passthrough, phantom)
 
 
 def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[int]) -> list[_layout.RoutedMating]:
@@ -163,30 +170,37 @@ def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[in
     return out
 
 
-def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> bool:
-    """Whether any two matings' child x-spans overlap on a row — the torn-sibship backstop.
+def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
+    """Why the drawing would misstate a descent, or ``None``: the backstop against a silently wrong figure.
 
-    A cross-join order that pulls a partner with siblings to its mate can tear that sibship, stretching its sib
-    bar until it overlaps another (a child reads as the issue of several matings). Ordering keeps sibships
-    contiguous, so this backstop never fires on a drawable shape; ``layout`` defers rather than mislay out
-    anything an order somehow tears (an interlocking loop/multi-mate shape).
+    Drawing reads sibships from ``fam`` and draws each as one bar from its children to its drop (the parents'
+    midpoint, or a lone parent's x), so two failures read as a false family:
+
+    * **a mixed group**: a drawn group whose children are not exactly one mating's, drawn from that mating's
+      partners. ``fam`` records only the parent's column; phantom partners give each lone-parent mating its own
+      couple, so this is a layout bug the check keeps from reaching a figure.
+    * **overlapping bars**: two groups on a row whose children's spans overlap (a torn sibship), so a child
+      would read as the issue of several matings. A drop beside its children does not extend its bar: it turns
+      at its own elbow track above the bars (``_draw._sibship``), so only the children's spans can meet.
+
+    ``layout`` defers on either rather than draw it.
     """
+    mating_of = {k: mi for mi, mr in enumerate(g.matings) if not mr.partnerless for k in mr.kids}
     xof = {i: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, i in enumerate(row)}
-    spans: dict[int, list[tuple[float, float]]] = collections.defaultdict(list)
-    for mr in g.matings:
-        kids = [k for k in mr.kids if k in xof]
-        if not kids:
-            continue
-        xs = [xof[k] for k in kids]
-        spans[g.level[kids[0]]].append((min(xs), max(xs)))
-    for row in spans.values():
+    bars: dict[int, list[tuple[float, float]]] = collections.defaultdict(list)
+    for s in _relations(lay):
+        matings = {mating_of.get(c) for c in s.children}
+        mi = next(iter(matings))
+        if len(matings) != 1 or mi is None or set(g.matings[mi].partners) != set(s.parents):
+            return "a lone parent's sibships would draw as one family, or from the wrong parents"
+        xs = [xof[c] for c in s.children]
+        bars[g.level[s.children[0]]].append((min(xs), max(xs)))
+    for row in bars.values():
         row.sort()
-        reach = float("-inf")
-        for lo, hi in row:
-            if lo < reach - 1e-9:
-                return True
-            reach = max(reach, hi)
-    return False
+        for (_, hi), (lo, _) in itertools.pairwise(row):
+            if lo <= hi + 1e-9:
+                return "two sibships' sib bars would overlap and read as one family"
+    return None
 
 
 def _relations(lay: _layout.Layout) -> list[_Sibship]:
@@ -197,17 +211,15 @@ def _relations(lay: _layout.Layout) -> list[_Sibship]:
     """
     out: list[_Sibship] = []
     for level in range(1, len(lay.nid)):
-        groups: dict[int, list[int]] = collections.defaultdict(list)  # parent column on level-1 -> child columns
+        groups: dict[tuple[int, bool], list[int]] = collections.defaultdict(list)  # (parent column, lone) -> cols
         for k in range(lay.n[level]):
             pc = lay.fam[level][k]
             if pc >= 0:
-                groups[pc].append(k)  # k ascends, so children stay left-to-right
-        for pc in sorted(groups):
-            children = tuple(lay.nid[level][k] for k in groups[pc])
-            if lay.spouse[level - 1][pc]:
-                parents = (lay.nid[level - 1][pc], lay.nid[level - 1][pc + 1])
-            else:
-                parents = (lay.nid[level - 1][pc],)
+                groups[(pc, lay.descends_from_one(level, k))].append(k)  # k ascends: children stay left-to-right
+        for pc, lone in sorted(groups):
+            children = tuple(lay.nid[level][k] for k in groups[(pc, lone)])
+            heads = (pc,) if lone else (pc, pc + 1)
+            parents = tuple(lay.nid[level - 1][c] for c in heads)
             out.append(_Sibship(parents=parents, children=children))
     return out
 
@@ -225,14 +237,84 @@ def _couples(lay: _layout.Layout) -> list[tuple[int, int]]:
     ]
 
 
-def _row_seps(lay: _layout.Layout, couple_gap: float, sib_gap: float) -> list[list[float]]:
-    """Hard min-separation between each adjacent pair on a row: ``couple_gap`` within a couple, else ``sib_gap``.
+# A drop that misses its bar stands at least this far (layout units, a third of the sibling gap) from another family's
+# child, so its vertical cannot be read as landing on that child; at most this many passes add such constraints.
+_APART_CLEAR = 0.5
+_APART_PASSES = 4
 
-    Both are >= ``couple_gap``, so the non-overlap invariant holds; the tighter couple gap realises the soft
-    couple-adjacency preference as a separation floor (couples read tighter than sibships, as in v1).
+
+def _apart(
+    lay: _layout.Layout,
+    sibships: list[_Sibship],
+    x: dict[int, float],
+    held: tuple[tuple[tuple[int, ...], int, int, float], ...],
+) -> tuple[tuple[tuple[int, ...], int, int, float], ...]:
+    """The keep-apart constraints ``x`` still violates.
+
+    Each drop that misses its bar, against each other family's child on its row (a pass-through included) standing
+    within ``_APART_CLEAR`` of it.
+
+    The side is the one ``x`` already has, or on an exact tie the side toward the drop's own bar, so the constraint
+    is linear and moves the drop the short way. Constraints only accumulate across passes, so a side once chosen holds.
     """
+    have = {(parents, cell) for parents, cell, _, _ in held}
+    out: list[tuple[tuple[int, ...], int, int, float]] = []
+    level_of = {c: level for level, row in enumerate(lay.nid) for c in row}
+    for s in sibships:
+        drop = sum(x[p] for p in s.parents) / len(s.parents)
+        xs = [x[c] for c in s.children]
+        if min(xs) - 1e-9 <= drop <= max(xs) + 1e-9:
+            continue  # meets its own bar
+        toward = 1 if drop > max(xs) else -1  # +1: its bar is to the left, so moving left (drop - x_c < 0) is toward
+        own = set(s.children)
+        for c in lay.nid[level_of[s.children[0]]]:
+            if c in own or c in lay.phantom or lay.fam[level_of[c]][lay.nid[level_of[c]].index(c)] < 0:
+                continue  # only another family's child (a married-in partner has no line above it)
+            if (s.parents, c) in have or abs(drop - x[c]) >= _APART_CLEAR - 1e-9:
+                continue
+            side = (1 if drop > x[c] else -1) if abs(drop - x[c]) > 1e-9 else -toward
+            out.append((s.parents, c, side, _APART_CLEAR))
+    return tuple(out)
+
+
+def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
+    """Each cell's half-label reach in layout units: half its label width plus half the gap between labels.
+
+    Two neighbours need ``(w_left + w_right) / 2 + label_size`` pixels between centres for their label stacks not to
+    touch; that is the sum of the two cells' values. A pass-through or phantom draws no label and needs none; a ghost
+    reserves its real individual's label.
+    """
+    out: dict[int, float] = {}
+    for row in lay.nid:
+        for c in row:
+            if c in lay.passthrough or c in lay.phantom:
+                out[c] = 0.0
+                continue
+            ind = p.individuals[lay.ghost_of.get(c, c)]
+            out[c] = (_labels.label_width(ind, geom) + geom.label_size) / 2 / geom.x_unit
+    return out
+
+
+def _row_seps(
+    lay: _layout.Layout, couple_gap: float, sib_gap: float, clearance: dict[int, float] | None = None
+) -> list[list[float]]:
+    """Hard min-separation between each adjacent pair on a row.
+
+    ``couple_gap`` within a couple, else ``sib_gap``, raised where the two cells' labels would otherwise collide
+    (``clearance``, in layout units). Both floors are >= ``couple_gap``, so the non-overlap invariant holds; the
+    tighter couple gap realises the soft couple-adjacency preference as a separation floor (couples read tighter
+    than sibships, as in v1). The label clearance is a separation, not a drawing-time widening, so the solve's
+    centring holds in pixels.
+    """
+    reach = clearance or {}
     return [
-        [couple_gap if lay.spouse[level][k] else sib_gap for k in range(lay.n[level] - 1)]
+        [
+            max(
+                couple_gap if lay.spouse[level][k] else sib_gap,
+                reach.get(lay.nid[level][k], 0.0) + reach.get(lay.nid[level][k + 1], 0.0),
+            )
+            for k in range(lay.n[level] - 1)
+        ]
         for level in range(len(lay.nid))
     ]
 
@@ -244,7 +326,10 @@ def _x_model(
     blocks: list[list[_Block]],
     geom: _geometry.Geometry,
 ) -> _xsolve.Model:
-    """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch."""
+    """The x model for this order: row separations, block rigidity, descent groups, and hinge couples' stretch.
+
+    A line to an omitted partner (a phantom) has no stretch cost; see below.
+    """
     rows = lay.nid
     gaps = tuple((row[k], row[k + 1], seps[level][k]) for level, row in enumerate(rows) for k in range(len(row) - 1))
     # A bonded pair sits exactly its row separation apart. Taken from ``seps`` directly, not as a difference of the
@@ -252,10 +337,12 @@ def _x_model(
     # arithmetic, contradict the pair's ``>= sep`` gap.
     rigid = tuple((rows[level][a], rows[level][b], seps[level][a]) for level, a, b in _block_pairs(blocks))
     bonded = {(rows[level][a], rows[level][b]) for level, a, b in _block_pairs(blocks)}
+    # A line to an omitted partner (a phantom) has no partner symbol to hold near, so its length costs nothing
+    # here: it stretches as far as centring its drop needs, and compactness (levels 2-3) keeps it no longer.
     couples = tuple(
         (left, right, geom.couple_gap, geom.sib_gap - geom.couple_gap)
         for left, right in _couples(lay)
-        if (left, right) not in bonded
+        if (left, right) not in bonded and left not in lay.phantom and right not in lay.phantom
     )
     return _xsolve.Model(
         cells=tuple(c for row in rows for c in row),
@@ -276,10 +363,12 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
 
     A block is a maximal run of adjacent columns joined by a **cohesion bond**. Three relations bond:
 
-    * an **ordinary couple** (``spouse`` flag) — but only when both partners mate exactly once. A multi-mate
-      individual (a half-sib hinge, an overflow) is excluded, so its couples stay free and it spreads to centre
-      over each of its sibships (``half_sibs``); this is the ordinary-vs-hinge distinction kept from the couple
-      cohesion this generalizes.
+    * an **ordinary couple** (``spouse`` flag) — but only when both partners mate exactly once and neither is
+      bonded to anyone else. A multi-mate individual (a half-sib hinge, an overflow) is excluded, so its couples
+      stay free and it spreads to centre over each of its sibships (``half_sibs``). So is a couple a partner of
+      which is a co-twin or a founder-sib floater: bonded, the couple would join that group into one rigid chain
+      (twins who both marry lock spouse, twin, twin, spouse together), and the chain's drops could not spread to
+      reach their own children, whose bars then met. Free, it stretches at the hinge couples' cost.
     * **co-twins** (``twins`` flag) — a twin group never separates.
     * a **founder-sib floater**: a member of a partnerless mating's sibship that heads no descent (no drawn
       children) has no anchor of its own, so centring alone would not keep it beside an anchored sibling pulled
@@ -305,10 +394,6 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
         ncols = lay.n[level]
         bond = [False] * max(ncols - 1, 0)  # bond[k]: columns k and k+1 share a block
         for k in range(ncols - 1):
-            if lay.spouse[level][k]:
-                left, right = lay.nid[level][k], lay.nid[level][k + 1]
-                if mates[left] == 1 and mates[right] == 1:
-                    bond[k] = True
             if lay.twins[level][k]:
                 bond[k] = True
         for k in range(ncols):
@@ -319,6 +404,13 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
                 bond[k - 1] = True
             elif k + 1 < ncols and fs_group.get((level, k + 1)) == gid:
                 bond[k] = True
+        other = list(bond)  # the twin and floater bonds, before any couple joins them
+        for k in range(ncols - 1):
+            if lay.spouse[level][k] and not other[k]:
+                left, right = lay.nid[level][k], lay.nid[level][k + 1]
+                alone = not (k > 0 and other[k - 1]) and not (k + 1 < ncols - 1 and other[k + 1])
+                if mates[left] == 1 and mates[right] == 1 and alone:
+                    bond[k] = True
         out.append(_row_blocks(bond, ncols))
     return out
 

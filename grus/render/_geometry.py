@@ -43,6 +43,10 @@ class Geometry:
             orthogonal edge for a >2-mate overflow, running over the intervening symbols).
         routed_track_gap: extra rise per additional routed track sharing one row, so multiple routed
             edges stagger deterministically instead of coinciding.
+        elbow_gap: pixels between elbow tracks above a sib bar. A drop the order leaves beside its own children
+            (a crossing descent, a cousin standing beside its mate) turns at its own track above the bar, runs
+            across and drops onto its bar, so it never runs along another sibship's bar; the row pitch opens by
+            one gap per track a figure needs.
         label_size: font size (pixels) of one line of an individual's label stack.
         label_gap: pixels between a symbol's bottom edge and the top of its label stack.
         label_line_gap: pixels between adjacent lines within the label stack.
@@ -74,6 +78,7 @@ class Geometry:
     double_line_offset: float = 4.0
     routed_stub: float = 14.0  # pixels a routed mating's horizontal track sits above the row's symbol tops
     routed_track_gap: float = 8.0  # extra rise per additional routed track on one row (deterministic stagger)
+    elbow_gap: float = 8.0  # pixels between elbow tracks above a sib bar (and the lowest track above the bar)
     childless_stub: float = 18.0  # vertical drop below a childless couple's mating line to the bar
     childless_bar: float = 12.0  # half-width of the horizontal bar (no children / infertility)
     childless_bar_gap: float = 5.0  # vertical gap between the two bars of the infertility glyph

@@ -17,7 +17,6 @@ These cover the properties specific to the v2 model, beyond the golden bytes and
 
 from __future__ import annotations
 
-import collections
 import itertools
 import pathlib
 import random
@@ -332,23 +331,25 @@ def test_review_set_deferral_count_is_zero() -> None:
 
 
 def _couple_gaps(lay: render.Layout) -> list[float]:
-    """Every ordinary drawn couple's x-distance (any mating flagged ``spouse``, childless included).
+    """Every rigid drawn couple's x-distance (any mating flagged ``spouse``, childless included).
 
-    A hinge's couples (either partner mates more than once) are excluded: they are deliberately not rigid, and
-    their spread is whatever centres each of the hinge's families, which the rows can make wider than
-    ``sib_gap`` (``hinge_offcentre``). Their property is centring, tested directly
-    (``test_half_sibs_hinge_centres_over_both_sibships``).
+    The couples the layout leaves free are excluded: a hinge's (either partner mates more than once), whose spread
+    centres each of its families and can exceed ``sib_gap`` (``hinge_offcentre``), and a couple with a partner
+    bonded to a co-twin, which stretches so each drop in the twins' chain reaches its own children
+    (``twins_marry_chain_stretches``). Their properties are centring and each drop on its own bar, tested directly.
     """
+    g = render.DEFAULT_GEOMETRY
+    seps = _layout2_mod._row_seps(lay, g.couple_gap, g.sib_gap)
+    blocks = _layout2_mod._blocks(lay, seps, _layout2_mod._relations(lay))
+    bonded = {(lay.nid[level][a], lay.nid[level][b]) for level, a, b in _layout2_mod._block_pairs(blocks)}
     xof = {c: lay.pos[level][k] for level, row in enumerate(lay.nid) for k, c in enumerate(row)}
-    couples = _layout2_mod._couples(lay)
-    mates = collections.Counter(c for couple in couples for c in couple)
-    return [abs(xof[a] - xof[b]) for a, b in couples if mates[a] == 1 and mates[b] == 1]
+    return [abs(xof[a] - xof[b]) for a, b in _layout2_mod._couples(lay) if (a, b) in bonded]
 
 
 @pytest.mark.parametrize("name", [*_DRAWABLE, "c05"])
 def test_drawn_couples_stay_tight(name: str) -> None:
     # Couples-stay-tight invariant: no ordinary drawn couple stretches past sib_gap — anything wider is a torn
-    # contiguity block. (A hinge's couples spread to centre its families; see _couple_gaps.)
+    # contiguity block. (The couples the layout leaves free stretch by design; see _couple_gaps.)
     lay = render.layout(test_render._load(name) if name in _DRAWABLE else _load_pair(name))
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"
@@ -573,3 +574,143 @@ def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
         "2-3",
         "2-6",
     ]
+
+
+def _pos(g: int, i: int) -> pb.Position:
+    return pb.Position(generation=g, index=i)
+
+
+def _lone_parent_pedigree(with_mate: bool) -> pb.Pedigree:
+    """II-1 heads two sibships: III-1/III-2 alone (or with II-2), and III-3 alone."""
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=woman),
+            *([pb.Individual(generation=2, index=2, gender=man)] if with_mate else []),
+            *(pb.Individual(generation=3, index=k, gender=man) for k in (1, 2, 3)),
+        ]
+    )
+    p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2)).offspring.add(child=_pos(2, 1))
+    first = p.matings.add(partner_a=_pos(2, 1))
+    if with_mate:
+        first.partner_b.CopyFrom(_pos(2, 2))
+    first.offspring.add(child=_pos(3, 1))
+    first.offspring.add(child=_pos(3, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 3))
+    return p
+
+
+@pytest.mark.parametrize(
+    ("with_mate", "sibships"),
+    [
+        (False, {("II-1", "III-1 III-2"), ("II-1", "III-3")}),
+        (True, {("II-1 II-2", "III-1 III-2"), ("II-1", "III-3")}),
+    ],
+)
+def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple[str, str]]) -> None:
+    # The layout recorded a child's parent by column, so II-1's lone-parent sibship joined its other one: three full
+    # siblings where the IR has two half-sibships (review-set figure c09), or III-3 drawn as II-1 and II-2's. Each
+    # lone-parent mating now has a phantom partner, drawn as a marriage line to an omitted partner as the literature
+    # draws it, so each sibship drops from its own line.
+    svg = render.render_svg(_lone_parent_pedigree(with_mate))
+    drawn = set(re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)"', svg))
+    assert {s for s in drawn if s[1].startswith("III")} == sibships
+    omitted = re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg)
+    assert omitted == (["II-1"] if with_mate else ["II-1", "II-1"])
+    assert "ind-III-4" not in svg and svg.count('class="individual') == len(
+        _lone_parent_pedigree(with_mate).individuals
+    )
+
+
+def test_crossing_descents_turn_on_their_own_tracks() -> None:
+    # A fuzzed pedigree, minimised. The order puts II-2 x II-6 left of II-3 x II-4 but its twins right of their
+    # children, so the descents cross; the drops used to run along each other's bars at bar height and the row read
+    # as one family. Each now turns on its own elbow track above the bars, and II-2 x II-6's drop, which stands over
+    # II-3 x II-4's landing leg, turns on the higher track, so the two never run along one line.
+    svg = render.render_svg(test_render._load("crossing_descents"))
+    elbows = re.findall(r'<path d="M([-0-9.]+),[-0-9.]+L[-0-9.]+,([-0-9.]+)Q', svg)
+    assert len(elbows) == 2
+    (_, y_left), (_, y_right) = sorted((float(x), float(y)) for x, y in elbows)
+    assert y_left < y_right, "the drop standing over the other's landing leg turns higher"
+    # And it stands clear of III-1, the other family's child it would otherwise sit exactly above.
+    p = test_render._load("crossing_descents")
+    lay = render.layout(p)
+    x = {
+        (i.generation, i.index): lay.pos[lv][k]
+        for lv, row in enumerate(lay.nid)
+        for k, c in enumerate(row)
+        if c < len(p.individuals)
+        for i in [p.individuals[c]]
+    }
+    assert abs((x[(2, 2)] + x[(2, 6)]) / 2 - x[(3, 1)]) >= _layout2_mod._APART_CLEAR - _EPS
+
+
+def _twin_parent_pedigree(married: bool) -> pb.Pedigree:
+    """Twins II-1, II-2; II-1 has III-1 with II-3 (if ``married``, else alone) and a lone sibship III-2."""
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=woman),
+            pb.Individual(generation=2, index=2, gender=woman),
+            *([pb.Individual(generation=2, index=3, gender=man)] if married else []),
+            pb.Individual(generation=3, index=1, gender=man),
+            pb.Individual(generation=3, index=2, gender=man),
+        ]
+    )
+    top = p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2))
+    for k in (1, 2):
+        top.offspring.add(child=_pos(2, k), twin_group=1, twin_type=pb.ZYGOSITY_TYPE_MONOZYGOTIC)
+    first = p.matings.add(partner_a=_pos(2, 1))
+    if married:
+        first.partner_b.CopyFrom(_pos(2, 3))
+    first.offspring.add(child=_pos(3, 1))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 2))
+    return p
+
+
+@pytest.mark.parametrize(
+    ("married", "sibships"),
+    [(True, {("II-1 II-3", "III-1"), ("II-1", "III-2")}), (False, {("II-1", "III-1"), ("II-1", "III-2")})],
+)
+def test_a_twins_lone_sibship_draws_without_a_free_side(married: bool, sibships: set[tuple[str, str]]) -> None:
+    # A phantom partner takes one of the parent's two sides. A twin with a spouse has none free (co-twin, spouse),
+    # and a phantom there overflowed and deferred a shape that drew before. The phantom now goes only where a side
+    # is free; the other lone sibship drops from the parent's own centre, marked so drawing does not read it as the
+    # couple's.
+    svg = render.render_svg(_twin_parent_pedigree(married))
+    drawn = {
+        (" ".join(sorted(parents.split())), kids)
+        for parents, kids in re.findall(r'<g class="sibship" data-parents="([^"]*)" data-children="([^"]*)"', svg)
+    }
+    assert {s for s in drawn if s[1].startswith("III")} == sibships
+
+
+def test_a_drop_on_its_bar_by_rounding_draws_no_elbow() -> None:
+    # Label clearance gives separations whose midpoints land a fraction of the position quantum off the child, and
+    # a pixel tolerance read that as a miss: a zero-length elbow path that also opened the row pitch.
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(
+                generation=1,
+                index=1,
+                gender=man,
+                annotations=[pb.Annotation(text="xxxxx", type=pb.ANNOTATION_TYPE_GENOTYPE)],
+            ),
+            pb.Individual(
+                generation=1,
+                index=2,
+                gender=woman,
+                annotations=[pb.Annotation(text="yyyyyyyyy", type=pb.ANNOTATION_TYPE_GENOTYPE)],
+            ),
+            pb.Individual(generation=2, index=1, gender=man),
+        ]
+    )
+    p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2)).offspring.add(child=_pos(2, 1))
+    svg = render.render_svg(p)
+    assert "<path d=" not in svg
+    assert render.render_svg(p) == svg
