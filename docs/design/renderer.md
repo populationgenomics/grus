@@ -8,8 +8,8 @@ Implementable spec: `../plans/03-renderer-tier1.md`.
 
 Deterministic IR → SVG. Two parts: **layout** (assign each individual a generation row and an x position) and
 **drawing** (emit Bennett-standard symbols and connecting lines from that grid). No LLM. Layout is the v2 constraint
-model (ranks fixed, x from a deterministic solve over soft pedigree constraints, every relationship a routed edge — full
-spec in [`layout-v2.md`](layout-v2.md)); this doc summarises it and specifies the drawing.
+model (ranks fixed, x from a deterministic solve over soft pedigree constraints, every relationship an edge — full spec
+in [`layout-v2.md`](layout-v2.md)); this doc summarises it and specifies the drawing.
 
 ## Background
 
@@ -49,23 +49,22 @@ Full spec in [`layout-v2.md`](layout-v2.md); the shape drawing depends on:
    (dot's `mincross`), couples and twin groups kept contiguous as adjacency atoms (one partner of either twin may stand
    between two co-twins, so a twin with two partners keeps both marriages adjacent). A same-generation cross-lineage /
    loop marriage becomes an ordinary adjacent couple once ordering pulls each partner to its sibship end; an individual
-   with >2 matings keeps its two heaviest adjacencies and **routes** the rest.
+   with more partners than sides keeps its heaviest adjacencies and **routes** the rest, and a routed mating defers.
 1. **x-coordinate solve** — from the fixed order, one lexicographic linear program: every descent on its own sib bar,
    then centring (with a half-sibling hinge spreading at most `sib_gap`), then even spacing, then compactness, subject
    to hard non-overlap. Contiguity **blocks** (an ordinary couple, a twin group, a founder-sib run) are rigid, so they
    never split. The default backend (z3) solves over exact rationals, so positions are identical on every platform;
    HiGHS is an optional alternative. Non-overlap is always satisfiable in 1-D, so layout rarely fails.
-1. **Line routing** — from the `(level, x)` grid, draw symbols and connectors (below), including a routed orthogonal
-   polyline for each non-adjacent (overflow) mating.
+1. **Line routing** — from the `(level, x)` grid, draw symbols and connectors (below). Every drawn couple is adjacent; a
+   routed mating has no drawn form yet and defers.
 
 **Layout ↔ drawing interface** — per-level parallel arrays (kinship2's shape): for each level, `n` (cell count), `nid`
 (individual row index per column), `pos` (x), `fam` (parent-couple column on the level above), `spouse` (0 /
 adjacent-spouse / adjacent-spouse-with-double-line — the last set straight from the explicit `Mating.consanguineous`
 flag, never inferred), `twin_groups` (each drawn twin group by its members' columns, with its zygosity — by membership,
 since a partner may stand between co-twins), `childless` (0 / by-choice / infertility on the couple's left column, from
-`Mating.childlessness`), plus `founder_sibships` (parentless sib groups), `ghost_of` (a ghost cell → the real individual
-it duplicates), and `routed` (matings drawn as routed edges rather than adjacent straight lines). Drawing reads only
-these arrays.
+`Mating.childlessness`), plus `founder_sibships` (parentless sib groups), and `ghost_of` (a ghost cell → the real
+individual it duplicates). Drawing reads only these arrays.
 
 ### Drawing (Bennett symbols)
 
@@ -149,18 +148,17 @@ A figure is a *set* of pedigrees (`ir.md`), so `render_set_svg(PedigreeSet)` com
 `render_svg`: each pedigree is laid out and drawn unchanged, then the tiles are stacked vertically and titled by their
 `Pedigree.title`, each wrapped in a nested `<svg viewBox>` that carries its own coordinate system — so drawing stays
 byte-identical and single-pedigree goldens are untouched. A pedigree the layout **defers** (an interlocking loop, a
-child of two matings, a routed mating with offspring — see Deferred) degrades to a labelled dashed placeholder so the
-rest of the figure still renders rather than the whole figure failing; an empty set is a minimal canvas. v1 stacks
-vertically; a grid for many-family figures is a later refinement (slice 13).
+child of two matings, a routed mating — see Deferred) degrades to a labelled dashed placeholder so the rest of the
+figure still renders rather than the whole figure failing; an empty set is a minimal canvas. v1 stacks vertically; a
+grid for many-family figures is a later refinement (slice 13).
 
 ## Deferred
 
 Non-overlap and generation rank are the only hard constraints and non-overlap is always satisfiable in 1-D, so the
-constraint layout **rarely fails** — the worst case is an ugly-but-correct routed drawing, a strictly better contract
-than v1's "detect and defer". The shapes v1 deferred now draw: a **cousin marriage** (with or without siblings) is an
-ordinary adjacent doubled couple once ordering pulls each cousin to its sibship end; an **avuncular** join draws via the
-ghost; **boundary-bridge** two-lineage joins order adjacently; a **>2-mate** individual routes its overflow matings. The
-mechanism is in [`layout-v2.md`](layout-v2.md).
+constraint layout **rarely fails**. The shapes v1 deferred now draw: a **cousin marriage** (with or without siblings) is
+an ordinary adjacent doubled couple once ordering pulls each cousin to its sibship end; an **avuncular** join draws via
+the ghost; **boundary-bridge** two-lineage joins order adjacently; a **twin with two partners** stands one between the
+co-twins. The mechanism is in [`layout-v2.md`](layout-v2.md).
 
 The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placeholder — never a wrong drawing):
 
@@ -172,8 +170,9 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **A couple across generations** other than an avuncular join between two partners with drawn parents — a marry-in
   numbered on a different generation from their partner has no drawn form; it is deferred rather than moved onto the
   partner's row (`_rank`).
-- **A routed / overflow mating that *has* offspring** — descent from a non-adjacent parent pair is not yet drawn, so a
-  > 2-mate individual whose overflow mating bears children defers rather than mislay the descent (`_build`).
+- **A routed mating** — partners that cannot stand side by side: a third partner, or a twin whose sides are both taken
+  (a twin pair holds three partners). Its drawn form, a track over the row, read as a sibship
+  ([`layout-v2.md`](layout-v2.md), Alternatives considered), so it defers (`_layout2.layout`).
 - **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).

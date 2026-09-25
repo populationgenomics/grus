@@ -70,8 +70,9 @@ message Placement {
   repeated Row rows = 2;
   // Sibships whose parents are undrawn (a partnerless mating), hung from an implied stub.
   repeated FounderSibship founder_sibships = 3;
-  // Matings drawn as orthogonal edges because their partners are not adjacent (a >2-mate individual's overflow).
-  repeated RoutedMating routed = 4;
+  // Up to layout version 1: matings drawn as orthogonal edges because their partners are not adjacent. Not written
+  // since version 2, which defers a mating whose partners cannot stand side by side; a record that sets it is refused.
+  repeated RoutedMating routed = 4 [deprecated = true];
   // Each drawn twin group of two or more members. Since layout version 2 a partner may stand between co-twins, so
   // membership is stored rather than read from adjacent cells (Cell.twin_right, no longer written).
   repeated TwinGroup twin_groups = 5;

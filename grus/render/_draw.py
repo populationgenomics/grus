@@ -35,7 +35,7 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line), then ``hit`` — an invisible
   ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow when one is drawn: the one
   element a consumer needs for hover and click.
-* ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``, ``routed``,
+* ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
   (``sibship founder`` for a parentless hanger); a descent drawn across rows — children more than one
@@ -501,7 +501,6 @@ class _Draw:
         return [
             *self._gen_markers(),
             *self._matings(),
-            *self._routed_matings(),
             *self._descents(),
             *self._founder_sibships(),
             *self._ghost_links(),
@@ -573,49 +572,6 @@ class _Draw:
                 out.append(_hit_line(x1, y, x2, y))
                 out.append("</g>")
         return out
-
-    def _routed_matings(self) -> list[str]:
-        """Orthogonal routed edge for each mating whose partners are not adjacent (layout v2, Stage C).
-
-        A >2-mate individual can keep only two 1-D neighbours, so a third mating's partner sits non-adjacent on
-        the same row (``Layout.routed``). The edge leaves each partner's top edge, rises to a clear horizontal
-        track *above* the row, and drops to the other partner — so it passes over any symbols between the
-        partners without touching one (the track clears every symbol top; the vertical legs sit at the partner
-        columns and only meet their own partner at its top edge). Consanguinity doubles the track. Several
-        routed edges on one row stagger by ``routed_track_gap`` (ordered by ``(min col, max col)``) so they
-        never coincide — deterministic. Descent from a routed mating is not drawn (Stage C routes only
-        childless matings; a routed mating with offspring falls back to v1 upstream).
-        """
-        out: list[str] = []
-        by_row: dict[int, list[_layout.RoutedMating]] = collections.defaultdict(list)
-        for rm in self.lay.routed:
-            by_row[rm.a[0]].append(rm)
-        for level in sorted(by_row):
-            ordered = sorted(by_row[level], key=lambda rm: (min(rm.a[1], rm.b[1]), max(rm.a[1], rm.b[1])))
-            for track, rm in enumerate(ordered):
-                classes = ["mating", "routed"] + (["consanguineous"] if rm.consanguineous else [])
-                partners = f"{self._cell_position(*rm.a)} {self._cell_position(*rm.b)}"
-                out.append(_open_g(classes, {"data-partners": partners}))
-                out += self._routed_edge(rm, track)
-                out.append("</g>")
-        return out
-
-    def _routed_edge(self, rm: _layout.RoutedMating, track: int) -> list[str]:
-        la, ka = rm.a
-        lb, kb = rm.b
-        xl, xr = sorted((self.px(self.lay.pos[la][ka]), self.px(self.lay.pos[lb][kb])))
-        y_top = self.py(la) - self.half  # both partners share the row; leave from the symbol top edge
-        track_y = y_top - self.geom.routed_stub - track * self.geom.routed_track_gap
-
-        def path(s: float) -> str:
-            # s offsets the whole orthogonal path outward (double line): legs out by s, track up by s.
-            return _polyline([(xl - s, y_top), (xl - s, track_y - s), (xr + s, track_y - s), (xr + s, y_top)])
-
-        hit = _hit_polyline([(xl, y_top), (xl, track_y), (xr, track_y), (xr, y_top)])
-        if rm.consanguineous:
-            d = self.geom.double_line_offset / 2
-            return [path(d), path(-d), hit]
-        return [path(0.0), hit]
 
     def _childless_glyph(self, level: int, k: int, kind: int) -> list[str]:
         """Bennett childless glyph under the couple at cells ``k, k+1``.
@@ -1153,11 +1109,6 @@ def _hit_line(x1: float, y1: float, x2: float, y2: float) -> str:
     )
 
 
-def _polyline(points: list[tuple[float, float]]) -> str:
-    pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in points)
-    return f'<polyline points="{pts}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}"/>'
-
-
 def _rounded_path(points: list[tuple[float, float]], radius: float) -> str:
     """An orthogonal polyline whose interior corners are rounded, so the direction of every turn reads at a glance.
 
@@ -1177,14 +1128,6 @@ def _toward(x: float, y: float, tx: float, ty: float, r: float) -> tuple[float, 
     """The point ``r`` from ``(x, y)`` toward ``(tx, ty)``."""
     length = math.hypot(tx - x, ty - y)
     return (x, y) if length == 0 else (x + (tx - x) * r / length, y + (ty - y) * r / length)
-
-
-def _hit_polyline(points: list[tuple[float, float]]) -> str:
-    pts = " ".join(f"{_num(x)},{_num(y)}" for x, y in points)
-    return (
-        f'<polyline class="hit" points="{pts}" fill="none" stroke="none" stroke-width="{_num(_HIT_STROKE)}" '
-        f'pointer-events="stroke"/>'
-    )
 
 
 def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "", anchor: str = "middle") -> str:

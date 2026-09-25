@@ -19,9 +19,9 @@ loop visits is chosen with torn sibships ranked first, so an untorn order it rea
 crossings (the exact search ranks crossings first; ``_exact_ranks`` says why). The moves themselves are priced by
 crossings: pricing them by tears first traded crossings without limit (a tear-free order with dozens of crossings)
 and cut searches short on shapes that were already clean.
-An individual needing more than two 1-D neighbours (>2 matings) overflows: the two highest-weight matings stay
-adjacent, the rest are **routed** (recorded in ``Ordering.routed`` for Stage C; Stage B still defers routed shapes as v1
-does). Determinism is bit-exact: no RNG, sorted integer/identity iteration, a fixed pass count, ``best``
+An individual needing more than two 1-D neighbours (>2 matings, or a twin whose sides are taken) overflows: the
+highest-weight matings stay adjacent, the rest are **routed** (recorded in ``Ordering.routed``; the layout defers a
+pedigree with any). Determinism is bit-exact: no RNG, sorted integer/identity iteration, a fixed pass count, ``best``
 replaced only on strict improvement, and a four-level IR-derived tie-break whose ultimate backstop is the
 individuals' stable ``(generation, index)`` identity (NOT their post-shuffle row index — so the order is
 invariant to a shuffle of the input, the strongest determinism guarantee).
@@ -47,8 +47,8 @@ class Ordering:
 
     Attributes:
         ranks: ``ranks[L]`` — individual indices on generation rank ``L``, left to right.
-        routed: mating indices demoted to routed edges (an individual's overflow matings). Empty for tier-1
-            and the boundary-bridge joins; non-empty shapes still defer in Stage B (Stage C draws the routes).
+        routed: mating indices whose partners cannot stand side by side (an individual's overflow matings). Empty
+            for every shape the layout draws; ``_layout2.layout`` defers on any.
     """
 
     ranks: list[list[int]]

@@ -123,9 +123,9 @@ The groups, and what each promises:
   and a `ghost-` id (with an ordinal suffix when one individual is ghosted more than once), so selecting by position
   lights both, selecting by id lights one, and `.individual:not(.ghost)` counts drawn symbols (a count-collapsed one
   stands for several people).
-- **`mating`** — the line or double line between an adjacent couple, a routed edge for an overflow mating, or the
-  childless glyph. It names both partners' positions and carries `consanguineous`, `routed` and the childlessness kind
-  as classes. A lone parent's line to an omitted partner is a `mating partner-omitted` group naming the one parent.
+- **`mating`** — the line or double line between an adjacent couple, or the childless glyph. It names both partners'
+  positions and carries `consanguineous` and the childlessness kind as classes. A lone parent's line to an omitted
+  partner is a `mating partner-omitted` group naming the one parent.
 - **`sibship`** — a descent drop (a `path` when it turns at an elbow), sib bar, child stubs and any twin bar, as one
   group naming the parent couple's positions (or the single parent's); a founder sibship's hanger is a `sibship founder`
   group with no parents. When the children are drawn more than one row below their parents, the one group also holds the

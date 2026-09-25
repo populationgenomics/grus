@@ -647,10 +647,8 @@ def test_more_than_two_matings_is_deferred() -> None:
             ),
         ],
     )
-    # A >2-mate individual routes its overflow mating (design), but routing a mating that HAS offspring is not
-    # yet drawn — its child's descent hangs from a non-adjacent parent pair, which _build cannot express — so
-    # this shape (every mating bears a child) still defers rather than mislay the descent out.
-    with pytest.raises(render.DeferredFeatureError, match="not an adjacent couple"):
+    # A >2-mate individual's third mating cannot stand beside it; a routed mating is not drawn, so this defers.
+    with pytest.raises(render.DeferredFeatureError, match="1-1 x 1-4 cannot stand side by side"):
         render.layout(p)
 
 

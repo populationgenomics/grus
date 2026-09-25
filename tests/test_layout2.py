@@ -198,36 +198,7 @@ def test_pos_is_quantised(name: str) -> None:
             assert x == round(x, _POS_QUANTUM), f"pos {x!r} is not on the 1e-{_POS_QUANTUM} grid"
 
 
-# --- routing (>2-mate overflow) ---------------------------------------------------------------------------
-
-# All axis-aligned symbol / connector geometry needed to check a routed edge never crosses a symbol.
-_RECT_RE = re.compile(r'<rect x="([-0-9.]+)" y="([-0-9.]+)" width="([-0-9.]+)" height="([-0-9.]+)"')
-_CIRCLE_RE = re.compile(r'<circle cx="([-0-9.]+)" cy="([-0-9.]+)" r="([-0-9.]+)"')
-_POLYGON_RE = re.compile(r'<polygon points="([^"]+)"')
-_POLYLINE_RE = re.compile(r'<polyline points="([^"]+)"')
-
-
-def _symbol_boxes(svg: str) -> list[tuple[float, float, float, float]]:
-    """Every symbol's axis-aligned bounding box ``(x0, y0, x1, y1)`` — square, circle, or diamond."""
-    boxes: list[tuple[float, float, float, float]] = []
-    for x, y, w, h in _RECT_RE.findall(svg):
-        boxes.append((float(x), float(y), float(x) + float(w), float(y) + float(h)))
-    for cx, cy, r in _CIRCLE_RE.findall(svg):
-        boxes.append((float(cx) - float(r), float(cy) - float(r), float(cx) + float(r), float(cy) + float(r)))
-    for pts in _POLYGON_RE.findall(svg):
-        xs = [float(p.split(",")[0]) for p in pts.split()]
-        ys = [float(p.split(",")[1]) for p in pts.split()]
-        boxes.append((min(xs), min(ys), max(xs), max(ys)))
-    return boxes
-
-
-def _routed_segments(svg: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
-    """Each straight segment of every routed ``<polyline>`` in the SVG."""
-    segs: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    for poly in _POLYLINE_RE.findall(svg):
-        pts = [(float(p.split(",")[0]), float(p.split(",")[1])) for p in poly.split()]
-        segs += list(itertools.pairwise(pts))
-    return segs
+# --- overflow (more partners than sides) ------------------------------------------------------------------
 
 
 def _overflow_pedigree() -> pb.Pedigree:
@@ -245,62 +216,48 @@ def _overflow_pedigree() -> pb.Pedigree:
     return p
 
 
-def _routed_idents(p: pb.Pedigree, lay: object) -> list[tuple[bool, frozenset[tuple[int, int]]]]:
-    """Each routed mating as ``(consanguineous, {partner identities})`` — independent of row indexing."""
-    out: list[tuple[bool, frozenset[tuple[int, int]]]] = []
-    for rm in lay.routed:  # type: ignore[attr-defined]
-        (la, ka), (lb, kb) = rm.a, rm.b
-        ends = {
-            (p.individuals[lay.nid[la][ka]].generation, p.individuals[lay.nid[la][ka]].index),  # type: ignore[attr-defined]
-            (p.individuals[lay.nid[lb][kb]].generation, p.individuals[lay.nid[lb][kb]].index),  # type: ignore[attr-defined]
-        }
-        out.append((rm.consanguineous, frozenset(ends)))
-    return sorted(out, key=repr)
+def _overflow_reason(p: pb.Pedigree) -> str:
+    with pytest.raises(render.DeferredFeatureError) as deferred:
+        render.layout(p)
+    return str(deferred.value)
 
 
-def test_overflow_routes_the_third_mating() -> None:
-    # A >2-mate individual keeps its two heaviest adjacencies; the third (lightest, childless) mating becomes a
-    # routed edge on the Layout seam — no multi-mate DeferredFeatureError (v1 deferred every >2-mate shape).
+def test_an_overflow_mating_defers() -> None:
+    # A >2-mate individual keeps its two heaviest adjacencies; the third (lightest, childless) mating's partners cannot
+    # stand side by side. It drew as a track over the row, which reads as a sibship, so the pedigree defers instead.
     p = _overflow_pedigree()
     g = _prepared(p)
-    routed = _ordering_mod.order(g, _layout_mod._cross_matings(g)).routed
-    assert len(routed) == 1  # the single lightest (childless) mating routes; two heavier stay adjacent
-    lay = render.layout(p)  # draws — no raise
-    assert len(lay.routed) == 1
-    rm = lay.routed[0]
-    # the routed partners (I-2 hinge and I-4) are non-adjacent columns on the same rank
-    assert rm.a[0] == rm.b[0] and abs(rm.a[1] - rm.b[1]) >= 2
-    assert rm.children == ()  # childless
-    # every non-routed mating still draws as an adjacent couple
-    at, idx = test_render._coords(lay), test_render._index(p)
-    for m in p.matings[:2]:
-        a, b = at[idx[test_render._pos(m.partner_a)]], at[idx[test_render._pos(m.partner_b)]]
-        assert a[0] == b[0] and abs(a[1] - b[1]) == 1
+    assert len(_ordering_mod.order(g, _layout_mod._cross_matings(g)).routed) == 1
+    assert "the partners of 1-2 x 1-4 cannot stand side by side" in _overflow_reason(p)
+    assert 'class="pedigree deferred"' in render.render_set_svg(pb.PedigreeSet(pedigrees=[p]))
 
 
-def test_overflow_renders_a_routed_polyline_clear_of_symbols() -> None:
-    svg = render.render_svg(_overflow_pedigree())
-    segs = _routed_segments(svg)
-    assert segs, "the routed third mating must draw as a polyline"
-    boxes = _symbol_boxes(svg)
-    for (x1, y1), (x2, y2) in segs:
-        lo_x, hi_x, lo_y, hi_y = min(x1, x2), max(x1, x2), min(y1, y2), max(y1, y2)
-        for bx0, by0, bx1, by1 in boxes:
-            ox = min(hi_x, bx1) - max(lo_x, bx0)
-            oy = min(hi_y, by1) - max(lo_y, by0)
-            assert not (ox > _EPS and oy > _EPS), "a routed segment passes through a symbol"
+def test_a_twin_pair_with_four_partners_defers() -> None:
+    # A twin pair has three places for partners (each outer side and the one gap), so a fourth mating overflows.
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    dz = pb.ZYGOSITY_TYPE_DIZYGOTIC
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+        ]
+    )
+    p.individuals.extend(pb.Individual(generation=2, index=k, gender=woman if k < 3 else man) for k in range(1, 7))
+    p.matings.add(
+        partner_a=_pos(1, 1),
+        partner_b=_pos(1, 2),
+        offspring=[pb.Offspring(child=_pos(2, k), twin_group=1, twin_type=dz) for k in (1, 2)],
+    )
+    for twin, partner in ((1, 3), (1, 4), (2, 5), (2, 6)):
+        p.matings.add(partner_a=_pos(2, twin), partner_b=_pos(2, partner))
+    assert "cannot stand side by side" in _overflow_reason(p)
 
 
 def test_overflow_is_deterministic_and_shuffle_invariant() -> None:
     p = _overflow_pedigree()
-    assert render.layout(p) == render.layout(p)  # run-to-run identical
-    ref_rows = _ident_rows(p, render.layout(p).nid)
-    ref_routed = _routed_idents(p, render.layout(p))
+    ref = _overflow_reason(p)
     for seed in range(4):
-        q = _shuffled(p, seed)
-        lay = render.layout(q)
-        assert _ident_rows(q, lay.nid) == ref_rows
-        assert _routed_idents(q, lay) == ref_routed  # the routed mating is the same by identity, whatever the order
+        assert _overflow_reason(_shuffled(p, seed)) == ref  # the same mating defers by identity, whatever the order
 
 
 def test_cousin_marriage_draws_as_adjacent_consanguineous_couple() -> None:
@@ -308,7 +265,6 @@ def test_cousin_marriage_draws_as_adjacent_consanguineous_couple() -> None:
     # end, so the loop mating is an ordinary ADJACENT consanguineous couple — no routing, no deferral.
     p = _load_pair("c05")
     lay = render.layout(p)
-    assert lay.routed == []  # drawn straight, not routed
     at, idx = test_render._coords(lay), test_render._index(p)
     consang = [m for m in p.matings if m.consanguineous]
     assert consang, "c05 has consanguineous matings"
@@ -326,7 +282,6 @@ def test_avuncular_marriage_draws_via_the_ghost() -> None:
     p = _load_pair("c18")
     lay = render.layout(p)
     assert lay.ghost_of, "avuncular join is drawn via the ghost duplication"
-    assert lay.routed == []  # not (yet) a routed cross-rank edge
     render.render_svg(p)  # renders without raising
 
 
@@ -522,9 +477,9 @@ def test_couple_across_generations_defers() -> None:
         render.layout(p)
 
 
-def test_deferral_names_the_descent_not_a_passthrough() -> None:
+def test_deferral_names_the_partners_not_a_passthrough() -> None:
     # I-1's third mating overflows (routed), and its child is drawn a row lower: the deferral names the real
-    # child, not the synthetic pass-through carrying its descent.
+    # partners, not the synthetic pass-through carrying the descent.
     i = test_render._ind
     p = pb.Pedigree(
         individuals=[i(1, 1), i(1, 2), i(1, 3), i(1, 4), i(2, 1), i(2, 2), i(3, 1)],
@@ -541,8 +496,7 @@ def test_deferral_names_the_descent_not_a_passthrough() -> None:
             )
         ],
     )
-    with pytest.raises(render.DeferredFeatureError, match="'descent to 3-1'"):
-        render.layout(p)
+    assert "the partners of 1-1 x 1-4 cannot stand side by side" in _overflow_reason(p)
 
 
 def _married_twin(older: bool) -> pb.Pedigree:
@@ -570,8 +524,7 @@ def test_cousins_across_a_family_move_it_aside() -> None:
     # order that put III-2 inside III-3/III-4's sibship (one crossing) and the layout deferred it as torn. Sibship
     # contiguity is strong and crossings weak, so the ordering now ranks torn sibships first and moves II-2's
     # family to the end instead.
-    lay = render.layout(test_render._load("cousins_across_family"))
-    assert lay.routed == []
+    render.layout(test_render._load("cousins_across_family"))  # draws, torn nowhere
 
 
 def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
@@ -865,41 +818,27 @@ def test_facing_seeds_do_not_depend_on_input_order() -> None:
 
 
 def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
-    # I-1 has three childless partners, one more than a row has sides for, so one mating routes. The tie between
-    # equally weighted matings broke on input position, so shuffling Pedigree.matings changed which partner stood
-    # apart; it now breaks on the matings' identity.
+    # I-1 has three childless partners, one more than a row has sides for, so one mating routes and the pedigree
+    # defers. The tie between equally weighted matings broke on input position, so shuffling Pedigree.matings changed
+    # which partner stood apart; it now breaks on the matings' identity.
     man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
     p = pb.Pedigree(individuals=[pb.Individual(generation=1, index=1, gender=man)])
     for k in (2, 3, 4):
         p.individuals.add(generation=1, index=k, gender=woman)
         p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, k))
-
-    def routed(q: pb.Pedigree) -> set[tuple[int, int]]:
-        lay = render.layout(q)
-        cells = {(lv, k): q.individuals[i] for lv, row in enumerate(lay.nid) for k, i in enumerate(row)}
-        return {
-            (cells[end].generation, cells[end].index)
-            for rm in lay.routed
-            for end in (rm.a, rm.b)
-            if cells[end].index != 1
-        }
-
-    ref = routed(p)
-    assert len(ref) == 1
+    ref = _overflow_reason(p)
+    assert "the partners of 1-1 x 1-4 cannot" in ref
     for seed in range(8):
-        assert routed(_shuffled(p, seed)) == ref
+        assert _overflow_reason(_shuffled(p, seed)) == ref
 
 
-def test_founder_sibships_and_routes_are_listed_in_layout_order() -> None:
-    # Both lists are drawn in order, so an order taken from the input's matings would reorder the SVG under a shuffle.
-    for p in (test_render._load("founder_sibship_marry_in"), _overflow_pedigree()):
-        lay = render.layout(p)
-        assert lay.founder_sibships == sorted(lay.founder_sibships)
-        assert lay.routed == sorted(lay.routed, key=lambda rm: (rm.a, rm.b))
-        for seed in range(4):
-            shuffled = render.layout(_shuffled(p, seed))
-            assert shuffled.founder_sibships == lay.founder_sibships
-            assert [(rm.a, rm.b) for rm in shuffled.routed] == [(rm.a, rm.b) for rm in lay.routed]
+def test_founder_sibships_are_listed_in_layout_order() -> None:
+    # The list is drawn in order, so an order taken from the input's matings would reorder the SVG under a shuffle.
+    p = test_render._load("founder_sibship_marry_in")
+    lay = render.layout(p)
+    assert lay.founder_sibships == sorted(lay.founder_sibships)
+    for seed in range(4):
+        assert render.layout(_shuffled(p, seed)).founder_sibships == lay.founder_sibships
 
 
 def _ghost_ind(g: int, i: int, gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
@@ -974,11 +913,25 @@ GHOST_PEDIGREES = {
     "niece_two_uncles_children": _niece_two_uncles(with_children=True),
     "uncle_niece_twice": _uncle_niece_twice(),
     "uncle_niece_with_and_without_children": _uncle_niece_repeated(((4, 1),), ()),
-    "uncle_niece_three_times": _uncle_niece_repeated(((4, 1),), ((4, 2),), ()),
     "uncle_niece_childless_twice": _uncle_niece_repeated(
         (), (), childless=(pb.CHILDLESSNESS_BY_CHOICE, pb.CHILDLESSNESS_INFERTILITY)
     ),
 }
+
+
+def test_a_third_avuncular_marriage_defers_by_identity() -> None:
+    # The niece's three marriages to her uncle each get a ghost beside her, one more than she has sides for. Which one
+    # overflows breaks on the ghosts' identity, so every mating order defers naming the same childless marriage.
+    p = _uncle_niece_repeated(((4, 1),), ((4, 2),), ())
+    reasons = set()
+    for perm in itertools.permutations(p.matings):
+        q = pb.Pedigree()
+        q.CopyFrom(p)
+        del q.matings[:]
+        q.matings.extend(perm)
+        reasons.add(_overflow_reason(q))
+    assert len(reasons) == 1
+    assert "3-1 x 2-1 cannot stand side by side" in reasons.pop()
 
 
 @pytest.mark.parametrize("name", sorted(GHOST_PEDIGREES))
@@ -1087,7 +1040,6 @@ def test_a_partner_stands_between_co_twins(name: str, row: list[str]) -> None:
     assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == row
     (group,) = lay.twin_groups
     assert group.level == 1 and group.columns[1] - group.columns[0] == 2
-    assert lay.routed == []
     svg = render.render_svg(p)
     assert svg.count('class="mating') == len(p.matings)
 
@@ -1120,4 +1072,3 @@ def test_a_born_in_partner_does_not_stand_between_co_twins() -> None:
     (group,) = lay.twin_groups
     between = lay.nid[1][group.columns[0] + 1]
     assert (p.individuals[between].generation, p.individuals[between].index) == (2, 4)
-    assert lay.routed == []

@@ -47,41 +47,14 @@ class DeferredFeatureError(Exception):
     """The IR uses a topology the layout deliberately does not draw — surfaced, not mislaid out.
 
     The v2 constraint layout draws far more than v1 did (loops that close on a single cross-mating,
-    >2-mate individuals via routed edges, two-lineage joins brought adjacent by the ordering), so the
+    two-lineage joins brought adjacent by the ordering, a partner standing between co-twins), so the
     residual deferral set is small: an interlocking consanguinity loop (a cycle that survives excluding the
     cross-lineage joins — ``_detect_loops``); an individual who is a child of more than one mating
     (``_derive``); a couple whose partners are on different generations other than an avuncular join between
-    two born-in partners, which draws via the ghost (``_rank``); an order ``_build`` cannot express (a routed
-    or overflow mating that *has* offspring — descent from a non-adjacent parent pair); and a torn sibship
-    whose descent bars would overlap. The IR still round-trips; the gap is meant to surface in the eval diff
-    rather than a wrong drawing.
+    two born-in partners, which draws via the ghost (``_rank``); a routed mating, whose partners cannot stand
+    side by side (``_layout2.layout``); and a torn sibship whose descent bars would overlap. The IR still
+    round-trips; the gap is meant to surface in the eval diff rather than a wrong drawing.
     """
-
-
-@dataclass(frozen=True)
-class RoutedMating:
-    """A mating drawn as a routed orthogonal polyline, not a straight adjacent line (layout v2, Stage C).
-
-    A mating whose partners are not adjacent same-rank cells cannot be expressed by ``spouse`` (which flags
-    only an adjacent couple ``k, k+1``); it is carried here instead, in cell coordinates, so drawing can route
-    an edge between the partners without re-deriving adjacency. ``Layout.routed`` is empty for v1 and for every
-    adjacency-drawable shape, so v1 output — and any pedigree without a routed mating — is unchanged.
-
-    Attributes:
-        a: ``(level, column)`` of one partner.
-        b: ``(level, column)`` of the other partner (same ``level`` as ``a`` for a same-rank routed mating —
-            an overflow >2-mate connector; a cross-rank avuncular join is still handled by the ``ghost``).
-        consanguineous: draw the routed edge doubled.
-        children: each child's ``(level, column)`` — empty for a childless routed mating. Stage C routes only
-            childless matings (the >2-mate overflow case); a routed mating *with* offspring still defers, so
-            ``children`` is presently always empty. Kept on the seam so a later stage can drop descent from
-            the routed edge's midpoint without another seam change.
-    """
-
-    a: tuple[int, int]
-    b: tuple[int, int]
-    consanguineous: bool
-    children: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True, order=True)
@@ -135,10 +108,6 @@ class Layout:
             Drawing hangs these from an implied hanger stub with a sib bar and no parent cells (they carry no
             ``fam`` entry). ``columns`` are cell columns on ``level``, left to right; the list is in ``(level,
             columns)`` order. Empty when none.
-        routed: matings drawn as routed edges rather than adjacent straight lines (a >2-mate individual's
-            overflow mating — the partners cannot both be its neighbour). Empty for v1 and for every
-            adjacency-drawable shape, so it never perturbs existing output. In ``(a, b)`` order. See
-            ``RoutedMating``.
         first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
             ``first_generation + L``. Rows between the first and last generation are kept even when empty
             (a detached branch several generations down).
@@ -166,7 +135,6 @@ class Layout:
     childless: list[list[int]] = field(default_factory=list)
     ghost_of: dict[int, int] = field(default_factory=dict)
     founder_sibships: list[tuple[int, tuple[int, ...]]] = field(default_factory=list)
-    routed: list[RoutedMating] = field(default_factory=list)
     first_generation: int = 1
     passthrough: frozenset[int] = frozenset()
     phantom: frozenset[int] = frozenset()
@@ -310,6 +278,9 @@ class _Graph:
             return f"descent to {self.label(self.passthrough_to[i])}"
         if i in self.phantom_of:
             return f"omitted partner of {self.label(self.phantom_of[i])}"
+        if i in self.ghost_key:  # a duplicate is drawn as, and named by, the real individual
+            generation, index = self.ghost_key[i].real
+            return f"{generation}-{index}"
         ind = self.individuals[i]
         return f"{ind.generation}-{ind.index}"
 
@@ -769,8 +740,8 @@ def _build(
                 ca, cb = colof[pa], colof[pb]
                 if g.level[pa] != level - 1 or g.level[pb] != level - 1 or abs(ca - cb) != 1:
                     # the order cannot express this child's descent: its parents are not an adjacent couple on
-                    # the row above (a routed / >2-mate overflow mating that has offspring). Defer — descent
-                    # from a non-adjacent parent pair is drawn by a later stage.
+                    # the row above. The layout defers every routed mating before this, so it guards a stored
+                    # order; descent from a non-adjacent parent pair has no drawn form.
                     raise DeferredFeatureError(f"parents of {g.label(i)!r} are not an adjacent couple on the row above")
                 fam[level][k] = min(ca, cb)
 
