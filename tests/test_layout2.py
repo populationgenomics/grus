@@ -944,10 +944,37 @@ def _uncle_niece_twice() -> pb.Pedigree:
     return pb.Pedigree(individuals=people, matings=matings)
 
 
+def _uncle_niece_repeated(*children: tuple[tuple[int, int], ...], childless: tuple[int, ...] = ()) -> pb.Pedigree:
+    """Uncle II-1 and niece III-1 with one mating per entry of ``children`` (``()`` for a childless one).
+
+    ``childless`` gives each childless mating's ``Childlessness``; the second of them lists the niece as ``partner_a``,
+    so only the partner order and the childlessness tell the repeats apart.
+    """
+    woman = pb.GENDER_WOMAN
+    people = [_ghost_ind(1, 1), _ghost_ind(1, 2, woman), _ghost_ind(2, 1), _ghost_ind(2, 2), _ghost_ind(2, 3, woman)]
+    people += [_ghost_ind(3, 1, woman)] + [_ghost_ind(g, i) for kids in children for g, i in kids]
+    matings = [_ghost_mating((1, 1), (1, 2), (2, 1), (2, 2)), _ghost_mating((2, 2), (2, 3), (3, 1))]
+    reasons = iter(childless)
+    for kids in children:
+        m = _ghost_mating((2, 1), (3, 1), *kids, consang=True)
+        if not kids and (reason := next(reasons, None)) is not None:
+            m.childlessness = reason  # type: ignore[assignment]
+            if reason == pb.CHILDLESSNESS_INFERTILITY:
+                m.partner_a.CopyFrom(pb.Position(generation=3, index=1))
+                m.partner_b.CopyFrom(pb.Position(generation=2, index=1))
+        matings.append(m)
+    return pb.Pedigree(individuals=people, matings=matings)
+
+
 GHOST_PEDIGREES = {
     "niece_two_uncles": _niece_two_uncles(with_children=False),
     "niece_two_uncles_children": _niece_two_uncles(with_children=True),
     "uncle_niece_twice": _uncle_niece_twice(),
+    "uncle_niece_with_and_without_children": _uncle_niece_repeated(((4, 1),), ()),
+    "uncle_niece_three_times": _uncle_niece_repeated(((4, 1),), ((4, 2),), ()),
+    "uncle_niece_childless_twice": _uncle_niece_repeated(
+        (), (), childless=(pb.CHILDLESSNESS_BY_CHOICE, pb.CHILDLESSNESS_INFERTILITY)
+    ),
 }
 
 
@@ -963,6 +990,25 @@ def test_ghost_drawing_is_independent_of_mating_order(name: str) -> None:
         q.CopyFrom(p)
         del q.matings[:]
         q.matings.extend(perm)
+        svgs.add(render.render_svg(q))
+    assert len(svgs) == 1
+
+
+@pytest.mark.parametrize("name", sorted(GHOST_PEDIGREES))
+def test_ghost_drawing_is_independent_of_partner_order(name: str) -> None:
+    # Which partner a mating lists first is not meaning: every combination of swapped partners draws the same bytes.
+    p = GHOST_PEDIGREES[name]
+    couples = [k for k, m in enumerate(p.matings) if m.HasField("partner_b")]
+    svgs = set()
+    for flips in itertools.product((False, True), repeat=len(couples)):
+        q = pb.Pedigree()
+        q.CopyFrom(p)
+        for k, flip in zip(couples, flips, strict=True):
+            if flip:
+                a = pb.Position()
+                a.CopyFrom(q.matings[k].partner_a)
+                q.matings[k].partner_a.CopyFrom(q.matings[k].partner_b)
+                q.matings[k].partner_b.CopyFrom(a)
         svgs.add(render.render_svg(q))
     assert len(svgs) == 1
 

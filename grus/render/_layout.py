@@ -238,15 +238,20 @@ class GhostKey:
     Attributes:
         real: ``(generation, index)`` of the real individual the ghost duplicates.
         partner: ``(generation, index)`` of the partner it marries.
-        first_child: ``(generation, index)`` of the join's first child; ``None`` for a childless join.
+        first_child: ``(generation, index)`` of the join's first child; ``NO_CHILD`` for a childless join, so keys
+            stay totally ordered.
         occurrence: 0, or the rank among joins agreeing on the fields above (repeated matings of one pair, told
-            apart by their content; content-identical ones are interchangeable).
+            apart by their content with the partners' order ignored; content-identical ones are interchangeable).
     """
 
     real: Key
     partner: Key
-    first_child: Key | None
+    first_child: Key
     occurrence: int
+
+
+NO_CHILD: Key = (0, 0)
+"""``GhostKey.first_child`` of a childless join: below every ``Position``, whose components are >= 1."""
 
 
 @dataclass
@@ -487,20 +492,29 @@ def _ghost_keys(g: _Graph, pedigree: pb.Pedigree, joins: list[tuple[int, _Mating
         ind = g.individuals[i]
         return (ind.generation, ind.index)
 
-    base: dict[int, tuple[Key, Key, Key | None]] = {}
+    base: dict[int, tuple[Key, Key, Key]] = {}
     for mi, mr, shallow, deep in joins:
-        first = pos(mr.offspring[0].child) if mr.offspring else None
+        first = pos(mr.offspring[0].child) if mr.offspring else NO_CHILD
         base[mi] = (pos(shallow), pos(deep), first)
-    groups: dict[tuple[Key, Key, Key | None], list[int]] = {}
+    groups: dict[tuple[Key, Key, Key], list[int]] = {}
     for mi, b in base.items():
         groups.setdefault(b, []).append(mi)
     out: dict[int, GhostKey] = {}
     for b, mis in groups.items():
         # Content-identical repeats tie here; they are interchangeable, so either rank draws the same figure.
-        mis.sort(key=lambda mi: pedigree.matings[mi].SerializeToString(deterministic=True))
+        mis.sort(key=lambda mi: _content_without_partners(pedigree.matings[mi]))
         for occurrence, mi in enumerate(mis):
             out[mi] = GhostKey(*b, occurrence)
     return out
+
+
+def _content_without_partners(m: pb.Mating) -> bytes:
+    """A mating's content, independent of which partner is ``partner_a``; the pair is the same across one group."""
+    rest = pb.Mating()
+    rest.CopyFrom(m)
+    rest.ClearField("partner_a")
+    rest.ClearField("partner_b")
+    return rest.SerializeToString(deterministic=True)
 
 
 def _rank(g: _Graph) -> int:

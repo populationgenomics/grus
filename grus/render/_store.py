@@ -25,7 +25,7 @@ LAYOUT_VERSION = 1
 # pass-through per row, all keyed by the same first child.
 _CellKey = tuple[str, *tuple[int, ...]]
 
-_NO_CHILD = (0, 0)  # a childless ghost's first-child slot in its key (no Position is (0, 0))
+_NO_CHILD = _layout.NO_CHILD  # a childless ghost's first-child slot in its key
 _XSOLVER = {_xsolve.XSolver.Z3: lpb.X_SOLVER_Z3, _xsolve.XSolver.HIGHS: lpb.X_SOLVER_HIGHS}
 _COUPLE_LINE = {1: lpb.COUPLE_LINE_SINGLE, 2: lpb.COUPLE_LINE_DOUBLE}
 _SPOUSE = {v: k for k, v in _COUPLE_LINE.items()}
@@ -294,7 +294,7 @@ def _cell_keys(p: pb.Pedigree, prep: _layout2._Prepared) -> dict[int, _CellKey]:
     keys: dict[int, _CellKey] = {i: ("individual", *_pos(p.individuals[i])) for i in range(n)}
     for ghost in prep.ghost_of:
         gk = g.ghost_key[ghost]
-        keys[ghost] = ("ghost", *gk.real, *gk.partner, *(gk.first_child or _NO_CHILD), gk.occurrence)
+        keys[ghost] = ("ghost", *gk.real, *gk.partner, *gk.first_child, gk.occurrence)
     for cell in prep.phantom:
         parent = g.phantom_of[cell]
         (mating,) = g.matings_of[cell]
