@@ -551,3 +551,29 @@ def test_married_twin_keeps_birth_order(older: bool, expected: list[str]) -> Non
     p = _married_twin(older)
     lay = render.layout(p)
     assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == expected
+
+
+def test_cousins_across_a_family_move_it_aside() -> None:
+    # II-1's and II-3's children marry; II-2's family stands between them. The crossing-only ordering reached an
+    # order that put III-2 inside III-3/III-4's sibship (one crossing) and the layout deferred it as torn. Sibship
+    # contiguity is strong and crossings weak, so the ordering now ranks torn sibships first and moves II-2's
+    # family to the end instead.
+    lay = render.layout(test_render._load("cousins_across_family"))
+    assert lay.routed == []
+
+
+def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
+    # Twins II-1 and II-2 both marry, a spouse-twin-twin-spouse chain that starts in birth order. II-1's daughter
+    # marries II-3's son, so II-1 must stand next to II-3 and the chain reversed. Local moves cannot reverse it and
+    # re-sort row III together, so the search kept a torn order and the pedigree deferred; the retry from reversed
+    # atoms finds the clean one.
+    p = test_render._load("twins_marry_cousins_apart")
+    lay = render.layout(p)
+    assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == [
+        "2-4",
+        "2-2",
+        "2-1",
+        "2-5",
+        "2-3",
+        "2-6",
+    ]
