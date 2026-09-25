@@ -334,7 +334,7 @@ class _Model:
 
         for pair in sorted(pairs, key=weight):
             if pair in edges:
-                continue  # a partner standing between co-twins, beside this twin
+                continue  # the marriage of a partner standing between co-twins: its gap already makes it adjacent
             a, b = tuple(pair)
             if a in in_gap or b in in_gap or degree[a] >= 2 or degree[b] >= 2 or find(a) == find(b):
                 routed |= {mr.index for mr in couples[pair]}

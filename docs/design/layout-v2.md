@@ -77,7 +77,7 @@ stages:
 
 0. **Relaxation pre-pass** — resolve constraint conflicts statically (below): compute which matings demote to `routed`
    by dropping the weakest constraint in each conflict, to a fixpoint over the strength order. Everything downstream
-   sees the surviving (blockable) matings plus the `routed` set.
+   sees the surviving (blockable) matings; a non-empty `routed` set defers the pedigree.
 1. **Ordering** — the left→right order within each rank, over the surviving blocks. Deterministic heuristic
    (weighted-median + transposition sweeps, as in `dot`); a small exact search only where the pruned space is tiny. The
    objective is lexicographic — **torn sibships, then crossings, then birth-order inversions, then total edge length** —
@@ -117,8 +117,7 @@ stages:
    beyond, so a hinge spreads that far to centre its families and a descent drops to the end of its bar rather than a
    couple line crossing the figure; (2) the largest excess gap, so slack spreads evenly; (3) the total excess gap; (4) a
    fixed tie-break, so the optimum is one point. The default backend (z3) solves over exact rationals; HiGHS is an
-   optional floating-point alternative. A relaxed (routed) mating exerts no couple-adjacency pull here, so each
-   parent-anchored partner settles under its own parents.
+   optional floating-point alternative.
 1. **Edge routing** — draw each relationship (see below).
 
 ### Hard constraints
@@ -178,9 +177,10 @@ II-4 order `II-1, II-3, II-2, II-4`: II-3 stands inside the twin grouping, both 
 and nothing routes.
 
 - **Who may stand between.** A partner with no drawn parents (not born-in, not in a founder sibship), not itself a twin,
-  and not an omitted partner (a phantom). A born-in partner's line from its parents would drop through the chevron and
-  tear the twins' sibship; a phantom's line would end under the chevron at nothing. A partner between twins has both
-  neighbours taken, so its other matings overflow; one married to both twins keeps both marriages adjacent there.
+  not an omitted partner (a phantom), and not a ghost (the duplicate of an avuncular partner). A born-in partner's line
+  from its parents would drop through the chevron and tear the twins' sibship; a phantom's line would end under the
+  chevron at nothing. A partner between twins has both neighbours taken, so its other matings overflow. A partner
+  married to both co-twins closes a loop through their parents and defers before ordering (`_detect_loops`).
 - **Ordering.** The twin group, the partners placed beside or between its members and the chains beyond them form one
   adjacency atom. Which partner stands in which gap is fixed when the atom is built (mincross only reverses it): the
   placement routing the fewest matings with offspring, then the fewest matings, then the fewest partners between twins,
@@ -196,9 +196,9 @@ and nothing routes.
   stays over its sibship's drop.
 
 Conflicts are detected **statically** from IR structure (anchor count per node, adjacency degree vs slots) and resolved
-in a pre-pass to a fixpoint over the strength order, producing the `routed` set the solver and router consume — no
-dynamic place-detect-repair loop. Iterate to fixpoint because relaxations interact: routing one mating frees a slot that
-can resolve a downstream overflow.
+in a pre-pass to a fixpoint over the strength order, producing the `routed` set, on which the layout defers (Edge
+routing) — no dynamic place-detect-repair loop. Iterate to fixpoint because relaxations interact: routing one mating
+frees a slot that can resolve a downstream overflow.
 
 ### Edge routing (net-new capability)
 
