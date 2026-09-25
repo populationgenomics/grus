@@ -158,6 +158,19 @@ class Layout:
             self.fam[level + 1][j] == k and self.descends_from_one(level + 1, j) for j in range(self.n[level + 1])
         )
 
+    def label_side(self, level: int, k: int) -> int:
+        """Which side of cell ``(level, k)`` its label stack sits: 0 centred, 1 right of an own-centre drop, -1 left.
+
+        A stack is centred unless a descent drops from the cell's own centre (``drops_from_centre``), which would run
+        through it; then it goes beside the drop, on the side no couple line (with its descent) leaves: left when the
+        cell's partner is on its right, else right. With couples on both sides it stays right.
+        """
+        if not self.drops_from_centre(level, k):
+            return 0
+        right_taken = bool(self.spouse[level][k])
+        left_taken = k > 0 and bool(self.spouse[level][k - 1])
+        return -1 if right_taken and not left_taken else 1
+
     def descends_from_one(self, level: int, k: int) -> bool:
         """Whether cell ``(level, k)`` descends from its ``fam`` cell alone rather than from the couple it heads.
 

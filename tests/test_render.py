@@ -92,17 +92,17 @@ def _label_lines(svg: str) -> list[tuple[float, float, str]]:
 
 
 _LABEL_RE = re.compile(
-    r'<text class="label" x="([-0-9.]+)" y="([-0-9.]+)" [^>]*text-anchor="(middle|start)"[^>]*>([^<]*)</text>'
+    r'<text class="label" x="([-0-9.]+)" y="([-0-9.]+)" [^>]*text-anchor="(middle|start|end)"[^>]*>([^<]*)</text>'
 )
 
 
 def _label_spans(svg: str) -> list[tuple[float, float, float, str]]:
-    """Each label line's estimated horizontal extent: ``(left, right, y, content)``, centred or left-aligned."""
+    """Each label line's estimated horizontal extent: ``(left, right, y, content)``, by its text anchor."""
     size = render.DEFAULT_GEOMETRY.label_size
     out: list[tuple[float, float, float, str]] = []
     for x, y, anchor, s in _LABEL_RE.findall(svg):
         w = 0.6 * size * len(s)
-        left = float(x) if anchor == "start" else float(x) - w / 2
+        left = {"start": float(x), "end": float(x) - w}.get(anchor, float(x) - w / 2)
         out.append((left, left + w, float(y), s))
     return out
 

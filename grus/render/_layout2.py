@@ -284,8 +284,8 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
 
     Two neighbours need the left cell's right reach plus the right cell's left reach between centres for their
     label stacks not to touch (``(w_left + w_right) / 2 + label_size`` for two centred stacks). A stack set beside
-    its own-centre drop (``_labels.label_reach``) reaches right only, and a count beside its symbol reaches right. A
-    pass-through or phantom draws no label and needs none; a ghost reserves its real individual's label.
+    its own-centre drop (``_labels.label_reach``) reaches to one side only, and a count beside its symbol reaches
+    right. A pass-through or phantom draws no label and needs none; a ghost reserves its real individual's label.
 
     A count beside the symbol is on the symbol's row, so it must also clear the right neighbour's *symbol*, whose
     label may be narrower than it: ``_row_seps`` adds that as its own floor (``_count_clearance``).
@@ -297,7 +297,7 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
                 out[c] = (0.0, 0.0)
                 continue
             ind = p.individuals[lay.ghost_of.get(c, c)]
-            left, right = _labels.label_reach(ind, geom, beside=lay.drops_from_centre(level, k))
+            left, right = _labels.label_reach(ind, geom, side=lay.label_side(level, k))
             out[c] = ((left + geom.label_size / 2) / geom.x_unit, (right + geom.label_size / 2) / geom.x_unit)
     return out
 

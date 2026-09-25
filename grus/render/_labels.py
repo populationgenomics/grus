@@ -137,16 +137,16 @@ def count_mark(ind: pb.Individual, geom: _geometry.Geometry) -> CountMark | None
     return CountMark(text, min(COUNT_SCALE * geom.symbol_size, fit / (0.6 * len(text))), inside=True)
 
 
-def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, beside: bool) -> tuple[float, float]:
-    """How far ``ind``'s drawing reaches left and right of its symbol's centre, in pixels: symbol, labels, count.
+def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int) -> tuple[float, float]:
+    """How far ``ind``'s drawing reaches left and right of its symbol's centre, in pixels: labels and count.
 
-    A stack is centred under its symbol, unless ``beside``: a symbol whose descent drops from its own centre (a
-    count-collapsed or sideless lone parent) would have that line run through a centred stack, so the stack is
-    left-aligned ``label_gap`` right of the line instead. A count placed outside the symbol reaches right
-    (``outside_count_reach``).
+    ``side`` is ``Layout.label_side``: 0 for a stack centred under its symbol; for a symbol whose descent drops from
+    its own centre (a count-collapsed or sideless lone parent), which would run through a centred stack, 1 for a
+    stack aligned ``label_gap`` right of the line and -1 for one ``label_gap`` left of it. A count placed outside
+    the symbol reaches right (``outside_count_reach``).
     """
     w = label_width(ind, geom)
-    left, right = (0.0, geom.label_gap + w) if beside else (w / 2, w / 2)
+    left, right = {0: (w / 2, w / 2), 1: (0.0, geom.label_gap + w), -1: (geom.label_gap + w, 0.0)}[side]
     return left, max(right, outside_count_reach(ind, geom))
 
 

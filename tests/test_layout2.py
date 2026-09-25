@@ -691,6 +691,51 @@ def test_a_group_with_two_lone_sibships_keeps_a_line_for_each() -> None:
     assert {s for s in drawn if s[1].startswith("III")} == {("II-1", "III-1"), ("II-1", "III-2 III-3")}
 
 
+def test_a_label_beside_the_drop_takes_the_side_no_couple_leaves() -> None:
+    # II-1 (a group of 3) has a lone sibship, dropped from its centre, and a drawn partner II-3 on its right, whose
+    # couple's drop leaves that side. The label stack moved beside the drop always went right, so the couple's drop
+    # ran through it; it now goes left, with its reach reserved on that side.
+    man, woman, unknown = pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_UNKNOWN
+    note = pb.Annotation(text="a long annotation here", type=pb.ANNOTATION_TYPE_OTHER)
+    p = pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=man),
+            pb.Individual(generation=1, index=2, gender=woman),
+            pb.Individual(generation=2, index=1, gender=man, count=3, annotations=[note]),
+            pb.Individual(generation=2, index=2, gender=woman),
+            pb.Individual(generation=2, index=3, gender=woman),
+            pb.Individual(generation=3, index=1, gender=unknown, count_unspecified=True),
+            pb.Individual(generation=3, index=2, gender=man),
+            pb.Individual(generation=3, index=3, gender=woman),
+        ]
+    )
+    top = p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, 2))
+    top.offspring.add(child=_pos(2, 1))
+    top.offspring.add(child=_pos(2, 2))
+    p.matings.add(partner_a=_pos(2, 1)).offspring.add(child=_pos(3, 1))
+    couple = p.matings.add(partner_a=_pos(2, 1), partner_b=_pos(2, 3))
+    couple.offspring.add(child=_pos(3, 2))
+    couple.offspring.add(child=_pos(3, 3))
+    lay = render.layout(p)
+    (level, k), (_, mate) = [
+        (lv, row.index(i))
+        for lv, row in enumerate(lay.nid)
+        for i, ind in enumerate(p.individuals)
+        if i in row and (ind.generation, ind.index) in ((2, 1), (2, 3))
+    ]
+    assert mate == k + 1 and lay.spouse[level][k], "the partner is on the right"
+    assert lay.label_side(level, k) == -1
+    svg = render.render_svg(p)
+    g = re.search(r'<g id="ind-II-1" class="individual.*?</g>', svg, re.S)
+    assert g is not None
+    anchors = re.findall(r'<text class="label" [^>]*text-anchor="(\w+)"', g.group(0))
+    assert anchors == ["end", "end"]
+    drop = re.search(r'<g class="sibship" data-parents="II-1 II-3"[^>]*>\s*(?:<line x1="|<path d="M)([-0-9.]+)', svg)
+    assert drop is not None
+    (right,) = [r for _l, r, _y, s in test_render._label_spans(svg) if s == note.text]
+    assert right < float(drop.group(1)), "the label stays clear of the couple's drop"
+
+
 def test_crossing_descents_turn_on_their_own_tracks() -> None:
     # A fuzzed pedigree, minimised. The order puts II-2 x II-6 left of II-3 x II-4 but its twins right of their
     # children, so the descents cross; the drops used to run along each other's bars at bar height and the row read
