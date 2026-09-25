@@ -178,15 +178,6 @@ def test_count_is_a_data_attribute_and_a_mark_inside_the_symbol() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    ("fields", "match"), [({"count": 0}, "count must be >= 1"), ({"count": 2, "count_unspecified": True}, "both set")]
-)
-def test_an_impossible_count_fails_loudly(fields: dict[str, object], match: str) -> None:
-    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, **fields)  # pyright: ignore[reportArgumentType]
-    with pytest.raises(ValueError, match=match):
-        render.render_svg(pb.Pedigree(individuals=[ind]))
-
-
 # --- connectors ------------------------------------------------------------------------------------------
 
 

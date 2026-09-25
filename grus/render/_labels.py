@@ -61,18 +61,11 @@ def label_lines(ind: pb.Individual) -> list[str]:
 def count_text(ind: pb.Individual) -> str | None:
     """The text drawn inside a count-collapsed symbol: ``"n"`` for an unknown number, else the count; None for one.
 
-    Bennett draws a group of individuals as one symbol with the number (or ``n``) centred inside it. ``count``
-    absent or 1 is one person and draws nothing.
-
-    Raises:
-        ValueError: ``count`` is below 1, or is set together with ``count_unspecified`` (a known and an unknown
-            number at once).
+    Bennett draws a group of individuals as one symbol with the number (or ``n``) inside it. ``count`` absent or 1
+    is one person and draws nothing. The IR's protovalidate rules guarantee ``count >= 1`` when set and never
+    together with ``count_unspecified``; the renderer validates before drawing.
     """
-    if ind.HasField("count") and ind.count < 1:
-        raise ValueError(f"{position(ind)}: count must be >= 1, got {ind.count}")
     if ind.count_unspecified:
-        if ind.HasField("count"):
-            raise ValueError(f"{position(ind)}: count {ind.count} and count_unspecified are both set")
         return "n"
     return str(ind.count) if ind.count > 1 else None
 

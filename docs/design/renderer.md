@@ -78,17 +78,17 @@ fill *opposite* halves (a compound het reads as opposite sides), while a single 
 half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. A **count-collapsed** symbol (a
 group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its number, or `n` for an unknown number,
 centred inside it at `0.45·SYMBOL_SIZE`, white on an affected symbol's solid fill; `count` absent or 1 is one person and
-draws none, and `count` < 1 or `count` with `count_unspecified` raises. Connectors: **mating line** (horizontal between
-partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit
-`Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop
-from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a
-crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with rounded corners and
-lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's landing leg turning
-higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short
-vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a
-joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating midpoint down to a short
-horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn
-instead of a descent).
+draws none (`ir.validate` rejects `count` < 1 and `count` with `count_unspecified`). Connectors: **mating line**
+(horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only
+from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line**
+(vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its
+children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with
+rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's
+landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib
+bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to
+one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating
+midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for
+`CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;
