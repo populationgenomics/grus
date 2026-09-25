@@ -91,9 +91,11 @@ stages:
    only as a crossing, and ranking tears first chose such orders over clean ones. When a tear remains, the loop is also
    seeded once per marriage between relatives: the two lines start adjacent at the mating where they split, each line's
    child toward the marriage at the facing end, so first cousins across a middle sibling's family start where the clean
-   order has them (`_facing_seeds`). A tear no run avoids still defers; the routed consanguineous marriage (below) is
-   the fix for what remains. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger
-   constraints leave free — never overriding contiguity or adjacency.
+   order has them (`_facing_seeds`). Every tie between matings in the ordering breaks on the mating's identity (its
+   partners and children), never its input position, so the search does not depend on input order. A tear no run avoids
+   still defers; the routed consanguineous marriage (below) is the fix for what remains. Crossing minimization is the
+   *weak*-strength tie-breaker among orders the stronger constraints leave free — never overriding contiguity or
+   adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
    program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a twin group, a founder-sib
    floater with its sibling, or a couple whose partners mate once and are bonded to no one else; a hinge's couples and a

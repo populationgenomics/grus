@@ -157,7 +157,18 @@ def test_order_is_run_to_run_deterministic(name: str) -> None:
     assert render.layout(p) == render.layout(p)
 
 
-_SHUFFLED_GOLDENS = ("childless", "founder_sibship_marry_in", "descent_across_rows", "detached_branch")
+_SHUFFLED_GOLDENS = (
+    "childless",
+    "founder_sibship_marry_in",
+    "descent_across_rows",
+    "detached_branch",
+    "cousins_across_family",
+    "cousins_across_middle_sibling",
+    "crossing_descents",
+    "lone_parent_sibships",
+    "twins_marry_chain_stretches",
+    "twins_marry_cousins_apart",
+)
 
 
 @pytest.mark.parametrize("name", [*_TIER1, *_SHUFFLED_GOLDENS, *_CROSS_JOINS])
@@ -724,3 +735,29 @@ def test_cousins_across_a_middle_sibling_start_at_facing_ends() -> None:
     lay = render.layout(p)
     row = [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[4] if i < len(p.individuals)]
     assert abs(row.index("5-1") - row.index("5-4")) == 1
+
+
+def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
+    # I-1 has three childless partners, one more than a row has sides for, so one mating routes. The tie between
+    # equally weighted matings broke on input position, so shuffling Pedigree.matings changed which partner stood
+    # apart; it now breaks on the matings' identity.
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    p = pb.Pedigree(individuals=[pb.Individual(generation=1, index=1, gender=man)])
+    for k in (2, 3, 4):
+        p.individuals.add(generation=1, index=k, gender=woman)
+        p.matings.add(partner_a=_pos(1, 1), partner_b=_pos(1, k))
+
+    def routed(q: pb.Pedigree) -> set[tuple[int, int]]:
+        lay = render.layout(q)
+        cells = {(lv, k): q.individuals[i] for lv, row in enumerate(lay.nid) for k, i in enumerate(row)}
+        return {
+            (cells[end].generation, cells[end].index)
+            for rm in lay.routed
+            for end in (rm.a, rm.b)
+            if cells[end].index != 1
+        }
+
+    ref = routed(p)
+    assert len(ref) == 1
+    for seed in range(8):
+        assert routed(_shuffled(p, seed)) == ref

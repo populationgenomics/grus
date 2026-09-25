@@ -126,6 +126,13 @@ class _Model:
     def is_mating(self, node: int) -> bool:
         return node >= self.mat_base
 
+    def mating_key(self, mr: _layout._Mating) -> tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]]:
+        """Stable IR identity of a mating: its partners' then its children's identities, never its input position.
+
+        Every tie between matings breaks on this, so a shuffle of ``Pedigree.matings`` cannot change the order.
+        """
+        return (tuple(sorted(self.ident(p) for p in mr.partners)), tuple(sorted(self.ident(k) for k in mr.kids)))
+
     def ident(self, i: int) -> tuple[int, int]:
         """Stable IR identity of an individual — used for every tie-break so the order is shuffle-invariant."""
         ind = self.g.individuals[i]
@@ -138,7 +145,7 @@ class _Model:
             if len(ms) <= 2:
                 continue
             # keep the two heaviest adjacencies (most offspring); route the rest, tie-broken by mating index.
-            ms.sort(key=lambda mr: (-len(mr.kids), mr.index))
+            ms.sort(key=lambda mr: (-len(mr.kids), self.mating_key(mr)))
             for mr in ms[2:]:
                 self.routed.add(mr.index)
 
@@ -276,7 +283,7 @@ def _init_order(model: _Model, kid_order: dict[int, list[int]] | None = None) ->
             return
         seen_i.add(i)
         appear[model.rank[i]].append(i)
-        for mr in sorted(g.matings_of[i], key=lambda mr: mr.index):
+        for mr in sorted(g.matings_of[i], key=model.mating_key):
             if model._drawn(mr):
                 visit_mat(mr)
 
@@ -472,10 +479,10 @@ def _placed_connectors(model: _Model, order_map: dict[int, list[int]], r: int) -
     up = _positions(order_map, r - 1) if r - 1 in order_map else {}
     dn = _positions(order_map, r + 1) if r + 1 in order_map else {}
 
-    def key(n: int) -> tuple[float, int]:
+    def key(n: int) -> tuple[float, tuple[tuple[tuple[int, int], ...], tuple[tuple[int, int], ...]]]:
         ups = [up[v] for v in model.up.get(n, ()) if v in up]
         ps = ups or [dn[v] for v in model.down.get(n, ()) if v in dn]
-        return (sum(ps) / len(ps) if ps else 0.0, n)
+        return (sum(ps) / len(ps) if ps else 0.0, model.mating_key(model.g.matings[n - model.mat_base]))
 
     return sorted(conns, key=key)
 
