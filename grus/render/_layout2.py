@@ -211,17 +211,15 @@ def _relations(lay: _layout.Layout) -> list[_Sibship]:
     """
     out: list[_Sibship] = []
     for level in range(1, len(lay.nid)):
-        groups: dict[int, list[int]] = collections.defaultdict(list)  # parent column on level-1 -> child columns
+        groups: dict[tuple[int, bool], list[int]] = collections.defaultdict(list)  # (parent column, lone) -> cols
         for k in range(lay.n[level]):
             pc = lay.fam[level][k]
             if pc >= 0:
-                groups[pc].append(k)  # k ascends, so children stay left-to-right
-        for pc in sorted(groups):
-            children = tuple(lay.nid[level][k] for k in groups[pc])
-            if lay.spouse[level - 1][pc]:
-                parents = (lay.nid[level - 1][pc], lay.nid[level - 1][pc + 1])
-            else:
-                parents = (lay.nid[level - 1][pc],)
+                groups[(pc, lay.descends_from_one(level, k))].append(k)  # k ascends: children stay left-to-right
+        for pc, lone in sorted(groups):
+            children = tuple(lay.nid[level][k] for k in groups[(pc, lone)])
+            heads = (pc,) if lone else (pc, pc + 1)
+            parents = tuple(lay.nid[level - 1][c] for c in heads)
             out.append(_Sibship(parents=parents, children=children))
     return out
 

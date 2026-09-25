@@ -119,6 +119,9 @@ class Layout:
         first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
             ``first_generation + L``. Rows between the first and last generation are kept even when empty
             (a detached branch several generations down).
+        lone: ``lone[L][k]`` — whether cell ``(L, k)`` descends from one drawn parent (its ``fam`` cell alone), not a
+            couple: a lone parent's sibship that has no phantom (no free side), or a hop below a pass-through.
+            Read through ``descends_from_one``.
         phantom: cells whose ``nid`` is a **synthetic phantom partner**: the omitted other parent of a lone-parent
             mating. It stands beside the parent as a couple member (``spouse`` marks the pair), so the descent
             drops from the marriage line's midpoint. Drawing emits the marriage line to the phantom's centre and
@@ -143,6 +146,18 @@ class Layout:
     first_generation: int = 1
     passthrough: frozenset[int] = frozenset()
     phantom: frozenset[int] = frozenset()
+    lone: list[list[bool]] = field(default_factory=list)
+
+    def descends_from_one(self, level: int, k: int) -> bool:
+        """Whether cell ``(level, k)`` descends from its ``fam`` cell alone rather than from the couple it heads.
+
+        A lone parent with no free side for a phantom (a twin with a spouse) keeps its lone sibship, drawn from its
+        own centre, while its column also heads a couple, so ``spouse`` alone cannot tell the two apart. ``lone``
+        records it; a Layout built without it falls back to ``spouse``.
+        """
+        if self.lone:
+            return self.lone[level][k]
+        return not self.spouse[level - 1][self.fam[level][k]]
 
 
 @dataclass(frozen=True)
@@ -439,21 +454,37 @@ def _insert_phantoms(g: _Graph) -> frozenset[int]:
     line from the parent to nothing, the descent dropping from that line, so a parent with two such sibships
     (half-sibships by different, undrawn partners) draws two lines and two drops, never one merged bar. With a
     phantom as its second partner the mating is an ordinary couple to the ordering, the x-solve and ``_build``;
-    drawing omits the phantom's symbol. A phantom's identity is ``(parent generation, -3_000_000_000 +
+    drawing omits the phantom's symbol. A phantom's identity is ``(parent generation, -2_000_000_000 +
     1_000_000 * child generation + child index)`` from the sibship's first child: stable under a shuffle of the
     input, negative so it never equals a real individual's, below every pass-through's, and increasing with the
     first child, so where only identity decides (half-sibships are not ranked by birth order) a lone parent's
     sibships follow the IR's numbering.
 
+    A phantom takes one of the parent's two sides on its row, so it is added only while one is free: a parent whose
+    partners and co-twin already take both sides (a twin with a spouse) keeps its lone sibship as a drop from its
+    own centre, marked in ``Layout.lone`` so drawing does not read it as the couple's.
+
     Mutates ``g`` in place (appends the phantoms, rewrites each lone-parent mating's partners and its children's
     parent pointers); returns the phantom indices. Runs after ``_rank`` and before ``_insert_passthroughs``, so
     a lone parent whose children sit several rows down gets its phantom on its own row.
     """
+    cotwin = {
+        o.child
+        for mr in g.matings
+        for o in mr.offspring
+        if o.twin_group is not None and sum(1 for q in mr.offspring if q.twin_group == o.twin_group) > 1
+    }
+    sides = {  # neighbours each individual already needs on its row: its partners, and a co-twin
+        i: sum(1 for m in g.matings_of[i] if len(m.partners) == 2) + (1 if i in cotwin else 0) for i in range(g.n)
+    }
     phantom: set[int] = set()
     for mi, mr in enumerate(list(g.matings)):
         if len(mr.partners) != 1 or not mr.offspring:
             continue
         (parent,) = mr.partners
+        if sides[parent] >= 2:
+            continue  # no free side: this sibship drops from the parent's own centre (Layout.lone)
+        sides[parent] += 1
         first_child = g.individuals[mr.offspring[0].child]
         cell = len(g.individuals)
         g.individuals.append(
@@ -648,4 +679,5 @@ def _build(
         first_generation=first_generation,
         passthrough=passthrough,
         phantom=phantom,
+        lone=[[len(g.parents.get(i, ())) == 1 for i in row] for row in cols],
     )

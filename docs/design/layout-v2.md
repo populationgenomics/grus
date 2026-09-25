@@ -56,8 +56,12 @@ the deeper row; any other couple across generations has no drawn form and defers
 A **lone-parent mating** (the other parent omitted from the figure) gets a **phantom partner** cell beside the parent,
 so it is an ordinary couple to ordering and the x-solve, and drawing emits a marriage line to where the partner would
 stand and no symbol — as the literature draws an omitted partner. Each lone-parent sibship then drops from its own line,
-so a parent's half-sibships by different, undrawn partners never share a drop and bar. A phantom's line carries no
-stretch cost: with no partner symbol its length means nothing, so it stretches as far as centring its drop needs.
+so a parent's half-sibships by different, undrawn partners never share a drop and bar. For a parent with another mating
+(a hinge) the phantom's line carries no stretch cost: with no partner symbol its length means nothing, so it stretches
+as far as centring its drop needs; a lone parent's only mating bonds at the couple gap like any couple. A phantom takes
+one of the parent's two sides, so it is added only while one is free: a twin with a spouse (co-twin and spouse on either
+side) keeps a lone sibship as a drop from its own centre, which `Layout.lone` marks so drawing does not read it as the
+couple's.
 
 ### The solve (x-positions)
 

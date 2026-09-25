@@ -68,7 +68,7 @@ _roman = _labels.roman
 _STROKE = "#000000"
 _WIDTH = 2.0
 _FONT = "sans-serif"
-_PX_EPS = 1e-6  # pixel slack when deciding whether a drop meets its bar
+_MEET_EPS = 1e-5  # layout units: a drop this close to its bar meets it (10x the position quantum)
 _GEN_MARKER_SIZE = 16.0
 _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
@@ -425,7 +425,7 @@ class _Draw:
     def px(self, x: float) -> float:
         # Shift so the leftmost content edge (symbol or overhanging label) sits at gutter + margin, so a
         # wide outermost label is not clipped into the gutter. Symbol-only figures keep _x_lo == -half.
-        return self.geom.gen_marker_gutter + self.geom.margin - self._x_lo + self._px[x]
+        return self.geom.gen_marker_gutter + self.geom.margin - self._x_lo + x * self.geom.x_unit  # _build_px_map
 
     def py(self, level: int) -> float:
         return self.geom.margin + self.half + level * self.gen_height
@@ -579,13 +579,16 @@ class _Draw:
             out.append(_line(mid_x - half, bar2, mid_x + half, bar2))
         return out
 
-    def _descent_groups(self, level: int) -> dict[int, list[int]]:
-        """The children on ``level`` grouped by their parent column, pass-throughs excluded (drawn as hops)."""
-        groups: dict[int, list[int]] = {}
+    def _descent_groups(self, level: int) -> dict[tuple[int, bool], list[int]]:
+        """The children on ``level`` by ``(parent column, lone)``, pass-throughs excluded (drawn as hops).
+
+        ``lone`` separates a lone parent's own sibship from the couple its column also heads (``descends_from_one``).
+        """
+        groups: dict[tuple[int, bool], list[int]] = {}
         for k in range(self.lay.n[level]):
             pc = self.lay.fam[level][k]
             if pc >= 0 and self.lay.nid[level][k] not in self.lay.passthrough:
-                groups.setdefault(pc, []).append(k)
+                groups.setdefault((pc, self.lay.descends_from_one(level, k)), []).append(k)
         return groups
 
     def _descent_calls(self) -> list[tuple[int, int, tuple[int, ...]]]:
@@ -595,7 +598,7 @@ class _Draw:
         """
         out: list[tuple[int, int, tuple[int, ...]]] = []
         for level in range(1, len(self.lay.nid)):
-            for pc, cols in sorted(self._descent_groups(level).items()):
+            for (pc, _), cols in sorted(self._descent_groups(level).items()):
                 top_level, top_pc = level - 1, pc
                 hops: list[tuple[int, int, tuple[int, ...]]] = []
                 while self.lay.nid[top_level][top_pc] in self.lay.passthrough:
@@ -611,17 +614,15 @@ class _Draw:
         The drop leaves the parents' midpoint, or a lone parent's centre. A lone child's bar, and a lone twin
         group's, is its one attach point.
         """
-        if self.lay.spouse[level - 1][pc]:
-            mid_x = (self.px(self.lay.pos[level - 1][pc]) + self.px(self.lay.pos[level - 1][pc + 1])) / 2
-        else:
-            mid_x = self.px(self.lay.pos[level - 1][pc])
-        attach = [
-            sum(self.px(self.lay.pos[level][k]) for k in g) / len(g) for g in self._child_groups(level, list(cols))
-        ]
+        row = self.lay.pos[level - 1]
+        # In layout units, with a tolerance above the position quantum: a midpoint of two rounded positions can sit
+        # a fraction of a quantum off a rounded child and must still read as meeting it.
+        mid = row[pc] if self.lay.descends_from_one(level, cols[0]) else (row[pc] + row[pc + 1]) / 2
+        attach = [sum(self.lay.pos[level][k] for k in g) / len(g) for g in self._child_groups(level, list(cols))]
         lo, hi = min(attach), max(attach)
-        if lo - _PX_EPS <= mid_x <= hi + _PX_EPS:
-            return mid_x, None
-        return mid_x, (lo if mid_x < lo else hi)
+        if lo - _MEET_EPS <= mid <= hi + _MEET_EPS:
+            return self.px(mid), None
+        return self.px(mid), self.px(lo if mid < lo else hi)
 
     def _assign_elbows(self) -> dict[tuple[int, int, tuple[int, ...]], int]:
         """Each drop that misses its bar -> its elbow track in its row gap (0 is nearest the bar).
@@ -672,10 +673,12 @@ class _Draw:
         out: list[str] = []
         for level in range(1, len(self.lay.nid)):
             groups = self._descent_groups(level)
-            for pc in sorted(groups):
+            for pc, lone in sorted(groups):
+                cols = groups[(pc, lone)]
                 hops: list[str] = []
                 top_level, top_pc = level - 1, pc
                 while self.lay.nid[top_level][top_pc] in self.lay.passthrough:
+                    lone = self.lay.descends_from_one(top_level, top_pc)  # whether the hop above is from one parent
                     through_y = self.py(top_level)
                     through_x = self.px(self.lay.pos[top_level][top_pc])
                     hops = [
@@ -685,16 +688,16 @@ class _Draw:
                     ]
                     top_pc = self.lay.fam[top_level][top_pc]
                     top_level -= 1
-                heads = [top_pc, top_pc + 1] if self.lay.spouse[top_level][top_pc] else [top_pc]
+                heads = [top_pc] if lone else [top_pc, top_pc + 1]
                 parents = [
                     self._cell_position(top_level, c)
                     for c in heads
                     if self.lay.nid[top_level][c] not in self.lay.phantom
                 ]
-                children = " ".join(self._cell_position(level, k) for k in groups[pc])
+                children = " ".join(self._cell_position(level, k) for k in cols)
                 out.append(_open_g(["sibship"], {"data-parents": " ".join(parents), "data-children": children}))
                 out += hops
-                out += self._sibship(level, pc, tuple(groups[pc]))
+                out += self._sibship(level, pc, tuple(cols))
                 out.append("</g>")
         return out
 
