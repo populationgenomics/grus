@@ -59,7 +59,8 @@ Positions are already quantised to 1e-6 layout units before drawing sees them, s
 
 ### What is stored
 
-The record is the `PedigreeLayout` message in `schema/proto/grus/models/layout.proto`. It holds a key and one outcome:
+The record is the `PedigreeLayout` message in
+[`schema/proto/grus/models/layout.proto`](../../schema/proto/grus/models/layout.proto). It holds a key and one outcome:
 
 - a **placement** — the rows of cells, left to right, each with its identity, x, parent column, `lone` flag and its
   couple / twin / childless relation to its right-hand neighbour; the founder sibships and routed matings in (row,
