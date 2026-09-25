@@ -1,50 +1,176 @@
 {
   "1": {
     "highs": {
-      "carrier_inheritance@3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b",
-      "childless@1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be",
-      "consanguineous@e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee",
-      "cousins_across_family@dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d": "d54dbea6c0166d942f80bc879386ddc87be91e9562185194d099d65eac6947a6",
-      "cousins_across_middle_sibling@5e10e1c8bf3e7cd14f8a478983c544243ec7f72d1b0dd5afd94be64b7d6f27d6": "405413654227502cd240048b4ef722a5441e7330ba5093e5b2baeb96ff48ba5d",
-      "crossing_descents@71575219bc72b2d5cf88b1c4609211a5994b91f8b553dcd35ab74c1a480f0da0": "caf7ac83723119cf3924d581afc47844002d10eaf7bef523b00a158f0c794bd6",
-      "descent_across_rows@11e4986563f819c367f358ee6a97926d51c568dc7dbb3bc03f911038ce47bd48": "56f81f46e577a5235e7bdeeb32e0cf27afca2344a39a091b65f86222cee720fe",
-      "detached_branch@37d46841a2ef72a18c1f2990a0914610fa6783d0faf0998302167ec3ef8ab432": "2368efaca4726120106259544ffae63d0c99169bd1af629f732b1dfbbdd8e560",
-      "founder_sibship@163d3a06e1b1724c4236a55b17a2bf8730c16640af2aafcbc6f087a901a312ea": "3a75c28c5328029d262187a5fa540a3cac02261b64c12fbfc42a779ac19d7438",
-      "founder_sibship_marry_in@213e8d9d480a3f70346f16d8fe3f9d66c62e114eb611c5beedd777754fe5efa1": "55ba9e369d15af650573f80b3bfff2f19d7d5b143a8600b881c9e2b37ccf42ba",
-      "half_sibs@9b0616a41b89cec72a45d6da08e7ed0cf824882231e832d7becf1bcf3a68514e": "3e4b0da09c72cab42bc0ec87319ee097e374a81dd2fd283ad4922a3fb4548cc9",
-      "hinge_family@6eab90e1ee1cef28e18c515f6eda6a416e31addfe4ccfebe65534b28168f57d0": "f7a7226a8083cbac07b41072a2abfadaf94afa479313871f4c0c7cbc9edfad36",
-      "hinge_offcentre@6bf6313ab12a354e31abc94c517c2270da4af12474c9862f26076028bfd00e92": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481",
-      "lone_parent_sibships@c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352",
-      "sibship@cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e",
-      "three_generation@e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f": "9d27b04e9315fdbf43e0144f6e351cfd324d0637c81ea0d4db0023c82f38413e",
-      "trio@c9ff32d81e2c4fb568c8acfcf43bff2bbf3319cccb5faaeb73fc5eb8408a24fe": "effcf8028a9ae0280c41dfa5e7b28761aa7217165ca5e9d6b66122090d240b07",
-      "twin_married@0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd": "cfb37aebd6e0f6e74a051dc417b6eab9a397609f08e0e54b00a71bfcce94af82",
-      "twins@f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5": "35f6761930f3d21e75eee7312aeeb4b0a33f850edf981dad9c21e1830842ecdc",
-      "twins_marry_chain_stretches@235e8f52812d85c75fc4188edb2f7ee843858dda3f69217204d750f0dec895c7": "e2047a3bf1c3bed06c2b14309844767a4058857b6250de5ef8f69375b83f2b74",
-      "twins_marry_cousins_apart@102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282": "90f03dbd75b474914bb630013c052c8e7848a19d39055126b43d687d70be31c0"
+      "carrier_inheritance": {
+        "pedigree": "3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216",
+        "placement": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b"
+      },
+      "childless": {
+        "pedigree": "1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332",
+        "placement": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be"
+      },
+      "consanguineous": {
+        "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",
+        "placement": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee"
+      },
+      "cousins_across_family": {
+        "pedigree": "dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d",
+        "placement": "d54dbea6c0166d942f80bc879386ddc87be91e9562185194d099d65eac6947a6"
+      },
+      "cousins_across_middle_sibling": {
+        "pedigree": "5e10e1c8bf3e7cd14f8a478983c544243ec7f72d1b0dd5afd94be64b7d6f27d6",
+        "placement": "405413654227502cd240048b4ef722a5441e7330ba5093e5b2baeb96ff48ba5d"
+      },
+      "crossing_descents": {
+        "pedigree": "71575219bc72b2d5cf88b1c4609211a5994b91f8b553dcd35ab74c1a480f0da0",
+        "placement": "caf7ac83723119cf3924d581afc47844002d10eaf7bef523b00a158f0c794bd6"
+      },
+      "descent_across_rows": {
+        "pedigree": "11e4986563f819c367f358ee6a97926d51c568dc7dbb3bc03f911038ce47bd48",
+        "placement": "56f81f46e577a5235e7bdeeb32e0cf27afca2344a39a091b65f86222cee720fe"
+      },
+      "detached_branch": {
+        "pedigree": "37d46841a2ef72a18c1f2990a0914610fa6783d0faf0998302167ec3ef8ab432",
+        "placement": "2368efaca4726120106259544ffae63d0c99169bd1af629f732b1dfbbdd8e560"
+      },
+      "founder_sibship": {
+        "pedigree": "163d3a06e1b1724c4236a55b17a2bf8730c16640af2aafcbc6f087a901a312ea",
+        "placement": "3a75c28c5328029d262187a5fa540a3cac02261b64c12fbfc42a779ac19d7438"
+      },
+      "founder_sibship_marry_in": {
+        "pedigree": "213e8d9d480a3f70346f16d8fe3f9d66c62e114eb611c5beedd777754fe5efa1",
+        "placement": "55ba9e369d15af650573f80b3bfff2f19d7d5b143a8600b881c9e2b37ccf42ba"
+      },
+      "half_sibs": {
+        "pedigree": "9b0616a41b89cec72a45d6da08e7ed0cf824882231e832d7becf1bcf3a68514e",
+        "placement": "3e4b0da09c72cab42bc0ec87319ee097e374a81dd2fd283ad4922a3fb4548cc9"
+      },
+      "hinge_family": {
+        "pedigree": "6eab90e1ee1cef28e18c515f6eda6a416e31addfe4ccfebe65534b28168f57d0",
+        "placement": "f7a7226a8083cbac07b41072a2abfadaf94afa479313871f4c0c7cbc9edfad36"
+      },
+      "hinge_offcentre": {
+        "pedigree": "6bf6313ab12a354e31abc94c517c2270da4af12474c9862f26076028bfd00e92",
+        "placement": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481"
+      },
+      "lone_parent_sibships": {
+        "pedigree": "c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc",
+        "placement": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352"
+      },
+      "sibship": {
+        "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
+        "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
+      },
+      "three_generation": {
+        "pedigree": "e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f",
+        "placement": "9d27b04e9315fdbf43e0144f6e351cfd324d0637c81ea0d4db0023c82f38413e"
+      },
+      "trio": {
+        "pedigree": "c9ff32d81e2c4fb568c8acfcf43bff2bbf3319cccb5faaeb73fc5eb8408a24fe",
+        "placement": "effcf8028a9ae0280c41dfa5e7b28761aa7217165ca5e9d6b66122090d240b07"
+      },
+      "twin_married": {
+        "pedigree": "0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd",
+        "placement": "cfb37aebd6e0f6e74a051dc417b6eab9a397609f08e0e54b00a71bfcce94af82"
+      },
+      "twins": {
+        "pedigree": "f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5",
+        "placement": "35f6761930f3d21e75eee7312aeeb4b0a33f850edf981dad9c21e1830842ecdc"
+      },
+      "twins_marry_chain_stretches": {
+        "pedigree": "235e8f52812d85c75fc4188edb2f7ee843858dda3f69217204d750f0dec895c7",
+        "placement": "e2047a3bf1c3bed06c2b14309844767a4058857b6250de5ef8f69375b83f2b74"
+      },
+      "twins_marry_cousins_apart": {
+        "pedigree": "102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282",
+        "placement": "90f03dbd75b474914bb630013c052c8e7848a19d39055126b43d687d70be31c0"
+      }
     },
     "z3": {
-      "carrier_inheritance@3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b",
-      "childless@1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be",
-      "consanguineous@e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee",
-      "cousins_across_family@dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d": "d54dbea6c0166d942f80bc879386ddc87be91e9562185194d099d65eac6947a6",
-      "cousins_across_middle_sibling@5e10e1c8bf3e7cd14f8a478983c544243ec7f72d1b0dd5afd94be64b7d6f27d6": "405413654227502cd240048b4ef722a5441e7330ba5093e5b2baeb96ff48ba5d",
-      "crossing_descents@71575219bc72b2d5cf88b1c4609211a5994b91f8b553dcd35ab74c1a480f0da0": "caf7ac83723119cf3924d581afc47844002d10eaf7bef523b00a158f0c794bd6",
-      "descent_across_rows@11e4986563f819c367f358ee6a97926d51c568dc7dbb3bc03f911038ce47bd48": "56f81f46e577a5235e7bdeeb32e0cf27afca2344a39a091b65f86222cee720fe",
-      "detached_branch@37d46841a2ef72a18c1f2990a0914610fa6783d0faf0998302167ec3ef8ab432": "2368efaca4726120106259544ffae63d0c99169bd1af629f732b1dfbbdd8e560",
-      "founder_sibship@163d3a06e1b1724c4236a55b17a2bf8730c16640af2aafcbc6f087a901a312ea": "3a75c28c5328029d262187a5fa540a3cac02261b64c12fbfc42a779ac19d7438",
-      "founder_sibship_marry_in@213e8d9d480a3f70346f16d8fe3f9d66c62e114eb611c5beedd777754fe5efa1": "55ba9e369d15af650573f80b3bfff2f19d7d5b143a8600b881c9e2b37ccf42ba",
-      "half_sibs@9b0616a41b89cec72a45d6da08e7ed0cf824882231e832d7becf1bcf3a68514e": "3e4b0da09c72cab42bc0ec87319ee097e374a81dd2fd283ad4922a3fb4548cc9",
-      "hinge_family@6eab90e1ee1cef28e18c515f6eda6a416e31addfe4ccfebe65534b28168f57d0": "f7a7226a8083cbac07b41072a2abfadaf94afa479313871f4c0c7cbc9edfad36",
-      "hinge_offcentre@6bf6313ab12a354e31abc94c517c2270da4af12474c9862f26076028bfd00e92": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481",
-      "lone_parent_sibships@c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352",
-      "sibship@cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e",
-      "three_generation@e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f": "9d27b04e9315fdbf43e0144f6e351cfd324d0637c81ea0d4db0023c82f38413e",
-      "trio@c9ff32d81e2c4fb568c8acfcf43bff2bbf3319cccb5faaeb73fc5eb8408a24fe": "effcf8028a9ae0280c41dfa5e7b28761aa7217165ca5e9d6b66122090d240b07",
-      "twin_married@0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd": "cfb37aebd6e0f6e74a051dc417b6eab9a397609f08e0e54b00a71bfcce94af82",
-      "twins@f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5": "35f6761930f3d21e75eee7312aeeb4b0a33f850edf981dad9c21e1830842ecdc",
-      "twins_marry_chain_stretches@235e8f52812d85c75fc4188edb2f7ee843858dda3f69217204d750f0dec895c7": "e2047a3bf1c3bed06c2b14309844767a4058857b6250de5ef8f69375b83f2b74",
-      "twins_marry_cousins_apart@102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282": "90f03dbd75b474914bb630013c052c8e7848a19d39055126b43d687d70be31c0"
+      "carrier_inheritance": {
+        "pedigree": "3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216",
+        "placement": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b"
+      },
+      "childless": {
+        "pedigree": "1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332",
+        "placement": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be"
+      },
+      "consanguineous": {
+        "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",
+        "placement": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee"
+      },
+      "cousins_across_family": {
+        "pedigree": "dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d",
+        "placement": "d54dbea6c0166d942f80bc879386ddc87be91e9562185194d099d65eac6947a6"
+      },
+      "cousins_across_middle_sibling": {
+        "pedigree": "5e10e1c8bf3e7cd14f8a478983c544243ec7f72d1b0dd5afd94be64b7d6f27d6",
+        "placement": "405413654227502cd240048b4ef722a5441e7330ba5093e5b2baeb96ff48ba5d"
+      },
+      "crossing_descents": {
+        "pedigree": "71575219bc72b2d5cf88b1c4609211a5994b91f8b553dcd35ab74c1a480f0da0",
+        "placement": "caf7ac83723119cf3924d581afc47844002d10eaf7bef523b00a158f0c794bd6"
+      },
+      "descent_across_rows": {
+        "pedigree": "11e4986563f819c367f358ee6a97926d51c568dc7dbb3bc03f911038ce47bd48",
+        "placement": "56f81f46e577a5235e7bdeeb32e0cf27afca2344a39a091b65f86222cee720fe"
+      },
+      "detached_branch": {
+        "pedigree": "37d46841a2ef72a18c1f2990a0914610fa6783d0faf0998302167ec3ef8ab432",
+        "placement": "2368efaca4726120106259544ffae63d0c99169bd1af629f732b1dfbbdd8e560"
+      },
+      "founder_sibship": {
+        "pedigree": "163d3a06e1b1724c4236a55b17a2bf8730c16640af2aafcbc6f087a901a312ea",
+        "placement": "3a75c28c5328029d262187a5fa540a3cac02261b64c12fbfc42a779ac19d7438"
+      },
+      "founder_sibship_marry_in": {
+        "pedigree": "213e8d9d480a3f70346f16d8fe3f9d66c62e114eb611c5beedd777754fe5efa1",
+        "placement": "55ba9e369d15af650573f80b3bfff2f19d7d5b143a8600b881c9e2b37ccf42ba"
+      },
+      "half_sibs": {
+        "pedigree": "9b0616a41b89cec72a45d6da08e7ed0cf824882231e832d7becf1bcf3a68514e",
+        "placement": "3e4b0da09c72cab42bc0ec87319ee097e374a81dd2fd283ad4922a3fb4548cc9"
+      },
+      "hinge_family": {
+        "pedigree": "6eab90e1ee1cef28e18c515f6eda6a416e31addfe4ccfebe65534b28168f57d0",
+        "placement": "f7a7226a8083cbac07b41072a2abfadaf94afa479313871f4c0c7cbc9edfad36"
+      },
+      "hinge_offcentre": {
+        "pedigree": "6bf6313ab12a354e31abc94c517c2270da4af12474c9862f26076028bfd00e92",
+        "placement": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481"
+      },
+      "lone_parent_sibships": {
+        "pedigree": "c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc",
+        "placement": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352"
+      },
+      "sibship": {
+        "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
+        "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
+      },
+      "three_generation": {
+        "pedigree": "e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f",
+        "placement": "9d27b04e9315fdbf43e0144f6e351cfd324d0637c81ea0d4db0023c82f38413e"
+      },
+      "trio": {
+        "pedigree": "c9ff32d81e2c4fb568c8acfcf43bff2bbf3319cccb5faaeb73fc5eb8408a24fe",
+        "placement": "effcf8028a9ae0280c41dfa5e7b28761aa7217165ca5e9d6b66122090d240b07"
+      },
+      "twin_married": {
+        "pedigree": "0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd",
+        "placement": "cfb37aebd6e0f6e74a051dc417b6eab9a397609f08e0e54b00a71bfcce94af82"
+      },
+      "twins": {
+        "pedigree": "f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5",
+        "placement": "35f6761930f3d21e75eee7312aeeb4b0a33f850edf981dad9c21e1830842ecdc"
+      },
+      "twins_marry_chain_stretches": {
+        "pedigree": "235e8f52812d85c75fc4188edb2f7ee843858dda3f69217204d750f0dec895c7",
+        "placement": "e2047a3bf1c3bed06c2b14309844767a4058857b6250de5ef8f69375b83f2b74"
+      },
+      "twins_marry_cousins_apart": {
+        "pedigree": "102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282",
+        "placement": "90f03dbd75b474914bb630013c052c8e7848a19d39055126b43d687d70be31c0"
+      }
     }
   }
 }

@@ -151,11 +151,12 @@ def test_a_column_outside_its_row_is_refused() -> None:
 
 # --- drawing from a stored layout ---------------------------------------------------------------------------------
 
-# The layout-version pins: for each LAYOUT_VERSION and solver, "<golden>@<pedigree digest>" -> the SHA-256 of that
-# golden's stored placement. Append-only: an entry, once committed, never changes. A layout change that moves a golden
-# changes an existing entry's placement, so it takes a LAYOUT_VERSION bump (old stored layouts must read as stale) and
-# a new version's entries; a golden IR edit changes the pedigree digest, so it adds an entry instead.
-# GRUS_REPIN_LAYOUTS=1 adds missing entries and refuses to change an existing one.
+# The layout-version pins: for each LAYOUT_VERSION, solver and golden, the golden's pedigree digest and the SHA-256 of
+# its stored placement. A pin's placement may change only together with its pedigree digest (the golden's IR was
+# edited); a changed placement under an unchanged digest is a layout change, which takes a LAYOUT_VERSION bump (old
+# stored layouts must read as stale) and pins under the new version. A pin whose golden is gone fails until removed.
+# GRUS_REPIN_LAYOUTS=1 writes missing pins and pins whose pedigree digest changed, and nothing else. A deliberate edit
+# of both a golden and its pin is out of reach of this test.
 _PINS = pathlib.Path(__file__).parent / "layout_pins.json"
 _REPIN = os.environ.get("GRUS_REPIN_LAYOUTS") == "1"
 _SOLVERS = {"z3": render.XSolver.Z3, "highs": render.XSolver.HIGHS}
@@ -167,24 +168,26 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> N
         pytest.importorskip("highspy")
     geom = dataclasses.replace(_GEOM, x_solver=_SOLVERS[solver])
     pins = json.loads(_PINS.read_text())
-    pinned: dict[str, str] = pins.setdefault(str(render.LAYOUT_VERSION), {}).setdefault(solver, {})
-    changed: list[str] = []
+    pinned: dict[str, dict[str, str]] = pins.setdefault(str(render.LAYOUT_VERSION), {}).setdefault(solver, {})
+    problems = [f"{name}: its golden is gone; remove the pin" for name in sorted(set(pinned) - set(test_render._NAMES))]
     for name in test_render._NAMES:
-        p = test_render._load(name)
-        record = render.store_layout(p, geom)
-        key = f"{name}@{record.key.pedigree_digest.hex()}"
-        placement = hashlib.sha256(record.placement.SerializeToString(deterministic=True)).hexdigest()
-        if key not in pinned and _REPIN:
-            pinned[key] = placement
-        elif pinned.get(key) != placement:
-            changed.append(name if key in pinned else f"{name} (not pinned)")
+        record = render.store_layout(test_render._load(name), geom)
+        now = {
+            "pedigree": record.key.pedigree_digest.hex(),
+            "placement": hashlib.sha256(record.placement.SerializeToString(deterministic=True)).hexdigest(),
+        }
+        pin = pinned.get(name)
+        if pin == now:
+            continue
+        if pin is not None and pin["pedigree"] == now["pedigree"]:
+            problems.append(f"{name}: layout changed under an unchanged pedigree; bump LAYOUT_VERSION")
+        elif _REPIN:
+            pinned[name] = now
+        else:
+            problems.append(f"{name}: {'not pinned' if pin is None else 'IR edited'}; repin with GRUS_REPIN_LAYOUTS=1")
     if _REPIN:
         _PINS.write_text(json.dumps(pins, indent=2, sort_keys=True) + "\n")
-    assert not changed, (
-        f"under LAYOUT_VERSION {render.LAYOUT_VERSION} with {solver}, these goldens' layouts differ from their pins: "
-        f"{changed}. A changed pin is a layout change: bump LAYOUT_VERSION and pin the new version with "
-        "GRUS_REPIN_LAYOUTS=1; an unpinned golden (new, or its IR edited) is pinned the same way"
-    )
+    assert not problems, f"LAYOUT_VERSION {render.LAYOUT_VERSION}, {solver}: {problems}"
 
 
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
