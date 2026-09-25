@@ -60,3 +60,39 @@ jobs:
       - run: uv sync --locked --python 3.13 --extra highs
       - run: uv run python -c "import highspy"
       - run: uv run pytest tests/test_xsolve.py
+
+  wheel:
+    # The installed package, not the source tree: the wheel lists its files one by one (only-include), and a module
+    # left out of that list passes every test above while breaking every install. Build the wheel, install it alone
+    # into a fresh environment, import every module in it, and draw a golden through the CLI.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          enable-cache: true
+      - run: uv build --wheel -o dist
+      - run: uv venv --python 3.13 /tmp/wheel-env
+      - run: uv pip install --python /tmp/wheel-env dist/*.whl
+      - name: import every module from the installed wheel
+        working-directory: /tmp
+        run: |
+          /tmp/wheel-env/bin/python - <<'PY'
+          import importlib, pkgutil
+          import grus
+          names = [m.name for m in pkgutil.walk_packages(grus.__path__, "grus.")]
+          import grus.models  # a namespace package (no __init__), which walk_packages does not descend into
+          names += [f"grus.models.{m.name}" for m in pkgutil.iter_modules(grus.models.__path__)]
+          for name in names:
+              importlib.import_module(name)
+          assert "grus.render" in names and "grus.models.layout_pb2" in names, names
+          print(f"imported {len(names)} modules")
+          PY
+      - name: lay out and draw a golden through the installed CLI
+        run: |-
+          /tmp/wheel-env/bin/grus layout tests/goldens/trio.pbtxt -o /tmp/trio.layout.pbtxt
+          /tmp/wheel-env/bin/grus render tests/goldens/trio.pbtxt --layout /tmp/trio.layout.pbtxt -o /tmp/trio.svg
+          test -s /tmp/trio.svg
