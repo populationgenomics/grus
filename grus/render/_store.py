@@ -107,8 +107,6 @@ def load_layout(
     _check_key(stored.key, p, geom)
     if stored.WhichOneof("outcome") == "deferred":
         raise _layout.DeferredFeatureError(stored.deferred)
-    if stored.placement_digest != _digest(stored.placement):
-        raise StaleLayoutError("stored placement does not match its digest: it was edited after grus wrote it")
     return from_proto(p, stored.placement, geom)
 
 
@@ -150,22 +148,17 @@ def to_proto(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> l
         placement.routed.add(
             a=_ref(rm.a), b=_ref(rm.b), consanguineous=rm.consanguineous, children=[_ref(c) for c in rm.children]
         )
-    return lpb.PedigreeLayout(key=layout_key(p, geom), placement=placement, placement_digest=_digest(placement))
-
-
-def _digest(placement: lpb.Placement) -> bytes:
-    return hashlib.sha256(placement.SerializeToString(deterministic=True)).digest()
+    return lpb.PedigreeLayout(key=layout_key(p, geom), placement=placement)
 
 
 def from_proto(p: pb.Pedigree, placement: lpb.Placement, geom: _geometry.Geometry) -> _layout.Layout:
     """The ``Layout`` a stored placement of ``p`` under ``geom`` records — equal to the fresh layout it was taken from.
 
-    Verified, not trusted: the cells are exactly the cells ``p`` lays out, row for row; ``first_generation``; every
-    relation (parent columns, couple, twin and childless flags, ``lone``, founder sibships, routed matings), rebuilt
-    from the stored row order and x and required to equal the stored values; each row's x in order and every adjacent
-    pair at least its separation (label clearance included); and no two sibships' bars overlapping. Trusted: that the
-    order and the x are the ones grus's search and solve chose — a record edited within all of the above draws a
-    correct figure of ``p``, though not grus's.
+    Checked for consistency (a stored layout is a cache grus writes, not an authenticated input): the cells are exactly
+    the cells ``p`` lays out, row for row; ``first_generation``; every relation (parent columns, couple, twin and
+    childless flags, ``lone``, founder sibships, routed matings), rebuilt from the stored row order and x and required
+    to equal the stored values; each row's x in order and every adjacent pair at least its separation (label clearance
+    included); and no two sibships' bars overlapping. Not re-run: the ordering search and the x-solve.
 
     Raises:
         StaleLayoutError: any check above fails.

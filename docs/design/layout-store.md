@@ -45,8 +45,7 @@ Positions are already quantised to 1e-6 layout units before drawing sees them, s
 
 ## Non-goals
 
-- **Hand-edited layouts.** A stored layout is grus's output, never an input a person authors; an edited one is refused
-  (see Reading a record back). See Open questions.
+- **Hand-edited layouts.** A stored layout is grus's output, never an input a person authors. See Open questions.
 - **The source figure's layout.** Bounding boxes of the symbols in an extracted figure are a different thing — where the
   paper drew each person, not where grus would. They would share nothing with this record but the pedigree; an `origin`
   field is left as the extension point if they are ever stored beside it.
@@ -118,15 +117,13 @@ Drawing from a stored layout checks all three and raises on the first mismatch, 
 fresh layout: a caller who wants recompute-on-stale does it explicitly, and a silent recompute would hide a cache that
 never hits.
 
-### Reading a record back: what is verified, what is trusted
+### Reading a record back: what is checked
 
-A record that does not match fails loudly rather than drawing a plausible wrong figure. Before drawing, the loader
-checks, in order:
+A stored layout is a cache grus writes itself, checked for staleness and internal consistency, not authenticated: anyone
+who can edit it can edit the pedigree. Before drawing, the loader checks, in order:
 
 1. the schema's field rules (protovalidate);
 1. the key: algorithm version, layout-affecting geometry, pedigree digest;
-1. the **placement digest**, a SHA-256 of the placement written beside it, so any edit made after grus wrote the record
-   is refused;
 1. the cells: exactly the cells the pedigree lays out, each on its row, none twice;
 1. `first_generation`, against the pedigree;
 1. every relation that the row order and x determine — parent columns, couple, twin and childless flags, `lone`, founder
@@ -135,11 +132,8 @@ checks, in order:
 1. what the order and x must satisfy: each row in increasing x from 0, every adjacent pair at least its separation
    (label clearance included, less the position quantum), and no two sibships' bars overlapping.
 
-Checks 4–7 hold for any record that draws a correct figure of the pedigree; they are what stands if someone recomputes
-the placement digest after an edit. What they cannot check, and the loader therefore trusts once the digest matches, is
-that the order and the x are the ones grus's ordering search and x-solve chose: two unrelated cells swapped, or a child
-nudged within its row, is still a correct drawing of the pedigree, just not grus's. Verifying that would mean re-running
-the search and the solve, which is the cost the store exists to avoid.
+These catch a stale record and a bug in grus's own serializer or in a version change, cheaply; they do not re-run the
+ordering search or the x-solve, so they do not establish that the order and x are the ones grus would choose.
 
 ### Exactness
 
@@ -190,6 +184,6 @@ unchanged.
   without maps, but protobuf does not promise it across releases. If a protobuf upgrade changed it, every stored layout
   would read as stale — safe, but a mass recomputation. A hand-rolled canonical encoding would remove the dependency at
   the cost of maintaining it as the IR grows.
-- **Hand edits.** Letting a person adjust a stored layout (nudge a cell, swap siblings) would reuse checks 4–7 above as
-  the validator, drop the placement digest for such records, and need a notion of a layout that is valid without being
-  grus's own output — for instance an `origin` field saying who placed it.
+- **Hand edits.** Letting a person adjust a stored layout (nudge a cell, swap siblings) would reuse the consistency
+  checks above as the validator, and need a notion of a layout that is valid without being grus's own output — for
+  instance an `origin` field saying who placed it.

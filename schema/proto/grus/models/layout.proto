@@ -20,12 +20,6 @@ message PedigreeLayout {
     // its placeholder tile from this without repeating the search.
     string deferred = 3 [(buf.validate.field).string.min_len = 1];
   }
-  // SHA-256 of the placement's deterministic serialization, set with it. Drawing refuses a placement that does not
-  // match: an edit that keeps every checkable relation (two unrelated cells swapped) still changes the drawing.
-  bytes placement_digest = 4 [
-    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
-    (buf.validate.field).bytes.len = 32
-  ];
 }
 
 // The stored layouts of a PedigreeSet's pedigrees, one per pedigree in the set's order.

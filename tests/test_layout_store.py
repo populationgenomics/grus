@@ -265,19 +265,13 @@ def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
         render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0])])
 
 
-# --- a record edited after grus wrote it -----------------------------------------------------------------------------
+# --- an internally inconsistent record (a serializer or version bug) ------------------------------------------------
 
 
-def _edited(name: str, edit: Callable[[lpb.Placement], None], *, redigest: bool = True) -> lpb.PedigreeLayout:
-    """``name``'s stored layout with ``edit`` applied.
-
-    ``redigest`` recomputes the placement digest, as a deliberate editor would, so the structural checks behind it are
-    what refuse the record.
-    """
+def _edited(name: str, edit: Callable[[lpb.Placement], None]) -> lpb.PedigreeLayout:
+    """``name``'s stored layout with ``edit`` applied to its placement."""
     record = render.store_layout(_FIXTURES[name])
     edit(record.placement)
-    if redigest:
-        record.placement_digest = hashlib.sha256(record.placement.SerializeToString(deterministic=True)).digest()
     return record
 
 
@@ -327,20 +321,10 @@ _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
 
 
 @pytest.mark.parametrize("case", sorted(_EDITS))
-def test_an_edited_record_is_refused_even_with_a_matching_digest(case: str) -> None:
+def test_an_inconsistent_record_is_refused(case: str) -> None:
     name, edit, why = _EDITS[case]
     with pytest.raises(render.StaleLayoutError, match=why):
         render.render_svg(_FIXTURES[name], stored_layout=_edited(name, edit))
-
-
-def test_an_edit_the_structure_allows_is_refused_by_the_digest() -> None:
-    # Two unrelated founders swapped, or a child nudged right: still a correct drawing of the pedigree, and so beyond
-    # the structural checks, but not grus's. The placement digest refuses it.
-    unrelated = _edited("carrier_inheritance", lambda pl: _swap_identities(pl.rows[0], 0, 2), redigest=False)
-    nudged = _edited("three_generation", lambda pl: setattr(pl.rows[2].cells[1], "x", 9.0), redigest=False)
-    for name, record in (("carrier_inheritance", unrelated), ("three_generation", nudged)):
-        with pytest.raises(render.StaleLayoutError, match="digest"):
-            render.render_svg(_FIXTURES[name], stored_layout=record)
 
 
 def _deferred_pedigree() -> pb.Pedigree:
