@@ -73,28 +73,29 @@ read the same `Condition.inheritance` + condition legend). `CarrierStyle.INHERIT
 existing literature): X-linked → central dot, else a region fill. `CarrierStyle.PARTITION_FILL` (NSGC 2022 §4.5, dot
 retired): every carrier is a region fill regardless of inheritance. A region fill is a rectangle clipped to the shape
 via a per-symbol `clipPath`, so one code path covers □ ○ ◇; the region is keyed to the carried condition's index in the
-pedigree's condition legend (distinct names, phenotype labels first) — so two carriers of *different* named variants
-fill *opposite* halves (a compound het reads as opposite sides), while a single or unnamed carrier is the plain left
-half (2-split; quadrants for 3–4 conditions). Plus deceased slash and proband arrow. A **count-collapsed** symbol (a
-group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its number, or `n` for an unknown number;
-`count` absent or 1 is one person and draws none (`ir.validate` rejects `count` < 1 and `count` with
-`count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
-centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
-for a circle, 0.5 for a diamond), white on an affected symbol's solid fill and black otherwise. When a mark runs through
-the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the deceased slash — it moves beside
-the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side, clear of
-the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the count clears both its label and
-its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over a carrier's region fill. A ghost
-places its count as the real cell does. Connectors: **mating line** (horizontal between partners; doubled for
-consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit `Mating.consanguineous`
-flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop from the mating midpoint →
-horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a crossing or a cousin standing
-beside its mate, turns at its own elbow track above the bars with rounded corners and lands on its bar's near end, and
-elbows sharing a row gap stagger, a drop standing over another's landing leg turning higher), a **founder sibship**'s
-implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point
-instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless
-glyph** (a couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
-`CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
+pedigree's condition legend (distinct names, phenotype labels first, then by first appearance in `Position` order) — so
+two carriers of *different* named variants fill *opposite* halves (a compound het reads as opposite sides), while a
+single or unnamed carrier is the plain left half (2-split; quadrants for 3–4 conditions). Plus deceased slash and
+proband arrow. A **count-collapsed** symbol (a group drawn as one: `Individual.count` > 1, or `count_unspecified`)
+carries its number, or `n` for an unknown number; `count` absent or 1 is one person and draws none (`ir.validate`
+rejects `count` < 1 and `count` with `count_unspecified`). The count never overprints another mark. When nothing runs
+through the symbol's centre it is centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape
+(0.8 of the size for a square, 0.7 for a circle, 0.5 for a diamond), white on an affected symbol's solid fill and black
+otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the
+deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating
+line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the
+count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over a
+carrier's region fill. A ghost places its count as the real cell does. Connectors: **mating line** (horizontal between
+partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit
+`Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop
+from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a
+crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with rounded corners and
+lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's landing leg turning
+higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short
+vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a
+joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating midpoint down to a short
+horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn
+instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;

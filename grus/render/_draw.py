@@ -195,8 +195,10 @@ def _condition_legend(p: pb.Pedigree) -> list[str]:
     """Ordered distinct condition names in the pedigree — the key for which region a carrier fills.
 
     Phenotype legend labels come first (their drawn order), then any remaining condition names by first
-    appearance. A condition's index here selects its fill region, so two carriers of *different* named
-    conditions get *different* halves (a compound het reads as opposite halves), consistently pedigree-wide.
+    appearance, walking individuals in ``Position`` order (never input order, so the legend and every carrier's fill
+    region are independent of how the IR lists its individuals). A condition's index here selects its fill region,
+    so two carriers of *different* named conditions get *different* halves (a compound het reads as opposite halves),
+    consistently pedigree-wide.
     """
     order: list[str] = []
     seen: set[str] = set()
@@ -204,7 +206,7 @@ def _condition_legend(p: pb.Pedigree) -> list[str]:
         if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text and label.text not in seen:
             seen.add(label.text)
             order.append(label.text)
-    for ind in p.individuals:
+    for ind in sorted(p.individuals, key=lambda ind: (ind.generation, ind.index)):
         for c in ind.conditions:
             if c.name and c.name not in seen:
                 seen.add(c.name)

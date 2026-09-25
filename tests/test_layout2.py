@@ -965,3 +965,29 @@ def test_ghost_drawing_is_independent_of_mating_order(name: str) -> None:
         q.matings.extend(perm)
         svgs.add(render.render_svg(q))
     assert len(svgs) == 1
+
+
+def _two_condition_carriers() -> pb.Pedigree:
+    """Two carriers of different named conditions, listed so input order and Position order disagree."""
+
+    def carrier(i: int, name: str) -> pb.Individual:
+        ind = _ghost_ind(1, i)
+        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER)
+        return ind
+
+    return pb.Pedigree(individuals=[carrier(2, "beta"), carrier(1, "alpha")])
+
+
+@pytest.mark.parametrize("name", [*_DRAWABLE, *sorted(GHOST_PEDIGREES), "two_condition_carriers"])
+def test_render_is_shuffle_invariant(name: str) -> None:
+    # Everything drawn depends on the pedigree, not on how the IR lists it: the whole SVG, including the condition
+    # legend that keys each carrier's fill region, is byte-identical under a shuffle.
+    if name in GHOST_PEDIGREES:
+        p = GHOST_PEDIGREES[name]
+    elif name == "two_condition_carriers":
+        p = _two_condition_carriers()
+    else:
+        p = test_render._load(name)
+    ref = render.render_svg(p)
+    for seed in range(4):
+        assert render.render_svg(_shuffled(p, seed)) == ref
