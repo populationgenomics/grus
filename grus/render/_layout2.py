@@ -135,7 +135,7 @@ def _prepare(p: pb.Pedigree) -> _Prepared:
     """
     ir.validate(p)
     g = _layout._derive(p)
-    ghost_of = _layout._duplicate_cross_generation(g)
+    ghost_of = _layout._duplicate_cross_generation(g, p)
     cross = _layout._cross_matings(g)
     _layout._detect_loops(g, cross)
     first_generation = _layout._rank(g)

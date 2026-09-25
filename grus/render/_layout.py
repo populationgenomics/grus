@@ -40,6 +40,8 @@ Key = tuple[int, int]
 
 # Childlessness values that draw a glyph (by choice / infertility); NONE and UNSPECIFIED draw nothing.
 _CHILDLESS_DRAWN = frozenset({int(pb.CHILDLESSNESS_BY_CHOICE), int(pb.CHILDLESSNESS_INFERTILITY)})
+# A ghost's synthetic index is this plus its rank among the pedigree's ghost identities: above every real index.
+_GHOST_INDEX_BASE = 1_000_000_000
 
 
 class DeferredFeatureError(Exception):
@@ -229,6 +231,24 @@ class _Mating:
         return self.partners[1] if x == self.partners[0] else self.partners[0]
 
 
+@dataclass(frozen=True, order=True)
+class GhostKey:
+    """A ghost's identity, from the pedigree's content alone: the join it is drawn for.
+
+    Attributes:
+        real: ``(generation, index)`` of the real individual the ghost duplicates.
+        partner: ``(generation, index)`` of the partner it marries.
+        first_child: ``(generation, index)`` of the join's first child; ``None`` for a childless join.
+        occurrence: 0, or the rank among joins agreeing on the fields above (repeated matings of one pair, told
+            apart by their content; content-identical ones are interchangeable).
+    """
+
+    real: Key
+    partner: Key
+    first_child: Key | None
+    occurrence: int
+
+
 @dataclass
 class _Graph:
     """The pedigree as index-based adjacency the layout works over."""
@@ -242,6 +262,7 @@ class _Graph:
     foundersib_members: set[int] = field(default_factory=set)  # individuals grouped by a partnerless mating
     level: list[int] = field(default_factory=list)
     passthrough_to: dict[int, int] = field(default_factory=dict)  # pass-through -> first real child it leads to
+    ghost_key: dict[int, GhostKey] = field(default_factory=dict)  # ghost -> its identity (see GhostKey)
     phantom_of: dict[int, int] = field(default_factory=dict)  # phantom partner -> the lone parent it partners
 
     @property
@@ -399,7 +420,7 @@ def _born_in(g: _Graph, i: int) -> bool:
     return i in g.parents or i in g.foundersib_members
 
 
-def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
+def _duplicate_cross_generation(g: _Graph, pedigree: pb.Pedigree) -> dict[int, int]:
     """Turn each genuine cross-generation join into a same-row couple by duplicating the shallower partner.
 
     A cross-lineage join whose two born-in partners sit on **different IR generations** is an avuncular
@@ -412,13 +433,17 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
     matings; drawing renders
     the ghost as a duplicate of the real individual with a dashed "same individual" link.
 
+    A ghost's identity is its ``GhostKey`` (the real individual, its partner, the join's first child), recorded in
+    ``g.ghost_key``; its synthetic ``index`` is its rank among those keys, so every tie-break the ordering takes on
+    identity is independent of the input order.
+
     Returns ``{ghost_index: real_index}`` for the drawing step; mutates ``g`` in place (appends the ghost
     individual, rewrites the join's partners and its children's parent pointers). Same-generation cross joins
     are left untouched — the ordering brings their partners adjacent as an ordinary couple. A partner already
     ghosted for another join, or a join both of whose partners would need duplicating, is left for the loop
     defenses downstream (interlocking cases stay deferred).
     """
-    ghost_of: dict[int, int] = {}
+    joins: list[tuple[int, _Mating, int, int]] = []
     for mi, mr in enumerate(list(g.matings)):
         if mr.b is None or mr.a not in g.parents or mr.b not in g.parents:
             continue  # not a two-lineage join
@@ -426,8 +451,17 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
         if gen_a == gen_b:
             continue  # same-generation join: brought adjacent by the ordering, not duplicated
         shallow, deep = (mr.a, mr.b) if gen_a < gen_b else (mr.b, mr.a)
+        joins.append((mi, mr, shallow, deep))
+    keys = _ghost_keys(g, pedigree, joins)
+    rank = {key: k for k, key in enumerate(sorted(keys.values()))}
+    ghost_of: dict[int, int] = {}
+    for mi, mr, shallow, deep in joins:
         ghost = len(g.individuals)
-        g.individuals.append(pb.Individual(generation=g.individuals[deep].generation, index=10_000 + mi))
+        # The identity the ordering breaks ties on: from the join's content, never the input order, and above every
+        # real index so a ghost ties after the real individuals of its row.
+        index = _GHOST_INDEX_BASE + rank[keys[mi]]
+        g.individuals.append(pb.Individual(generation=g.individuals[deep].generation, index=index))
+        g.ghost_key[ghost] = keys[mi]
         g.parents = dict(g.parents)  # ghost is parentless; real `shallow` keeps its parents
         new = _Mating(
             index=mi,
@@ -444,6 +478,29 @@ def _duplicate_cross_generation(g: _Graph) -> dict[int, int]:
             g.parents[k] = (ghost, deep)
         ghost_of[ghost] = shallow
     return ghost_of
+
+
+def _ghost_keys(g: _Graph, pedigree: pb.Pedigree, joins: list[tuple[int, _Mating, int, int]]) -> dict[int, GhostKey]:
+    """Each join's ``GhostKey`` by mating index; repeated joins of one pair rank by their mating's content."""
+
+    def pos(i: int) -> Key:
+        ind = g.individuals[i]
+        return (ind.generation, ind.index)
+
+    base: dict[int, tuple[Key, Key, Key | None]] = {}
+    for mi, mr, shallow, deep in joins:
+        first = pos(mr.offspring[0].child) if mr.offspring else None
+        base[mi] = (pos(shallow), pos(deep), first)
+    groups: dict[tuple[Key, Key, Key | None], list[int]] = {}
+    for mi, b in base.items():
+        groups.setdefault(b, []).append(mi)
+    out: dict[int, GhostKey] = {}
+    for b, mis in groups.items():
+        # Content-identical repeats tie here; they are interchangeable, so either rank draws the same figure.
+        mis.sort(key=lambda mi: pedigree.matings[mi].SerializeToString(deterministic=True))
+        for occurrence, mi in enumerate(mis):
+            out[mi] = GhostKey(*b, occurrence)
+    return out
 
 
 def _rank(g: _Graph) -> int:
