@@ -13,9 +13,9 @@ says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders a
 same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
 (docs/design/layout-store.md).
 
-Exit status: 0 on success; 1 when the input fails (``validate``) or the ``--layout`` file cannot be drawn from —
-unreadable, unparseable, the wrong kind for the input (a set's layout for a single pedigree or the reverse), invalid, or
-stale — reported as one line naming the file and the cause; 2 for a usage error.
+Exit status: 0 on success; 1 when an input file cannot be used — an IR file that is unreadable, not UTF-8,
+unparseable or invalid, or a ``--layout`` file that is any of those, the wrong kind for the input (a set's layout for a
+single pedigree or the reverse), or stale — reported as one line naming the file and the cause; 2 for a usage error.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
     A set is tried first because its top-level field (``pedigrees``) is disjoint from a pedigree's; a
     text that parses as neither raises the *pedigree* parse error (the more common hand-authored shape).
     """
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     parse = json_format.Parse if fmt == "json" else text_format.Parse
     try:
         ps = parse(text, pb.PedigreeSet())
@@ -79,6 +79,23 @@ def _describe(e: BaseException) -> str:
     return "; ".join(parts)
 
 
+def _load_input(args: argparse.Namespace, command: str) -> pb.PedigreeSet | pb.Pedigree | None:
+    """``load_ir`` on the command's input, or ``None`` after reporting why it cannot be read, in one line."""
+    path: pathlib.Path = args.input
+    try:
+        return load_ir(path, _text_format(path, args.format))
+    except OSError as e:
+        cause = f"cannot read it: {e.strerror or e}"
+    except UnicodeDecodeError as e:
+        cause = f"not UTF-8 text: {e.reason} at byte {e.start}"
+    except (json_format.ParseError, text_format.ParseError) as e:
+        cause = f"not a pedigree IR: {e}"
+    except (ir.ValidationError, ir.IntegrityError) as e:
+        cause = f"invalid: {_describe(e)}"
+    print(f"grus {command}: error: {path}: {' '.join(cause.split())}", file=sys.stderr)
+    return None
+
+
 def _geometry(args: argparse.Namespace) -> render.Geometry:
     geom = render.DEFAULT_GEOMETRY
     if args.carrier_style:
@@ -108,9 +125,11 @@ def _read_layout[Stored: (lpb.PedigreeLayout, lpb.PedigreeSetLayout)](path: path
     """Parse and validate a stored-layout file of ``kind`` (a set's layout for a set input, else one pedigree's)."""
     parse = json_format.Parse if _text_format(path, None) == "json" else text_format.Parse
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except OSError as e:
         raise _LayoutFileError(f"cannot read it: {e.strerror or e}") from e
+    except UnicodeDecodeError as e:
+        raise _LayoutFileError(f"not UTF-8 text: {e.reason} at byte {e.start}") from e
     try:
         record = parse(text, kind())
     except (json_format.ParseError, text_format.ParseError) as e:
@@ -138,7 +157,9 @@ def _violation(v: protovalidate.Violation) -> str:
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
-    loaded = load_ir(args.input, _text_format(args.input, args.format))
+    loaded = _load_input(args, "render")
+    if loaded is None:
+        return 1
     geom = _geometry(args)
     try:
         if isinstance(loaded, pb.PedigreeSet):
@@ -169,7 +190,9 @@ def _cmd_render(args: argparse.Namespace) -> int:
 
 
 def _cmd_layout(args: argparse.Namespace) -> int:
-    loaded = load_ir(args.input, _text_format(args.input, args.format))
+    loaded = _load_input(args, "layout")
+    if loaded is None:
+        return 1
     geom = _geometry(args)
     record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
         lpb.PedigreeSetLayout(pedigrees=[render.store_layout(p, geom) for p in loaded.pedigrees])

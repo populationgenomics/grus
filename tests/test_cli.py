@@ -224,3 +224,39 @@ def test_render_reports_a_missing_or_garbled_layout(tmp_path: pathlib.Path, caps
     garbled.write_text("this is not a layout")
     err = _render_error(capsys, ["render", str(one), "--layout", str(garbled)])
     assert "not a PedigreeLayout" in err
+
+
+def test_render_reports_a_layout_that_is_not_text(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, _, _, _ = _layout_files(tmp_path)
+    binary = tmp_path / "binary.pbtxt"
+    binary.write_bytes(b"\xff\xfe\x00garbage")
+    err = _render_error(capsys, ["render", str(one), "--layout", str(binary)])
+    assert str(binary) in err and "not UTF-8 text" in err
+    err = _render_error(capsys, ["render", str(one), "--layout", str(tmp_path)])
+    assert str(tmp_path) in err and "cannot read it" in err
+
+
+@pytest.mark.parametrize("command", ["render", "layout"])
+@pytest.mark.parametrize(
+    ("content", "cause"),
+    [
+        (b"\xff\xfe\x00garbage", "not UTF-8 text"),
+        (b"no such field: 1\n", "not a pedigree IR"),
+        (
+            b"individuals { generation: 1 index: 1 gender: GENDER_MAN }\n"
+            b"matings { partner_a { generation: 9 index: 9 } }\n",
+            "invalid",
+        ),
+    ],
+)
+def test_an_unusable_input_is_reported_in_one_line(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str], command: str, content: bytes, cause: str
+) -> None:
+    src = tmp_path / "in.pbtxt"
+    src.write_bytes(content)
+    assert cli.main([command, str(src)]) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and err.startswith(f"grus {command}: error: {src}: {cause}")
+    missing = tmp_path / "missing.pbtxt"
+    assert cli.main([command, str(missing)]) == 1
+    assert "cannot read it" in capsys.readouterr().err
