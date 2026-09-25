@@ -310,13 +310,15 @@ _MAX_FACING_SEEDS = 6  # seeded runs per pedigree, each a full mincross; only wh
 
 
 def _facing_seeds(model: _Model) -> list[dict[int, list[int]]]:
-    """One child-order override per same-row marriage between relatives, bringing their two lines to facing ends.
+    """One child-order override per same-row marriage whose lines split at a mating, bringing them to facing ends.
 
-    For partners ``x`` and ``y`` with a common ancestor, the nearest mating ``M`` with distinct children ``a_x``
+    For partners ``x`` and ``y`` below a common couple, the nearest mating ``M`` with distinct children ``a_x``
     (``x`` or an ancestor of ``x``) and ``a_y`` (likewise for ``y``) is where the lines split. The seed puts ``a_y``
     right after ``a_x`` among ``M``'s children, and at every mating below on ``x``'s line the child toward ``x``
     last, on ``y``'s line the child toward ``y`` first, so the first-appearance order starts with the two
-    families side by side and the partners at their facing ends. Deterministic: matings in index order.
+    families side by side and the partners at their facing ends. Seeds are in the marriages' identity order and ties
+    between split matings break on identity, so neither depends on input order. Relatives only through a parent's
+    two different matings (half-first-cousins) share no such ``M`` and get no seed.
     """
     g = model.g
     mating_of = {k: mr for mr in g.matings for k in mr.kids}
@@ -339,19 +341,19 @@ def _facing_seeds(model: _Model) -> list[dict[int, list[int]]]:
         return out
 
     seeds: list[dict[int, list[int]]] = []
-    for mr in g.matings:
+    for mr in sorted(g.matings, key=model.mating_key):  # identity order, so the cap and early stop are shuffle-free
         if len(mr.partners) != 2 or not all(p in mating_of for p in mr.partners):
             continue
         x, y = sorted(mr.partners, key=model.ident)
         up_x, up_y = line(x), line(y)
-        best: tuple[int, _layout._Mating, int, int] | None = None
+        best: tuple[tuple[int, object], _layout._Mating, int, int] | None = None
         for m in g.matings:
             ax = [k for k in m.kids if k in up_x]
             ay = [k for k in m.kids if k in up_y]
             if ax and ay and ax[0] != ay[0]:
-                depth = model.rank[m.kids[0]]
-                if best is None or depth > best[0]:
-                    best = (depth, m, ax[0], ay[0])
+                rank = (-model.rank[m.kids[0]], model.mating_key(m))  # deepest split, then identity
+                if best is None or rank < best[0]:
+                    best = (rank, m, ax[0], ay[0])
         if best is None:
             continue  # not relatives: an ordinary couple
         _, top, ax, ay = best

@@ -737,6 +737,29 @@ def test_cousins_across_a_middle_sibling_start_at_facing_ends() -> None:
     assert abs(row.index("5-1") - row.index("5-4")) == 1
 
 
+def test_facing_seeds_do_not_depend_on_input_order() -> None:
+    # The seeds were built in input mating order, and ties between split matings went to the first in input order,
+    # while the six-seed cap and the stop at the first tear-free seed made that order decide draw versus defer (a
+    # fuzzed pedigree drew in one input order and deferred in two others). Seeds and ties now follow identity.
+    from grus.render import _layout2 as l2
+    from grus.render import _ordering
+
+    def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, int], ...], list[tuple[int, int]]]]:
+        prep = l2._prepare(p)
+        model = _ordering._Model(prep.graph)
+        by_index = {mr.index: mr for mr in prep.graph.matings}
+        return [
+            {model.mating_key(by_index[mi])[0]: [model.ident(k) for k in kids] for mi, kids in seed.items()}
+            for seed in _ordering._facing_seeds(model)
+        ]
+
+    p = test_render._load("cousins_across_middle_sibling")
+    ref = seeds(p)
+    assert ref
+    for seed in range(4):
+        assert seeds(_shuffled(p, seed)) == ref
+
+
 def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
     # I-1 has three childless partners, one more than a row has sides for, so one mating routes. The tie between
     # equally weighted matings broke on input position, so shuffling Pedigree.matings changed which partner stood
