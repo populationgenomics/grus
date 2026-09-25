@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import random
 import time
 
 from grus import render
@@ -72,6 +73,39 @@ def measure(case: corpus.Case, highs: bool) -> Result:
         return Result(case.key, time.perf_counter() - t, None, str(e))
     seconds = time.perf_counter() - t
     return Result(case.key, seconds, _drawn(p, lay, render.render_svg(p, geom)), None)
+
+
+def shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
+    """``p`` with its individuals and matings in a seeded random order; offspring keep theirs, which is birth order."""
+    rng = random.Random(seed)
+    inds = list(p.individuals)
+    mats = list(p.matings)
+    rng.shuffle(inds)
+    rng.shuffle(mats)
+    q = pb.Pedigree()
+    q.CopyFrom(p)
+    del q.individuals[:]
+    del q.matings[:]
+    q.individuals.extend(inds)
+    q.matings.extend(mats)
+    return q
+
+
+def shuffle_outcomes(p: pb.Pedigree, shuffles: int, highs: bool) -> list[str]:
+    """The SVG digest, or ``defer``, of ``p`` and of ``shuffled(p, s)`` for each ``s`` below ``shuffles``."""
+    geom = geometry(highs)
+    out = []
+    for q in [p] + [shuffled(p, s) for s in range(shuffles)]:
+        try:
+            out.append(hashlib.sha1(render.render_svg(q, geom).encode()).hexdigest())
+        except render.DeferredFeatureError:
+            out.append("defer")
+    return out
+
+
+def shuffle_case(case: corpus.Case, shuffles: int, highs: bool) -> tuple[str, list[str]]:
+    """``shuffle_outcomes`` of ``case``'s pedigree, with its key."""
+    return case.key, shuffle_outcomes(case.load(), shuffles, highs)
 
 
 def _drawn(p: pb.Pedigree, lay: render.Layout, svg: str) -> Drawn:

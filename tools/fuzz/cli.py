@@ -1,4 +1,4 @@
-"""Command line for the fuzz tooling: ``python -m tools.fuzz {gen,diff}``."""
+"""Command line for the fuzz tooling: ``python -m tools.fuzz {gen,diff,shuffle}``."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 
 from google.protobuf import text_format
 
-from tools.fuzz import corpus, diff, gen, trees
+from tools.fuzz import corpus, diff, gen, shuffle, trees
 
 
 def _corpus_args(p: argparse.ArgumentParser) -> None:
@@ -57,6 +57,14 @@ def _diff(args: argparse.Namespace) -> int:
     return 1 if c.changed else 0
 
 
+def _shuffle(args: argparse.Namespace) -> int:
+    cases = _cases(args)
+    with trees.materialised([args.tree]) as (t,):
+        results = shuffle.run(t, cases, args.shuffles, args.jobs, args.highs)
+    print(shuffle.report(results, args.show))
+    return 1 if shuffle.varying(results) else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one command; the exit status is 1 when a check finds a change, else 0."""
     parser = argparse.ArgumentParser(prog="python -m tools.fuzz", description=__doc__)
@@ -75,6 +83,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--show", type=int, default=20, help="cases listed per change (default 20)")
     p.add_argument("--json", type=pathlib.Path, help="also write both runs' raw results here")
     p.set_defaults(func=_diff)
+
+    p = sub.add_parser("shuffle", help="check that drawings do not depend on the order of individuals and matings")
+    p.add_argument("tree", help="a git ref or a directory holding grus/")
+    _corpus_args(p)
+    _run_args(p)
+    p.add_argument("--shuffles", type=int, default=3, help="shuffled copies drawn per pedigree (default 3)")
+    p.add_argument("--show", type=int, default=20, help="varying cases listed (default 20)")
+    p.set_defaults(func=_shuffle)
 
     args = parser.parse_args(argv)
     return args.func(args)
