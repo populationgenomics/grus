@@ -277,26 +277,28 @@ def _apart(
     return tuple(out)
 
 
-def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
-    """Each cell's half-label reach in layout units: half its label width plus half the gap between labels.
+def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, tuple[float, float]]:
+    """Each cell's label reach left and right in layout units: the stack's reach plus half the gap between labels.
 
-    Two neighbours need ``(w_left + w_right) / 2 + label_size`` pixels between centres for their label stacks not to
-    touch; that is the sum of the two cells' values. A pass-through or phantom draws no label and needs none; a ghost
-    reserves its real individual's label.
+    Two neighbours need the left cell's right reach plus the right cell's left reach between centres for their
+    label stacks not to touch (``(w_left + w_right) / 2 + label_size`` for two centred stacks). A stack set beside
+    its own-centre drop (``_labels.label_reach``) reaches right only. A pass-through or phantom draws no label and
+    needs none; a ghost reserves its real individual's label.
     """
-    out: dict[int, float] = {}
-    for row in lay.nid:
-        for c in row:
+    out: dict[int, tuple[float, float]] = {}
+    for level, row in enumerate(lay.nid):
+        for k, c in enumerate(row):
             if c in lay.passthrough or c in lay.phantom:
-                out[c] = 0.0
+                out[c] = (0.0, 0.0)
                 continue
             ind = p.individuals[lay.ghost_of.get(c, c)]
-            out[c] = (_labels.label_width(ind, geom) + geom.label_size) / 2 / geom.x_unit
+            left, right = _labels.label_reach(ind, geom, beside=lay.drops_from_centre(level, k))
+            out[c] = ((left + geom.label_size / 2) / geom.x_unit, (right + geom.label_size / 2) / geom.x_unit)
     return out
 
 
 def _row_seps(
-    lay: _layout.Layout, couple_gap: float, sib_gap: float, clearance: dict[int, float] | None = None
+    lay: _layout.Layout, couple_gap: float, sib_gap: float, clearance: dict[int, tuple[float, float]] | None = None
 ) -> list[list[float]]:
     """Hard min-separation between each adjacent pair on a row.
 
@@ -311,7 +313,7 @@ def _row_seps(
         [
             max(
                 couple_gap if lay.spouse[level][k] else sib_gap,
-                reach.get(lay.nid[level][k], 0.0) + reach.get(lay.nid[level][k + 1], 0.0),
+                reach.get(lay.nid[level][k], (0.0, 0.0))[1] + reach.get(lay.nid[level][k + 1], (0.0, 0.0))[0],
             )
             for k in range(lay.n[level] - 1)
         ]

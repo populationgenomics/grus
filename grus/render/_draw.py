@@ -335,6 +335,13 @@ class _Draw:
                     self._ghost_cell[idx] = (level, k)
                     seen[lay.ghost_of[idx]] += 1
                     self._ghost_ordinal[idx] = seen[lay.ghost_of[idx]]
+        # Cells whose descent drops from their own centre: their label stacks sit beside the line (label_reach).
+        self._beside = {
+            lay.nid[level][k]
+            for level in range(len(lay.nid))
+            for k in range(lay.n[level])
+            if lay.drops_from_centre(level, k)
+        }
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
         self._elbow = self._assign_elbows()
@@ -389,14 +396,14 @@ class _Draw:
         """The individual in cell ``idx`` — resolving a synthetic ghost (cross-generation duplicate) to its real."""
         return self.p.individuals[self.lay.ghost_of.get(idx, idx)]
 
-    def _cell_w(self, idx: int) -> float:
-        """The width cell ``idx``'s label stack reserves; a pass-through or phantom is a line only and reserves none."""
+    def _cell_reach(self, idx: int) -> tuple[float, float]:
+        """How far cell ``idx``'s label stack reaches left and right; a pass-through or phantom reaches nowhere."""
         if idx in self.lay.passthrough or idx in self.lay.phantom:
-            return 0.0
-        return self._label_w(self._ind_at(idx))
+            return (0.0, 0.0)
+        return self._label_reach(self._ind_at(idx), beside=idx in self._beside)
 
-    def _label_w(self, ind: pb.Individual) -> float:
-        return _labels.label_width(ind, self.geom)
+    def _label_reach(self, ind: pb.Individual, *, beside: bool) -> tuple[float, float]:
+        return _labels.label_reach(ind, self.geom, beside=beside)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
@@ -408,20 +415,24 @@ class _Draw:
         return {v: v * self.geom.x_unit for row in self.lay.pos for v in row}
 
     def _content_bounds(self) -> tuple[float, float]:
-        """Leftmost / rightmost pixel offset touched by any symbol *or* its centred label stack.
+        """Leftmost / rightmost pixel offset touched by any symbol *or* its label stack.
 
-        A label is centred on its symbol and can be wider than it, so it — not the symbol — sets the
-        canvas edge. Returns the min/max content edge in ``_px`` offset units (symbol half or label
-        half, whichever reaches further from each cell's centre).
+        A label can be wider than its symbol, so it — not the symbol — sets the canvas edge. Returns the min/max
+        content edge in ``_px`` offset units (symbol half or label reach, whichever is further from each cell's
+        centre).
         """
         los: list[float] = []
         his: list[float] = []
         for level, row in enumerate(self.lay.pos):
             for k, x in enumerate(row):
                 idx = self.lay.nid[level][k]
-                extent = 0.0 if idx in self.lay.phantom else max(self.half, self._cell_w(idx) / 2)
-                los.append(self._px[x] - extent)
-                his.append(self._px[x] + extent)
+                if idx in self.lay.phantom:
+                    los.append(self._px[x])
+                    his.append(self._px[x])
+                    continue
+                left, right = self._cell_reach(idx)
+                los.append(self._px[x] - max(self.half, left))
+                his.append(self._px[x] + max(self.half, right))
         return (min(los), max(his)) if los else (0.0, 0.0)
 
     def px(self, x: float) -> float:
@@ -808,13 +819,14 @@ class _Draw:
                     continue  # an omitted partner: only its marriage line is drawn, by _matings
                 cx, cy = self.px(self.lay.pos[level][k]), self.py(level)
                 real = self.lay.ghost_of.get(idx)
+                beside = idx in self._beside
                 if real is not None:
-                    out += self._ghost_symbol(self.p.individuals[real], cx, cy, self._ghost_ordinal[idx])
+                    out += self._ghost_symbol(self.p.individuals[real], cx, cy, self._ghost_ordinal[idx], beside=beside)
                 else:
-                    out += self._symbol(self.p.individuals[idx], cx, cy)
+                    out += self._symbol(self.p.individuals[idx], cx, cy, beside=beside)
         return out
 
-    def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float, ordinal: int) -> list[str]:
+    def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float, ordinal: int, *, beside: bool) -> list[str]:
         """A duplicated individual (cross-generation join).
 
         The same shape/affection, count and id label as the real one, but no arrow, annotations, or status marks —
@@ -827,8 +839,8 @@ class _Draw:
         out += self._count_mark(ind, cx, cy)
         lines, ys = _label_lines(ind), self._line_ys(ind)
         if lines:
-            out.append(_text(cx, cy + self.half + ys[0], _escape(lines[0]), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy, arrow=False))
+            out.append(self._label(lines[0], cx, cy + self.half + ys[0], beside=beside))
+        out.append(self._hit_rect(ind, cx, cy, arrow=False, beside=beside))
         out.append("</g>")
         return out
 
@@ -881,13 +893,14 @@ class _Draw:
         idx = self._data_legend.index(affected[0].name)
         return [self._shape(ind.gender, cx, cy, _STROKE, stroke=False, cls="fill", extra=f'data-condition="{idx}"')]
 
-    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool) -> str:
+    def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool, beside: bool) -> str:
         """The invisible pointer target: the symbol, its reserved label box, and the arrow when one is drawn.
 
-        ``arrow`` is whether this cell draws the proband/consultand arrow (a ghost never does).
+        ``arrow`` is whether this cell draws the proband/consultand arrow (a ghost never does); ``beside`` whether its
+        label stack sits beside an own-centre drop.
         """
-        w = max(self.geom.symbol_size, self._label_w(ind))
-        left, right = cx - w / 2, cx + w / 2
+        reach_left, reach_right = self._label_reach(ind, beside=beside)
+        left, right = cx - max(self.half, reach_left), cx + max(self.half, reach_right)
         bottom = cy + self.half + self.label_band
         if arrow and (ind.proband or ind.consultand):
             # The arrow's tail sits symbol_size/sqrt(2) beyond the lower-left corner; a proband's 'P' hangs
@@ -922,7 +935,7 @@ class _Draw:
             out.append("</g>")
         return out
 
-    def _symbol(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
+    def _symbol(self, ind: pb.Individual, cx: float, cy: float, *, beside: bool) -> list[str]:
         """One ``individual`` group: backing, status fill, outline, marks, label lines, hit — in that order."""
         statuses = {c.status for c in ind.conditions}
         affected = pb.CONDITION_STATUS_AFFECTED in statuses
@@ -946,10 +959,16 @@ class _Draw:
             out += ['<g class="mark consultand">', *self._arrow(cx, cy, label=None), "</g>"]
         base_y = cy + self.half
         for line, off in zip(_label_lines(ind), self._line_ys(ind), strict=True):
-            out.append(_text(cx, base_y + off, _escape(line), self.geom.label_size, cls="label"))
-        out.append(self._hit_rect(ind, cx, cy, arrow=True))
+            out.append(self._label(line, cx, base_y + off, beside=beside))
+        out.append(self._hit_rect(ind, cx, cy, arrow=True, beside=beside))
         out.append("</g>")
         return out
+
+    def _label(self, line: str, cx: float, y: float, *, beside: bool) -> str:
+        """One label line: centred under the symbol, or left-aligned ``label_gap`` right of an own-centre drop."""
+        if beside:
+            return _text(cx + self.geom.label_gap, y, _escape(line), self.geom.label_size, cls="label", anchor="start")
+        return _text(cx, y, _escape(line), self.geom.label_size, cls="label")
 
     def _count_mark(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
         """A count-collapsed symbol's number, or ``n`` for an unknown number, centred inside it (Bennett).
@@ -1105,8 +1124,8 @@ def _hit_polyline(points: list[tuple[float, float]]) -> str:
     )
 
 
-def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "") -> str:
+def _text(x: float, y: float, s: str, size: float, fill: str = _STROKE, cls: str = "", anchor: str = "middle") -> str:
     return (
         f'<text {_cls(cls)}x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(size)}" '
-        f'fill="{fill}" text-anchor="middle" dominant-baseline="central">{s}</text>'
+        f'fill="{fill}" text-anchor="{anchor}" dominant-baseline="central">{s}</text>'
     )

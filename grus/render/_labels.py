@@ -77,6 +77,17 @@ def count_text(ind: pb.Individual) -> str | None:
     return str(ind.count) if ind.count > 1 else None
 
 
+def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, beside: bool) -> tuple[float, float]:
+    """How far ``ind``'s label stack reaches left and right of its symbol's centre, in pixels.
+
+    A stack is centred under its symbol, unless ``beside``: a symbol whose descent drops from its own centre (a
+    count-collapsed or sideless lone parent) would have that line run through a centred stack, so the stack is
+    left-aligned ``label_gap`` right of the line instead.
+    """
+    w = label_width(ind, geom)
+    return (0.0, geom.label_gap + w) if beside else (w / 2, w / 2)
+
+
 def label_width(ind: pb.Individual, geom: _geometry.Geometry) -> float:
     """Estimated pixel width of ``ind``'s widest label line (conservative — text is unmeasurable here).
 

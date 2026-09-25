@@ -1,0 +1,27 @@
+id: "count_collapsed_parents"
+labels { text: "Count-collapsed siblings each with offspring of unknown number drop straight down; a lone parent keeps its omitted partner" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_MAN }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 3 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 4 gender: GENDER_MAN }
+individuals { generation: 3 index: 1 gender: GENDER_WOMAN count: 3 }
+individuals { generation: 3 index: 2 gender: GENDER_MAN count: 3 }
+individuals { generation: 3 index: 3 gender: GENDER_MAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 4 gender: GENDER_MAN count: 6 }
+individuals { generation: 3 index: 5 gender: GENDER_WOMAN count: 2 }
+individuals { generation: 4 index: 1 gender: GENDER_UNKNOWN count_unspecified: true }
+individuals { generation: 4 index: 2 gender: GENDER_UNKNOWN count_unspecified: true }
+individuals { generation: 4 index: 3 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 4 index: 4 gender: GENDER_MAN }
+individuals { generation: 4 index: 5 gender: GENDER_UNKNOWN count_unspecified: true }
+individuals { generation: 4 index: 6 gender: GENDER_UNKNOWN count_unspecified: true }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } offspring { child { generation: 2 index: 3 } } }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 2 } offspring { child { generation: 3 index: 1 } } offspring { child { generation: 3 index: 2 } } offspring { child { generation: 3 index: 3 } } }
+matings { partner_a { generation: 2 index: 3 } partner_b { generation: 2 index: 4 } offspring { child { generation: 3 index: 4 } } offspring { child { generation: 3 index: 5 } } }
+matings { partner_a { generation: 3 index: 1 } offspring { child { generation: 4 index: 1 } } }
+matings { partner_a { generation: 3 index: 2 } offspring { child { generation: 4 index: 2 } } }
+matings { partner_a { generation: 3 index: 3 } offspring { child { generation: 4 index: 3 } } offspring { child { generation: 4 index: 4 } } }
+matings { partner_a { generation: 3 index: 4 } offspring { child { generation: 4 index: 5 } } }
+matings { partner_a { generation: 3 index: 5 } offspring { child { generation: 4 index: 6 } } }

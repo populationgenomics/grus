@@ -166,6 +166,7 @@ _SHUFFLED_GOLDENS = (
     "cousins_across_middle_sibling",
     "crossing_descents",
     "lone_parent_sibships",
+    "count_collapsed_parents",
     "twins_marry_chain_stretches",
     "twins_marry_cousins_apart",
 )
@@ -633,6 +634,33 @@ def test_a_lone_parents_sibships_draw_apart(with_mate: bool, sibships: set[tuple
     assert "ind-III-4" not in svg and svg.count('class="individual') == len(
         _lone_parent_pedigree(with_mate).individuals
     )
+
+
+def test_a_count_collapsed_parent_drops_from_its_own_centre() -> None:
+    # A phantom partner drew a group symbol ("3" sisters) as one person with children by an omitted partner. The
+    # literature drops a straight line from the group symbol to its offspring (review-set figure c05): no phantom,
+    # the drop leaves the symbol's centre, and the label stack moves beside the line. An ordinary lone parent keeps
+    # its line to the omitted partner.
+    p = test_render._load("count_collapsed_parents")
+    lay = render.layout(p)
+    svg = render.render_svg(p)
+    at = {
+        (i.generation, i.index): (lv, k)
+        for lv, row in enumerate(lay.nid)
+        for k, c in enumerate(row)
+        if c < len(p.individuals)
+        for i in [p.individuals[c]]
+    }
+    assert len(lay.phantom) == 1
+    assert re.findall(r'<g class="mating partner-omitted" data-partners="([^"]*)"', svg) == ["III-3"]
+    for parent, child in (((3, 1), (4, 1)), ((3, 2), (4, 2)), ((3, 4), (4, 5)), ((3, 5), (4, 6))):
+        (plv, pk), (clv, ck) = at[parent], at[child]
+        assert lay.fam[clv][ck] == pk and lay.descends_from_one(clv, ck)
+        assert lay.drops_from_centre(plv, pk)
+        assert lay.pos[plv][pk] == lay.pos[clv][ck], "the drop runs straight down from the group to its offspring"
+    assert not lay.drops_from_centre(*at[(3, 3)])
+    starts = set(re.findall(r'<text class="label" [^>]*text-anchor="start"[^>]*>([^<]*)</text>', svg))
+    assert starts == {"III-1", "III-2", "III-4", "III-5"}, "only a label with a line through its centre moves"
 
 
 def test_crossing_descents_turn_on_their_own_tracks() -> None:

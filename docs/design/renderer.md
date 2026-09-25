@@ -100,7 +100,9 @@ the single-condition affected/carrier fills above are drawn, the multi-region ca
 `ANNOTATION_TYPE_INDIVIDUAL_NUMBER` annotation is **skipped** — it is the bare arabic index ("2") already carried by
 `local_id` ("II-2"), so drawing it would duplicate the id. De-duplication additionally collapses any annotation whose
 text equals a line already present (e.g. an extractor that repeats the id). The deprecated `label` field is never drawn.
-Lines use `LABEL_SIZE`, separated by `LABEL_LINE_GAP`; the first line sits `LABEL_GAP` below the symbol's bottom edge.
+Lines use `LABEL_SIZE`, separated by `LABEL_LINE_GAP`; the first line sits `LABEL_GAP` below the symbol's bottom edge. A
+symbol whose descent drops from its own centre (a count-collapsed parent, or a lone parent with no free side for a
+phantom) would have that line run through a centred stack, so its stack is left-aligned `LABEL_GAP` right of the line.
 
 **Generation markers.** A Roman numeral (the row's IR generation, so a pedigree whose top row is `II` starts there) is
 drawn once per row in a reserved **left gutter** of width `GEN_MARKER_GUTTER`, at the gutter's horizontal centre and on
@@ -117,13 +119,15 @@ sized from the actual pedigree, not a fixed band:
   `SYMBOL_SIZE + band + LABEL_GAP + SIB_STUB` so a parent's stack clears the sib bar and descent lines of the row below.
 - *Horizontal.* SVG text width isn't measurable at build time, so a line's width is estimated conservatively as
   `0.6·LABEL_SIZE` px per character (a sans-serif average advance) (`_labels.py`). Label widening is **local** and lives
-  in the x-solve: each adjacent same-row pair's minimum separation is the larger of its geometric gap and
-  `(width_left + width_right)/2 + LABEL_SIZE`, in layout units, so only the gaps whose labels would overlap widen and
-  one wide annotation does not inflate the whole figure's pitch. Drawing then maps layout-x to pixel-x by one scale,
-  `X_UNIT` px per unit. A widening applied after the solve (it used to be) keeps lines vertical but moves every midpoint
-  off the one the solve centred. The canvas width and origin are sized from true content bounds (symbol half or label
-  half, whichever reaches further per cell), so an outermost label wider than its symbol is not clipped. All
-  deterministic functions of the pedigree, keeping golden bytes stable.
+  in the x-solve: each adjacent same-row pair's minimum separation is the larger of its geometric gap and the left
+  cell's right label reach plus the right cell's left reach plus `LABEL_SIZE`
+  (`(width_left + width_right)/2 + LABEL_SIZE` for two centred stacks; a stack beside its drop reaches right only), in
+  layout units, so only the gaps whose labels would overlap widen and one wide annotation does not inflate the whole
+  figure's pitch. Drawing then maps layout-x to pixel-x by one scale, `X_UNIT` px per unit. A widening applied after the
+  solve (it used to be) keeps lines vertical but moves every midpoint off the one the solve centred. The canvas width
+  and origin are sized from true content bounds (symbol half or label reach, whichever is further per side of each
+  cell), so an outermost label wider than its symbol is not clipped. All deterministic functions of the pedigree,
+  keeping golden bytes stable.
 
 Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, `SIB_GAP`, `SIB_STUB`,
 `DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`.
