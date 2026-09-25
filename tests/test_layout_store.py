@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import itertools
 
 import protovalidate
 import pytest
@@ -34,6 +35,7 @@ def _fixtures() -> dict[str, pb.Pedigree]:
     out["ghost"] = test_svg_output._avuncular()
     out["two_ghosts"] = test_svg_output._avuncular(second_niece=True)
     out["routed"] = test_layout2._overflow_pedigree()
+    out.update(test_layout2.GHOST_PEDIGREES)
     return out
 
 
@@ -70,6 +72,26 @@ def test_record_is_independent_of_input_order(name: str) -> None:
     for seed in range(4):
         q = test_layout2._shuffled(p, seed)
         assert _record(q).SerializeToString(deterministic=True) == ref
+
+
+@pytest.mark.parametrize("name", sorted(test_layout2.GHOST_PEDIGREES))
+def test_ghost_records_are_independent_of_mating_order(name: str) -> None:
+    # A record of one mating order draws every other order exactly as a fresh render of it does.
+    p = test_layout2.GHOST_PEDIGREES[name]
+    ref = _record(p)
+    for perm in itertools.permutations(p.matings):
+        q = pb.Pedigree()
+        q.CopyFrom(p)
+        del q.matings[:]
+        q.matings.extend(perm)
+        assert _record(q).SerializeToString(deterministic=True) == ref.SerializeToString(deterministic=True)
+        assert render.render_svg(q, stored_layout=ref) == render.render_svg(q)
+
+
+def test_repeated_avuncular_marriages_store_distinct_ghosts() -> None:
+    record = render.store_layout(test_layout2.GHOST_PEDIGREES["uncle_niece_twice"])
+    ghosts = [c.ghost for row in record.placement.rows for c in row.cells if c.HasField("ghost")]
+    assert sorted((g.first_child.index, g.occurrence) for g in ghosts) == [(1, 0), (2, 0)]
 
 
 def test_record_reads_back_into_a_shuffled_pedigree() -> None:

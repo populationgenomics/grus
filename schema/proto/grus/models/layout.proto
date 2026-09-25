@@ -98,10 +98,14 @@ enum CoupleLine {
   COUPLE_LINE_DOUBLE = 2;  // consanguineous
 }
 
-// A duplicate of a real individual on its partner's row, drawn for an avuncular (cross-generation) marriage.
+// A duplicate of a real individual on its partner's row, drawn for an avuncular (cross-generation) marriage. Keyed by
+// that marriage: the pair, its first child, and a rank among repeated marriages of the pair.
 message Ghost {
   grus.models.pedigree.Position real = 1 [(buf.validate.field).required = true];
   grus.models.pedigree.Position partner = 2 [(buf.validate.field).required = true];  // whom the ghost marries
+  optional grus.models.pedigree.Position first_child = 3;  // the marriage's first child; absent = childless
+  // 0, or the rank (by the Mating's serialized content) among marriages agreeing on the fields above.
+  uint32 occurrence = 4;
 }
 
 // The omitted other parent of a lone-parent sibship; drawn as a marriage line to nothing.

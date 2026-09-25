@@ -24,6 +24,7 @@ LAYOUT_VERSION = 1
 # pass-through per row, all keyed by the same first child.
 _CellKey = tuple[str, *tuple[int, ...]]
 
+_NO_CHILD = (0, 0)  # a childless ghost's first-child slot in its key (no Position is (0, 0))
 _XSOLVER = {_xsolve.XSolver.Z3: lpb.X_SOLVER_Z3, _xsolve.XSolver.HIGHS: lpb.X_SOLVER_HIGHS}
 _COUPLE_LINE = {1: lpb.COUPLE_LINE_SINGLE, 2: lpb.COUPLE_LINE_DOUBLE}
 _SPOUSE = {v: k for k, v in _COUPLE_LINE.items()}
@@ -213,9 +214,9 @@ def _cell_keys(p: pb.Pedigree, prep: _layout2._Prepared) -> dict[int, _CellKey]:
     g = prep.graph
     n = len(p.individuals)
     keys: dict[int, _CellKey] = {i: ("individual", *_pos(p.individuals[i])) for i in range(n)}
-    for ghost, real in prep.ghost_of.items():
-        (mating,) = g.matings_of[ghost]
-        keys[ghost] = ("ghost", *_pos(p.individuals[real]), *_pos(p.individuals[mating.other(ghost)]))
+    for ghost in prep.ghost_of:
+        gk = g.ghost_key[ghost]
+        keys[ghost] = ("ghost", *gk.real, *gk.partner, *(gk.first_child or _NO_CHILD), gk.occurrence)
     for cell in prep.phantom:
         parent = g.phantom_of[cell]
         (mating,) = g.matings_of[cell]
@@ -223,9 +224,8 @@ def _cell_keys(p: pb.Pedigree, prep: _layout2._Prepared) -> dict[int, _CellKey]:
         keys[cell] = ("phantom", *_pos(p.individuals[parent]), first_child.generation, first_child.index)
     for cell in prep.passthrough:
         keys[cell] = ("pass_through", g.level[cell], *_pos(p.individuals[g.passthrough_to[cell]]))
-    if len(set(keys.values())) != len(keys):
-        # Only a ghost can collide: two avuncular matings between the same two individuals.
-        raise ValueError("two cells of this pedigree share an identity (a repeated avuncular mating); cannot store it")
+    if len(set(keys.values())) != len(keys):  # pragma: no cover - every key is unique by construction
+        raise AssertionError("two cells of this pedigree share an identity")
     return keys
 
 
@@ -240,6 +240,9 @@ def _set_identity(cell: lpb.Cell, key: _CellKey) -> None:
     elif kind == "ghost":
         cell.ghost.real.CopyFrom(_position(v[0], v[1]))
         cell.ghost.partner.CopyFrom(_position(v[2], v[3]))
+        if (v[4], v[5]) != _NO_CHILD:
+            cell.ghost.first_child.CopyFrom(_position(v[4], v[5]))
+        cell.ghost.occurrence = v[6]
     elif kind == "phantom":
         cell.phantom.parent.CopyFrom(_position(v[0], v[1]))
         cell.phantom.first_child.CopyFrom(_position(v[2], v[3]))
@@ -256,7 +259,9 @@ def _identity(cell: lpb.Cell, level: int) -> _CellKey:
     if kind == "individual":
         return ("individual", cell.individual.generation, cell.individual.index)
     if kind == "ghost":
-        return ("ghost", *_ppos(cell.ghost.real), *_ppos(cell.ghost.partner))
+        gh = cell.ghost
+        first = _ppos(gh.first_child) if gh.HasField("first_child") else _NO_CHILD
+        return ("ghost", *_ppos(gh.real), *_ppos(gh.partner), *first, gh.occurrence)
     if kind == "phantom":
         return ("phantom", *_ppos(cell.phantom.parent), *_ppos(cell.phantom.first_child))
     if kind == "pass_through":
@@ -273,7 +278,8 @@ def _describe(key: _CellKey) -> str:
     if kind == "individual":
         return f"individual {v[0]}-{v[1]}"
     if kind == "ghost":
-        return f"the ghost of {v[0]}-{v[1]} marrying {v[2]}-{v[3]}"
+        child = "childless" if (v[4], v[5]) == _NO_CHILD else f"first child {v[4]}-{v[5]}"
+        return f"the ghost of {v[0]}-{v[1]} marrying {v[2]}-{v[3]} ({child}, occurrence {v[6]})"
     if kind == "phantom":
         return f"the omitted partner of {v[0]}-{v[1]} (first child {v[2]}-{v[3]})"
     return f"the pass-through on row {v[0]} of the descent to {v[1]}-{v[2]}"

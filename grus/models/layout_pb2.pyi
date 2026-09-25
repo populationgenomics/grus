@@ -112,12 +112,16 @@ class Cell(_message.Message):
     def __init__(self, individual: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ..., ghost: _Optional[_Union[Ghost, _Mapping]] = ..., phantom: _Optional[_Union[Phantom, _Mapping]] = ..., pass_through: _Optional[_Union[PassThrough, _Mapping]] = ..., x: _Optional[float] = ..., parent_column: _Optional[int] = ..., lone: _Optional[bool] = ..., couple_right: _Optional[_Union[CoupleLine, str]] = ..., twin_right: _Optional[_Union[_pedigree_pb2.ZygosityType, str]] = ..., childless: _Optional[_Union[_pedigree_pb2.Childlessness, str]] = ...) -> None: ...
 
 class Ghost(_message.Message):
-    __slots__ = ("real", "partner")
+    __slots__ = ("real", "partner", "first_child", "occurrence")
     REAL_FIELD_NUMBER: _ClassVar[int]
     PARTNER_FIELD_NUMBER: _ClassVar[int]
+    FIRST_CHILD_FIELD_NUMBER: _ClassVar[int]
+    OCCURRENCE_FIELD_NUMBER: _ClassVar[int]
     real: _pedigree_pb2.Position
     partner: _pedigree_pb2.Position
-    def __init__(self, real: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ..., partner: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ...) -> None: ...
+    first_child: _pedigree_pb2.Position
+    occurrence: int
+    def __init__(self, real: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ..., partner: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ..., first_child: _Optional[_Union[_pedigree_pb2.Position, _Mapping]] = ..., occurrence: _Optional[int] = ...) -> None: ...
 
 class Phantom(_message.Message):
     __slots__ = ("parent", "first_child")

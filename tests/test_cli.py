@@ -162,3 +162,18 @@ def test_render_refuses_a_stale_layout(tmp_path: pathlib.Path, capsys: pytest.Ca
     src.write_text(ir.dump_pbtxt(edited))
     assert cli.main(["render", str(src), "--layout", str(stored)]) == 1
     assert "digest" in capsys.readouterr().err
+
+
+def test_layout_of_a_set_with_repeated_avuncular_marriages(tmp_path: pathlib.Path) -> None:
+    import test_layout2
+
+    from grus.render import render_set_svg
+
+    ps = pb.PedigreeSet(pedigrees=list(test_layout2.GHOST_PEDIGREES.values()))
+    src = tmp_path / "s.pbtxt"
+    src.write_text(ir.dump_set_pbtxt(ps))
+    stored = tmp_path / "s.layout.pbtxt"
+    out = tmp_path / "s.svg"
+    assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
+    assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
+    assert out.read_text() == render_set_svg(ps)

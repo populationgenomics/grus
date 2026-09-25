@@ -77,8 +77,10 @@ order. The record never mentions an index into `Pedigree.individuals`.
 A cell names what it draws, not where that sits in the input:
 
 - a real individual by its `Position`;
-- a ghost by the real individual it duplicates and the partner it marries — the pair the ghost exists for, unique within
-  a pedigree;
+- a ghost by the marriage it exists for: the real individual it duplicates, the partner it marries, that marriage's
+  first child, and a rank by content among repeated marriages of the same pair (an uncle and niece with two matings have
+  two ghosts). The layout breaks its ordering ties on the same key, so a ghost's place does not depend on input order
+  either;
 - a phantom by the lone parent and the first child of the sibship it partners;
 - a pass-through by the first child of the descent it carries; its row gives its generation.
 
@@ -147,8 +149,8 @@ unchanged.
   which the IR does not give meaning to; a re-serialized or re-imported pedigree would scramble the layout.
 - **Key a ghost by the real individual plus an ordinal**, as its SVG id does (`ghost-II-1-2`). The ordinal is assigned
   in cell order, so it is a property of the layout, not of the pedigree: reading the record back could not tell which of
-  two ghosts of one individual marries whom without trusting the stored adjacency. The (real, partner) pair names the
-  marriage the ghost exists for.
+  two ghosts of one individual marries whom without trusting the stored adjacency. The marriage key names the marriage
+  the ghost exists for.
 - **Store the front end's synthetic `Position`s verbatim** (phantoms and pass-throughs have stable negative indices).
   Rejected: negative indices fail the IR's field rules, and the encoding is an implementation detail a version bump
   would have to track; semantic keys state what the cell is.
