@@ -267,6 +267,10 @@
         "pedigree": "c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc",
         "placement": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352"
       },
+      "mz_twins_with_three_partners": {
+        "pedigree": "b47ec83210b8af4378d2988f5d460db0c1fdcb2b8c600bfd5b7b77eb4489d1e6",
+        "placement": "07f8caae73f68ccdcf0383fb6c79475eff2d8e1f47bd0c4d7a1e473590c50588"
+      },
       "sibship": {
         "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
         "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
@@ -283,6 +287,10 @@
         "pedigree": "0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd",
         "placement": "20260afc06003302ec288b5c9ef71a53a518666eecc947e3c6ae9161cad86d3d"
       },
+      "twin_with_two_partners": {
+        "pedigree": "c9690fa60d02e9bbd9ae190371b6be16efd7144eecb5a30cb7b9b5b0acb7ae98",
+        "placement": "7a27258ec115719a6199fd598f8e4ffd8457c72b7fda51f1a2275af4c218d45a"
+      },
       "twins": {
         "pedigree": "f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5",
         "placement": "412d63ce91f7453e2f416cee6058357f24ea698d55ef26daa92ff0f78da8765d"
@@ -294,6 +302,10 @@
       "twins_marry_cousins_apart": {
         "pedigree": "102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282",
         "placement": "a5832615b4e48c6d4ca78bacdc7eb6476bc4cba025f7c1b967e8402bc7fbd2e3"
+      },
+      "unknown_twin_with_two_partners": {
+        "pedigree": "0afdd077c3b2956b4a28c01d5c672a8b43c347f0655f2a1cf815bcfcef9c561c",
+        "placement": "c10ca99c6620904a2efa6d87d237ae5e28a9101a9e5c68f2c38119ee7e99f519"
       }
     },
     "z3": {
@@ -365,6 +377,10 @@
         "pedigree": "c2cef24cf187346342513e6b3b4aa121f0e11c883128d8bf12aeae0a17a3e9fc",
         "placement": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352"
       },
+      "mz_twins_with_three_partners": {
+        "pedigree": "b47ec83210b8af4378d2988f5d460db0c1fdcb2b8c600bfd5b7b77eb4489d1e6",
+        "placement": "07f8caae73f68ccdcf0383fb6c79475eff2d8e1f47bd0c4d7a1e473590c50588"
+      },
       "sibship": {
         "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
         "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
@@ -381,6 +397,10 @@
         "pedigree": "0590776ae6da614e3c104608226ef8ab75b9f2d08ff7991d5eef4db0ce1077fd",
         "placement": "20260afc06003302ec288b5c9ef71a53a518666eecc947e3c6ae9161cad86d3d"
       },
+      "twin_with_two_partners": {
+        "pedigree": "c9690fa60d02e9bbd9ae190371b6be16efd7144eecb5a30cb7b9b5b0acb7ae98",
+        "placement": "7a27258ec115719a6199fd598f8e4ffd8457c72b7fda51f1a2275af4c218d45a"
+      },
       "twins": {
         "pedigree": "f58450130f96c69191634c1715d2ebfd64644d1b38437e5bd42912e3793b9fb5",
         "placement": "412d63ce91f7453e2f416cee6058357f24ea698d55ef26daa92ff0f78da8765d"
@@ -392,6 +412,10 @@
       "twins_marry_cousins_apart": {
         "pedigree": "102307f21d79c18ea5b1ce0eb609e50aa1641245dfb74ff4b8660889d51e7282",
         "placement": "a5832615b4e48c6d4ca78bacdc7eb6476bc4cba025f7c1b967e8402bc7fbd2e3"
+      },
+      "unknown_twin_with_two_partners": {
+        "pedigree": "0afdd077c3b2956b4a28c01d5c672a8b43c347f0655f2a1cf815bcfcef9c561c",
+        "placement": "c10ca99c6620904a2efa6d87d237ae5e28a9101a9e5c68f2c38119ee7e99f519"
       }
     }
   }

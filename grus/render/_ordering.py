@@ -10,7 +10,8 @@ accumulator bilayer counter, and a tiny exact search on small ranks. Output is o
 order per generation rank; Stage A's x-solver turns it into coordinates.
 
 Couple adjacency and twin grouping are STRUCTURE, not soft penalties: each is an **adjacency atom** (a path of
-individuals kept contiguous on their rank, orientation free). A same-generation cross-marriage (a
+individuals kept contiguous on their rank, orientation free; a partner of either twin may stand between two co-twins,
+``_Model._twin_chains``). A same-generation cross-marriage (a
 boundary-bridge join) is an ordinary couple atom whose two members belong to different families, so ordering
 alone brings the two sibships' ends together — no special placement pass. Sibship contiguity mostly emerges (the
 children of one mating share a connector, so crossing-minimisation clusters them), and the best order the mincross
@@ -111,8 +112,8 @@ class _Model:
         self.routed: set[int] = set()
         self.birth = _birth_of(g)
         self._resolve_overflow()
+        self._build_atoms()  # may route more matings (a twin's partners past its sides), so before the layers
         self._build_layers()
-        self._build_atoms()
         # Each drawn sibship's children, grouped by the rank they sit on: what sibship contiguity is measured over.
         self.sibships_on: dict[int, list[tuple[int, ...]]] = defaultdict(list)
         for mr in g.matings:
@@ -185,8 +186,16 @@ class _Model:
 
     # -- atoms: per even rank, the must-be-adjacent chains (couples + twin groups) --
     def _build_atoms(self) -> None:
+        """Each rank's adjacency atoms: connected couples and twin groups, each laid out as one path.
+
+        A component that is already a simple path is that path. One that is not — a twin whose partners outnumber its
+        free sides, or a cycle — is arranged by ``_twin_chains``, which may stand a partner between co-twins and
+        routes the matings it cannot keep adjacent.
+        """
         g = self.g
         adj: dict[int, set[int]] = defaultdict(set)
+        couples: dict[frozenset[int], list[_layout._Mating]] = defaultdict(list)
+        groups: list[tuple[int, ...]] = []
 
         def link(a: int, b: int) -> None:
             adj[a].add(b)
@@ -197,16 +206,17 @@ class _Model:
                 continue
             if mr.b is not None and g.level[mr.a] == g.level[mr.b]:
                 link(mr.a, mr.b)
-            groups: dict[int, list[int]] = defaultdict(list)
+                couples[frozenset(mr.partners)].append(mr)
+            by_group: dict[int, list[int]] = defaultdict(list)
             for o in mr.offspring:
                 if o.twin_group is not None:
-                    groups[o.twin_group].append(o.child)
-            for kids in groups.values():
+                    by_group[o.twin_group].append(o.child)
+            for kids in by_group.values():
+                if len(kids) > 1:
+                    groups.append(tuple(kids))
                 for a, b in itertools.pairwise(kids):
                     link(a, b)
 
-        # each connected component becomes one atom (a canonical path). Overflow already routed above; a
-        # residual non-path component (Stage-C shape) is emitted sorted and the caller's guards defer it.
         self.atom_of: dict[int, tuple[int, ...]] = {}
         for lvl in range(self.nlevels):
             members = [i for i in range(g.n) if g.level[i] == lvl]
@@ -216,9 +226,138 @@ class _Model:
                     continue
                 comp = self._component(start, adj)
                 seen |= comp
-                atom = self._orient(comp, adj)
-                for i in atom:
-                    self.atom_of[i] = atom
+                if _is_path(comp, adj):
+                    atoms = [self._orient(comp, adj)]
+                else:
+                    atoms = self._twin_chains(comp, couples, [grp for grp in groups if grp[0] in comp])
+                for atom in atoms:
+                    for i in atom:
+                        self.atom_of[i] = atom
+
+    def _twin_chains(
+        self,
+        comp: set[int],
+        couples: dict[frozenset[int], list[_layout._Mating]],
+        groups: list[tuple[int, ...]],
+    ) -> list[tuple[int, ...]]:
+        """Lay out a component that is not a simple path as paths, routing the matings none can keep adjacent.
+
+        layout-v2.md, Twins with partners: co-twins stay adjacent, except that one partner of either twin may stand
+        between two co-twins consecutive in the group — a partner with no drawn parents, not itself a twin, not a
+        phantom or a ghost. Only a gap beside a twin with more partners than free sides (an end twin has one, a middle
+        twin none) is offered one. Every choice of gap partners is tried; each keeps the heaviest matings first
+        (``_arrange``), and the one kept is the one routing the fewest matings with offspring, then the fewest
+        matings, then with the fewest partners between twins, then the smallest identity sequence. The routed
+        matings join ``self.routed``.
+        """
+        g = self.g
+        pairs = [pair for pair in couples if pair <= comp]
+        partners_of: dict[int, set[int]] = defaultdict(set)
+        for pair in pairs:
+            a, b = tuple(pair)
+            partners_of[a].add(b)
+            partners_of[b].add(a)
+        in_group = {i for grp in groups for i in grp}
+
+        def eligible(p: int) -> bool:
+            return not (_layout._born_in(g, p) or p in in_group or p in g.phantom_of or p in g.ghost_key)
+
+        def overfull(grp: tuple[int, ...], k: int) -> bool:
+            free = 1 if k in (0, len(grp) - 1) else 0
+            return len(partners_of[grp[k]]) > free
+
+        gaps = [(grp, k) for grp in groups for k in range(len(grp) - 1)]
+        options: list[list[int | None]] = []
+        for grp, k in gaps:
+            if overfull(grp, k) or overfull(grp, k + 1):
+                cands = {p for t in grp[k : k + 2] for p in partners_of[t] if eligible(p)}
+                options.append([None, *sorted(cands, key=self.ident)])
+            else:
+                options.append([None])
+        best: tuple[tuple[object, ...], list[tuple[int, ...]], set[int]] | None = None
+        for choice in itertools.product(*options):
+            placed = [p for p in choice if p is not None]
+            if len(set(placed)) != len(placed):
+                continue  # one partner cannot stand in two gaps
+            trial = self._arrange(comp, couples, pairs, gaps, choice)
+            if best is None or trial[0] < best[0]:
+                best = trial
+        assert best is not None  # the all-adjacent choice is always offered
+        _, atoms, routed = best
+        self.routed |= routed
+        return atoms
+
+    def _arrange(
+        self,
+        comp: set[int],
+        couples: dict[frozenset[int], list[_layout._Mating]],
+        pairs: list[frozenset[int]],
+        gaps: list[tuple[tuple[int, ...], int]],
+        choice: tuple[int | None, ...],
+    ) -> tuple[tuple[object, ...], list[tuple[int, ...]], set[int]]:
+        """``comp``'s paths with ``choice[j]`` standing in gap ``j`` (``None``: the co-twins side by side).
+
+        The twins' sequence is kept first; then each couple, heaviest first (most offspring, then identity), while
+        neither partner already has two neighbours or stands in a gap and it closes no cycle. Returns the ranking key
+        (``_twin_chains``), the oriented paths, and the matings routed.
+        """
+        edges: set[frozenset[int]] = set()
+        in_gap: set[int] = set()
+        for (grp, k), p in zip(gaps, choice, strict=True):
+            a, b = grp[k], grp[k + 1]
+            if p is None:
+                edges.add(frozenset((a, b)))
+            else:
+                edges |= {frozenset((a, p)), frozenset((p, b))}
+                in_gap.add(p)
+        degree: dict[int, int] = defaultdict(int)
+        root = {i: i for i in comp}
+
+        def find(i: int) -> int:
+            while root[i] != i:
+                root[i] = root[root[i]]
+                i = root[i]
+            return i
+
+        for e in edges:
+            a, b = tuple(e)
+            degree[a] += 1
+            degree[b] += 1
+            root[find(a)] = find(b)
+        routed: set[int] = set()
+
+        def weight(pair: frozenset[int]) -> tuple[int, tuple[object, ...]]:
+            return (
+                -sum(len(mr.kids) for mr in couples[pair]),
+                tuple(sorted(self.mating_key(mr) for mr in couples[pair])),
+            )
+
+        for pair in sorted(pairs, key=weight):
+            if pair in edges:
+                continue  # a partner standing between co-twins, beside this twin
+            a, b = tuple(pair)
+            if a in in_gap or b in in_gap or degree[a] >= 2 or degree[b] >= 2 or find(a) == find(b):
+                routed |= {mr.index for mr in couples[pair]}
+                continue
+            edges.add(pair)
+            degree[a] += 1
+            degree[b] += 1
+            root[find(a)] = find(b)
+        adj: dict[int, set[int]] = defaultdict(set)
+        for e in edges:
+            a, b = tuple(e)
+            adj[a].add(b)
+            adj[b].add(a)
+        atoms: list[tuple[int, ...]] = []
+        seen: set[int] = set()
+        for start in sorted(comp, key=self.ident):
+            if start not in seen:
+                sub = self._component(start, adj)
+                seen |= sub
+                atoms.append(self._orient(sub, adj))
+        with_kids = sum(1 for mi in routed if self.g.matings[mi].kids)
+        ident = tuple(sorted(tuple(self.ident(i) for i in atom) for atom in atoms))
+        return (with_kids, len(routed), len(in_gap), ident), atoms, routed
 
     def _component(self, start: int, adj: dict[int, set[int]]) -> set[int]:
         comp = {start}
@@ -242,7 +381,7 @@ class _Model:
         if len(comp) == 1:
             return (next(iter(comp)),)
         ends = sorted((i for i in comp if len(adj[i]) <= 1), key=self.ident)
-        if len(ends) != 2:  # not a simple path (a cycle or a branch) — Stage C; emit sorted, caller defers
+        if len(ends) != 2:  # pragma: no cover - callers pass only paths (``_is_path``, ``_arrange``)
             return tuple(sorted(comp, key=self.ident))
         best: tuple[int, tuple[_layout.Ident, ...]] | None = None
         best_path: tuple[int, ...] = ()
@@ -263,6 +402,12 @@ class _Model:
 
 
 # --- init_order: birth-order DFS from founders ------------------------------------------------------------
+
+
+def _is_path(comp: set[int], adj: dict[int, set[int]]) -> bool:
+    """Whether the connected ``comp`` is a simple path: no member with three neighbours, and no cycle."""
+    degrees = [len(adj[i]) for i in comp]
+    return max(degrees, default=0) <= 2 and sum(degrees) == 2 * (len(comp) - 1)
 
 
 def _init_order(model: _Model, kid_order: dict[int, list[int]] | None = None) -> dict[int, list[int]]:

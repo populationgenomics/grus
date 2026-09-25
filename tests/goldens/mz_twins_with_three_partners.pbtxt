@@ -1,0 +1,17 @@
+id: "mz_twins_with_three_partners"
+labels { text: "MZ twins with three partners and children: one partner stands between the co-twins" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 3 gender: GENDER_MAN }
+individuals { generation: 2 index: 4 gender: GENDER_MAN }
+individuals { generation: 2 index: 5 gender: GENDER_MAN }
+individuals { generation: 3 index: 1 gender: GENDER_MAN }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 3 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 4 gender: GENDER_MAN }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } twin_group: 1 twin_type: ZYGOSITY_TYPE_MONOZYGOTIC } offspring { child { generation: 2 index: 2 } twin_group: 1 twin_type: ZYGOSITY_TYPE_MONOZYGOTIC } }
+matings { partner_a { generation: 2 index: 3 } partner_b { generation: 2 index: 1 } offspring { child { generation: 3 index: 1 } } }
+matings { partner_a { generation: 2 index: 4 } partner_b { generation: 2 index: 2 } offspring { child { generation: 3 index: 2 } } offspring { child { generation: 3 index: 3 } } }
+matings { partner_a { generation: 2 index: 5 } partner_b { generation: 2 index: 2 } offspring { child { generation: 3 index: 4 } } }

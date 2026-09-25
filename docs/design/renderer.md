@@ -46,7 +46,8 @@ Full spec in [`layout-v2.md`](layout-v2.md); the shape drawing depends on:
    duplicating the shallower partner as a **ghost** on the deeper row; interlocking consanguinity loops are detected and
    deferred.
 1. **Ordering** — a deterministic left→right order per rank by weighted-median + transposition crossing minimization
-   (dot's `mincross`), couples and twin groups kept contiguous as adjacency atoms. A same-generation cross-lineage /
+   (dot's `mincross`), couples and twin groups kept contiguous as adjacency atoms (one partner of either twin may stand
+   between two co-twins, so a twin with two partners keeps both marriages adjacent). A same-generation cross-lineage /
    loop marriage becomes an ordinary adjacent couple once ordering pulls each partner to its sibship end; an individual
    with >2 matings keeps its two heaviest adjacencies and **routes** the rest.
 1. **x-coordinate solve** — from the fixed order, one lexicographic linear program: every descent on its own sib bar,

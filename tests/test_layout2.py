@@ -159,6 +159,9 @@ def test_order_is_run_to_run_deterministic(name: str) -> None:
 
 _SHUFFLED_GOLDENS = (
     "childless",
+    "twin_with_two_partners",
+    "mz_twins_with_three_partners",
+    "unknown_twin_with_two_partners",
     "founder_sibship_marry_in",
     "descent_across_rows",
     "detached_branch",
@@ -1065,3 +1068,56 @@ def test_no_valid_index_reorders_a_ghost() -> None:
     ref = arrangement(_two_nieces(0))
     for offset in (999_999_999, 1_000_000_000, 2**31 - 3):
         assert arrangement(_two_nieces(offset)) == ref
+
+
+@pytest.mark.parametrize(
+    ("name", "row"),
+    [
+        ("twin_with_two_partners", ["2-1", "2-3", "2-2", "2-4"]),
+        ("mz_twins_with_three_partners", ["2-3", "2-1", "2-4", "2-2", "2-5"]),
+        ("unknown_twin_with_two_partners", ["2-3", "2-1", "2-4", "2-2"]),
+    ],
+)
+def test_a_partner_stands_between_co_twins(name: str, row: list[str]) -> None:
+    # A twin with two partners needs three neighbours. The ordering kept both matings adjacent anyway, so one marriage
+    # was neither adjacent nor routed and its line silently not drawn. One partner now stands between the co-twins:
+    # every marriage is an adjacent couple, the twin group is named by membership, and nothing routes.
+    p = test_render._load(name)
+    lay = render.layout(p)
+    assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == row
+    (group,) = lay.twin_groups
+    assert group.level == 1 and group.columns[1] - group.columns[0] == 2
+    assert lay.routed == []
+    svg = render.render_svg(p)
+    assert svg.count('class="mating') == len(p.matings)
+
+
+def test_a_born_in_partner_does_not_stand_between_co_twins() -> None:
+    # Twin II-2 marries II-5, whose parents are drawn, and II-4, a marry-in. II-5's descent would drop through the
+    # chevron and tear the twins' sibship, so the marry-in takes the gap.
+    def ind(g: int, i: int, gender: pb.Gender) -> pb.Individual:
+        return pb.Individual(generation=g, index=i, gender=gender)
+
+    man, woman = pb.GENDER_MAN, pb.GENDER_WOMAN
+    dz = pb.ZYGOSITY_TYPE_DIZYGOTIC
+    p = pb.Pedigree(
+        individuals=[
+            *(ind(1, 1, man), ind(1, 2, woman), ind(1, 3, man), ind(1, 4, woman)),
+            *(ind(2, 1, woman), ind(2, 2, woman), ind(2, 4, man), ind(2, 5, man)),
+        ],
+        matings=[
+            pb.Mating(
+                partner_a=_pos(1, 1),
+                partner_b=_pos(1, 2),
+                offspring=[pb.Offspring(child=_pos(2, k), twin_group=1, twin_type=dz) for k in (1, 2)],
+            ),
+            pb.Mating(partner_a=_pos(1, 3), partner_b=_pos(1, 4), offspring=[pb.Offspring(child=_pos(2, 5))]),
+            pb.Mating(partner_a=_pos(2, 2), partner_b=_pos(2, 4)),
+            pb.Mating(partner_a=_pos(2, 2), partner_b=_pos(2, 5)),
+        ],
+    )
+    lay = render.layout(p)
+    (group,) = lay.twin_groups
+    between = lay.nid[1][group.columns[0] + 1]
+    assert (p.individuals[between].generation, p.individuals[between].index) == (2, 4)
+    assert lay.routed == []
