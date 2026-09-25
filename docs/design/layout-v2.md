@@ -87,35 +87,36 @@ stages:
    crossings (the two swapped units' endpoint pairs, `dot`'s in/out-cross) and accepted on a strict crossing decrease,
    or on a tie when it strictly repairs birth order or returns an atom to its canonical orientation — so every sweep
    terminates. The moves are adjacent-unit swaps and reversals of a whole adjacency atom (a couple, a twin group, or a
-   chain of both, such as twins joined to one twin's spouse); an atom starts in the orientation with fewer birth-order
-   inversions. The moves are local, so a birth-order repair that needs two ranks to change together (a twin marrying
-   into another family, whose parents' couples would have to swap) is not found. When the best order still tears a
-   sibship, the loop runs once more from every atom reversed and keeps the better result: an atom that starts in birth
-   order where a marriage below needs the reverse (twins who both marry, one twin's child marrying a cousin) otherwise
-   leaves a tear that local moves cannot repair. Pricing moves by tears first was tried and rejected: it traded
-   crossings without limit and stopped searches early on shapes that were already clean. The exact search ranks
-   crossings before tears too: the tear measure sees a lone child as a point, so moving one past another family counts
-   only as a crossing, and ranking tears first chose such orders over clean ones. When a tear remains, the loop is also
-   seeded once per marriage whose partners' lines split at a mating: the two lines start adjacent there, each line's
-   child toward the marriage at the facing end, so first cousins across a middle sibling's family start where the clean
-   order has them (`_facing_seeds`). At most six seeds run, in the marriages' identity order, stopping at the first
-   tear-free one; relatives only through one parent's two matings (half-first-cousins) share no split mating and get no
-   seed. Every tie between matings in the ordering breaks on the mating's identity (its partners and children), never
-   its input position, so neither the seeds nor the search depend on input order. A tear no run avoids still defers; the
-   routed consanguineous marriage (below) is the fix for what remains. Crossing minimization is the *weak*-strength
-   tie-breaker among orders the stronger constraints leave free — never overriding contiguity or adjacency.
+   chain of both, such as twins joined to one twin's spouse or a partner standing between co-twins — Twins with
+   partners, below); an atom starts in the orientation with fewer birth-order inversions. The moves are local, so a
+   birth-order repair that needs two ranks to change together (a twin marrying into another family, whose parents'
+   couples would have to swap) is not found. When the best order still tears a sibship, the loop runs once more from
+   every atom reversed and keeps the better result: an atom that starts in birth order where a marriage below needs the
+   reverse (twins who both marry, one twin's child marrying a cousin) otherwise leaves a tear that local moves cannot
+   repair. Pricing moves by tears first was tried and rejected: it traded crossings without limit and stopped searches
+   early on shapes that were already clean. The exact search ranks crossings before tears too: the tear measure sees a
+   lone child as a point, so moving one past another family counts only as a crossing, and ranking tears first chose
+   such orders over clean ones. When a tear remains, the loop is also seeded once per marriage whose partners' lines
+   split at a mating: the two lines start adjacent there, each line's child toward the marriage at the facing end, so
+   first cousins across a middle sibling's family start where the clean order has them (`_facing_seeds`). At most six
+   seeds run, in the marriages' identity order, stopping at the first tear-free one; relatives only through one parent's
+   two matings (half-first-cousins) share no split mating and get no seed. Every tie between matings in the ordering
+   breaks on the mating's identity (its partners and children), never its input position, so neither the seeds nor the
+   search depend on input order. A tear no run avoids still defers; the routed consanguineous marriage (below) is the
+   fix for what remains. Crossing minimization is the *weak*-strength tie-breaker among orders the stronger constraints
+   leave free — never overriding contiguity or adjacency.
 1. **x-coordinate assignment** — given the ordering and the surviving blocks, place x by one **lexicographic linear
-   program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a twin group, a founder-sib
-   floater with its sibling, or a couple whose partners mate once and are bonded to no one else; a hinge's couples and a
-   couple joined to a co-twin stay free (a rigid spouse-twin-twin-spouse chain could not spread its drops to reach their
-   own children). Its objectives, each minimised among the optima of those before it: (0) every descent lands on its own
-   sib bar — the parents' midpoint within the children's span; (1) centring — each midpoint over its children's
-   centroid, plus a stretch cost on each free couple, cheap up to `sib_gap` and steep beyond, so a hinge spreads that
-   far to centre its families and a descent drops to the end of its bar rather than a couple line crossing the figure;
-   (2) the largest excess gap, so slack spreads evenly; (3) the total excess gap; (4) a fixed tie-break, so the optimum
-   is one point. The default backend (z3) solves over exact rationals; HiGHS is an optional floating-point alternative.
-   A relaxed (routed) mating exerts no couple-adjacency pull here, so each parent-anchored partner settles under its own
-   parents.
+   program** (`_xsolve.py`), subject to the row separations and block rigidity. A block is a run of co-twins standing
+   side by side, a founder-sib floater with its sibling, or a couple whose partners mate once and are bonded to no one
+   else; a hinge's couples and a couple joined to a co-twin stay free (a rigid spouse-twin-twin-spouse chain could not
+   spread its drops to reach their own children). Its objectives, each minimised among the optima of those before it:
+   (0) every descent lands on its own sib bar — the parents' midpoint within the children's span; (1) centring — each
+   midpoint over its children's centroid, plus a stretch cost on each free couple, cheap up to `sib_gap` and steep
+   beyond, so a hinge spreads that far to centre its families and a descent drops to the end of its bar rather than a
+   couple line crossing the figure; (2) the largest excess gap, so slack spreads evenly; (3) the total excess gap; (4) a
+   fixed tie-break, so the optimum is one point. The default backend (z3) solves over exact rationals; HiGHS is an
+   optional floating-point alternative. A relaxed (routed) mating exerts no couple-adjacency pull here, so each
+   parent-anchored partner settles under its own parents.
 1. **Edge routing** — draw each relationship (see below).
 
 ### Hard constraints
@@ -123,13 +124,12 @@ stages:
 - **Non-overlap:** any two symbols on a rank are ≥ min-separation apart.
 - **Rank:** y = generation (above).
 
-Non-overlap is always satisfiable in 1-D, so layout **rarely fails**: the worst case is an ugly-but-correct routed
-drawing, a strictly better contract than v1's "detect and defer". The residual deferrals (`DeferredFeatureError`, drawn
-as a placeholder — never a wrong drawing) are listed in [`renderer.md`](renderer.md) "Deferred": an interlocking loop, a
-child of more than one mating, a routed union *with offspring*, a torn sibship (two sibships' children interleaved). A
-crossing the ordering accepts is drawn, not deferred: a drop left beside its children turns at its own **elbow** track
-above the bars (`Geometry.elbow_gap`, rounded corners), so it crosses other descents at right angles and never runs
-along another sibship's bar.
+Non-overlap is always satisfiable in 1-D, so layout **rarely fails**. The residual deferrals (`DeferredFeatureError`,
+drawn as a placeholder — never a wrong drawing) are listed in [`renderer.md`](renderer.md) "Deferred": an interlocking
+loop, a child of more than one mating, a routed mating (no drawn form of one reads correctly yet; Edge routing), a torn
+sibship (two sibships' children interleaved). A crossing the ordering accepts is drawn, not deferred: a drop left beside
+its children turns at its own **elbow** track above the bars (`Geometry.elbow_gap`, rounded corners), so it crosses
+other descents at right angles and never runs along another sibship's bar.
 
 ### Soft constraints — a strength hierarchy, relaxed lexicographically (not a weighted sum)
 
@@ -158,13 +158,40 @@ weakest constraint in a conflict*:
   long (double, if consanguineous) line spanning the gap, descent from its midpoint. A one-sided join (a marry-in with
   no parents in the graph) has only one anchor, no conflict, so it stays an adjacent couple — the discriminator is
   *both* partners anchored.
-- **Overflow** (a 3rd cross-marriage into a two-ended sibship; an individual with >2 matings and two 1-D neighbours):
-  more *medium* adjacencies than slots — keep the two highest, route the rest.
+- **Overflow** (a 3rd cross-marriage into a two-ended sibship; an individual with >2 matings and two 1-D neighbours; a
+  twin whose sides are both taken): more *medium* adjacencies than slots — keep the two highest, route the rest. A
+  routed mating defers (Edge routing).
 - **Mated sibling** reaching a sibship end reorders siblings: *weak* birth order yields to *strong* contiguity +
   *medium* adjacency, no penalty bookkeeping.
 
 Crossing count sits at *weak* deliberately: readability never overrides a family's structural anchors — it breaks ties
 among orderings the stronger constraints leave free (this is why ordering is heavily pruned).
+
+### Twins with partners
+
+A co-twin takes one of a twin's two row neighbours, so a twin with two partners needs three: its co-twin and both
+partners. Co-twins stay adjacent, except that **one partner of either twin may stand between two co-twins that are
+adjacent in the group** — at most one per gap, never a non-partner. DZ twins II-1, II-2 with II-2 married to II-3 and
+II-4 order `II-1, II-3, II-2, II-4`: II-3 stands inside the twin grouping, both marriages are ordinary adjacent couples,
+and nothing routes.
+
+- **Who may stand between.** A partner with no drawn parents (not born-in, not in a founder sibship), not itself a twin,
+  and not an omitted partner (a phantom). A born-in partner's line from its parents would drop through the chevron and
+  tear the twins' sibship; a phantom's line would end under the chevron at nothing. A partner between twins has both
+  neighbours taken, so its other matings overflow; one married to both twins keeps both marriages adjacent there.
+- **Ordering.** The twin group, the partners placed beside or between its members and the chains beyond them form one
+  adjacency atom. Which partner stands in which gap is fixed when the atom is built (mincross only reverses it): the
+  placement routing the fewest matings with offspring, then the fewest matings, then the fewest partners between twins,
+  then the smallest identity sequence of the oriented atom — identity, never input order. Sides follow: an end twin has
+  its outer side and the gap beside it, a middle twin only its gaps, so a twin pair keeps at most three partners and
+  each twin at most two; the rest overflow.
+- **Layout seam.** Twins are no longer found by adjacent columns: `Layout.twin_groups` lists each drawn twin group by
+  its members' columns, with the zygosity drawn, and the stored layout records the same (`Placement.twin_groups`).
+- **Drawing.** The chevron spans its twins with the partner under it: the apex is the twins' mean x, and the MZ joining
+  bar and the unknown-zygosity `?` are drawn as for side-by-side twins.
+- **x-solve.** A gap holding a partner is not rigid: co-twins bond only where they stand side by side, and the partner's
+  couple stretches as a hinge couple does. The descent centres over the children, the twins among them, so the apex
+  stays over its sibship's drop.
 
 Conflicts are detected **statically** from IR structure (anchor count per node, adjacency degree vs slots) and resolved
 in a pre-pass to a fixpoint over the strength order, producing the `routed` set the solver and router consume — no
@@ -179,7 +206,8 @@ polyline, dummy-node chain across intervening ranks) otherwise:
 
 - **mating** — straight horizontal if partners adjacent same-rank; else a routed line (the third-marriage connector, the
   avuncular cross-rank line, a consanguinity-loop line between non-adjacent cousins). A consanguineous routed union is a
-  double line spanning the gap.
+  double line spanning the gap. *Not drawn today:* a routed mating defers. Its first form, a track over the row, read as
+  a sibship (Alternatives considered); the avuncular join draws via the ghost.
 - **descent** — mating node → sib bar → per-child stubs (v1's shape, but from the mating node, wherever it is). The
   mating node of a routed union sits at the midpoint of its (non-adjacent) partners, so a routed union **with
   offspring** drops its sibship from that midpoint — the case v1 (and Stage D) deferred.
@@ -214,6 +242,11 @@ absorbs the HiGHS backend's tolerance.
   data, which suits an importer that has none — and grus's importers do exactly this to synthesise generations. For
   drawing it is rejected: the IR already carries the drawn row, and where the computed rank differs, the figure is right
   and the computation is wrong (a detached branch, a half-sibling drawn a row lower).
+- **Route a twin's second partner.** Over the row, the routed track sits at the height of the row's sib bars and reads
+  as a sibship: the married-in partner looks like a child. Below the row, it crosses the parent-child lines of the row's
+  children. No documented convention (Bennett 2008/2022, kinship2, Madeline) covers a twin with two partners, a rare
+  case; a partner inside the twin grouping draws every marriage as an ordinary couple. Every other overflow mating drew
+  the same over-the-row track, so a routed mating defers until a form exists that does not misread.
 - **Graphviz `dot` as-is.** The right optimization architecture, but pedigree-blind constraints (couples drift, children
   off-centre, graph-y bends). v2 is "dot's architecture with pedigree constraints", not dot.
 
@@ -235,7 +268,7 @@ absorbs the HiGHS backend's tolerance.
   taken: a quadratic needs a floating solver, which gives up the exact reproducibility the goldens rest on, and the
   linear program's balance objective recovers the even spread absolute distances otherwise lack.
 - **Edge-routing style.** Orthogonal polylines (matches Bennett) vs splines; how loop edges avoid symbols; whether a
-  routed mating reads as clearly as an adjacent one.
+  routed mating reads as clearly as an adjacent one. A track over the row does not: it reads as a sibship.
 - **Birth-order demotion.** *Done (Stage D):* demoted from ir.md's "one semantic horizontal fact" to a *soft*
   preference; the **data stays in the IR** (`Mating.offspring` order), surfaceable as a per-symbol number where position
   no longer conveys it. Low risk in practice — the IR is extracted from already-laid-out paper figures, so the extracted
