@@ -26,7 +26,7 @@ import pytest
 
 from grus import ir, render
 from grus.models import pedigree_pb2 as pb
-from grus.render import _labels
+from grus.render import _draw, _labels
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 _NAMES = sorted(path.stem for path in _GOLDENS.glob("*.pbtxt"))
@@ -234,7 +234,8 @@ def test_children_lie_within_parent_span(name: str) -> None:
             parent_x.append(lay.pos[level][phantom_col])
         midpoint = sum(parent_x) / len(parent_x)
         child_x = [at[idx[_pos(o.child)]][2] for o in m.offspring]
-        if min(child_x) - _EPS <= midpoint <= max(child_x) + _EPS:
+        meet = _draw._MEET_EPS  # the drawer's tolerance: a midpoint of two rounded positions may sit a quantum off
+        if min(child_x) - meet <= midpoint <= max(child_x) + meet:
             continue
         # Off its bar only where the order forces it (a crossing descent), and then drawn with an elbow, never
         # along another bar.

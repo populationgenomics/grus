@@ -7,6 +7,7 @@ ids are unique and prefixable, and the minimum label box is a floor the layout h
 
 from __future__ import annotations
 
+import collections
 import dataclasses
 import itertools
 import json
@@ -176,6 +177,33 @@ def test_count_is_a_data_attribute_and_a_mark_inside_the_symbol() -> None:
         "II-3": (None, None, None),  # count 1 is one person
         "II-4": ("n", "n", "#000000"),
     }
+
+
+def test_count_never_overprints_another_mark() -> None:
+    # The count sat on top of a '?', an X-linked carrier's dot, the presymptomatic line and the deceased slash, and a
+    # three-digit count overflowed a diamond. With a mark through the centre it now sits beside the upper right,
+    # clear of the symbol; otherwise it is centred and shrunk to fit the shape. A halo keeps it legible over a fill.
+    size = render.DEFAULT_GEOMETRY.symbol_size
+    fit = {"man": 0.8, "woman": 0.7, "unknown": 0.5}
+    root = _parse(render.render_svg(_load("count_marks")))
+    seen = collections.Counter()
+    for g in _groups(root, "individual"):
+        (mark,) = [c for c in g if _classes(c)[:2] == ["mark", "count"]]
+        symbol = next(c for c in g if "symbol" in _classes(c))
+        cx, cy = _centre(symbol)
+        x, y, font = (float(mark.get(a, "nan")) for a in ("x", "y", "font-size"))
+        centre_mark = bool({"deceased", "presymptomatic"} & set(_classes(g))) or any(
+            _classes(c)[:2] in (["mark", "unknown"], ["fill", "dot"]) for c in g
+        )
+        assert mark.get("paint-order") == "stroke" and mark.get("stroke") != mark.get("fill"), "a contrasting halo"
+        if centre_mark:
+            assert "outside" in _classes(mark) and mark.get("text-anchor") == "start"
+            assert x > cx + size / 2 and y < cy, "beside the upper right, off the symbol"
+        else:
+            assert "outside" not in _classes(mark) and (x, y) == (cx, cy)
+            assert 0.6 * font * len(mark.text or "") <= fit[g.get("data-gender", "")] * size + 1e-9
+        seen[centre_mark] += 1
+    assert seen[True] and seen[False]
 
 
 # --- connectors ------------------------------------------------------------------------------------------

@@ -30,10 +30,11 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   ``.individual:not(.ghost)`` counts drawn symbols.
   Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape — the whole
   shape when affected, a legend-keyed region or the X-linked ``dot`` when a carrier — each with ``data-condition``
-  naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …`` (``count``, the number inside a
-  count-collapsed symbol; ``deceased``, ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group),
-  ``label`` (one ``<text>`` per line), then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol,
-  its reserved label box and the arrow when one is drawn: the one element a consumer needs for hover and click.
+  naming the condition it paints), ``symbol`` (the shape as outline only), ``mark …`` (``count``, a count-collapsed
+  symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``, ``presymptomatic``, ``unknown``,
+  ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line), then ``hit`` — an invisible
+  ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow when one is drawn: the one
+  element a consumer needs for hover and click.
 * ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``, ``routed``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
@@ -75,7 +76,7 @@ _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
 _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
-_COUNT_SCALE = 0.45  # a count-collapsed symbol's number (or 'n'), as a fraction of the symbol size
+_HALO = 3.0  # stroke width of the contrasting outline behind a count, so it reads over any fill or line
 # The proband's 'P': font size, and its offset left of and below the arrow tail (_arrow, _arrow_bottom, _hit_rect).
 _ARROW_LABEL_SIZE = 15.0
 _ARROW_LABEL_DX = 8.0
@@ -829,8 +830,9 @@ class _Draw:
     def _ghost_symbol(self, ind: pb.Individual, cx: float, cy: float, ordinal: int, *, beside: bool) -> list[str]:
         """A duplicated individual (cross-generation join).
 
-        The same shape/affection, count and id label as the real one, but no arrow, annotations, or status marks —
-        those belong to the primary instance. The dashed link (``_ghost_links``) ties it back to that instance.
+        The same shape/affection, count (placed as the real cell's, so both reserve one width) and id label as the
+        real one, but no arrow, annotations, or status marks — those belong to the primary instance. The dashed link
+        (``_ghost_links``) ties it back to that instance.
         """
         out = [self._open_individual(ind, ghost=ordinal)]
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
@@ -971,16 +973,30 @@ class _Draw:
         return _text(cx, y, _escape(line), self.geom.label_size, cls="label")
 
     def _count_mark(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
-        """A count-collapsed symbol's number, or ``n`` for an unknown number, centred inside it (Bennett).
+        """A count-collapsed symbol's number, or ``n`` for an unknown number, placed by ``_labels.count_mark``.
 
-        White on an affected (solid) symbol, black otherwise.
+        Inside, it is centred and shrunk to fit the shape, white on an affected (solid) symbol and black otherwise;
+        beside the upper right when a mark already runs through the centre. Either way it has a halo in the
+        contrasting colour, so it reads over a carrier's region fill or a line.
         """
-        text = _labels.count_text(ind)
-        if text is None:
+        mark = _labels.count_mark(ind, self.geom)
+        if mark is None:
             return []
+        if not mark.inside:
+            x, y = cx + self.half + _labels.COUNT_OUTSIDE_DX, cy - self.half + mark.size / 2
+            return [self._count_text(x, y, mark, _STROKE, "#ffffff", "mark count outside", anchor="start")]
         affected = any(c.status == pb.CONDITION_STATUS_AFFECTED for c in ind.conditions)
-        fill = "#ffffff" if affected else _STROKE
-        return [_text(cx, cy, text, _COUNT_SCALE * self.geom.symbol_size, fill=fill, cls="mark count")]
+        fill, halo = ("#ffffff", _STROKE) if affected else (_STROKE, "#ffffff")
+        return [self._count_text(cx, cy, mark, fill, halo, "mark count", anchor="middle")]
+
+    def _count_text(
+        self, x: float, y: float, mark: _labels.CountMark, fill: str, halo: str, cls: str, *, anchor: str
+    ) -> str:
+        return (
+            f'<text class="{cls}" x="{_num(x)}" y="{_num(y)}" font-family="{_FONT}" font-size="{_num(mark.size)}" '
+            f'fill="{fill}" stroke="{halo}" stroke-width="{_num(_HALO)}" stroke-linejoin="round" paint-order="stroke" '
+            f'text-anchor="{anchor}" dominant-baseline="central">{mark.text}</text>'
+        )
 
     def _carrier_glyph(self, ind: pb.Individual, cx: float, cy: float) -> list[str]:
         """The carrier's ``fill`` parts, drawn under the outline.

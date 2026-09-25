@@ -95,7 +95,9 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
 
     routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
-    seps = _row_seps(built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom))
+    seps = _row_seps(
+        built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom), _count_clearance(p, built, geom)
+    )
     blocks = _blocks(built, seps, sibships)
     model = _x_model(built, seps, sibships, blocks, geom)
     x = _xsolve.solve(model, geom.x_solver)
@@ -282,8 +284,11 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
 
     Two neighbours need the left cell's right reach plus the right cell's left reach between centres for their
     label stacks not to touch (``(w_left + w_right) / 2 + label_size`` for two centred stacks). A stack set beside
-    its own-centre drop (``_labels.label_reach``) reaches right only. A pass-through or phantom draws no label and
-    needs none; a ghost reserves its real individual's label.
+    its own-centre drop (``_labels.label_reach``) reaches right only, and a count beside its symbol reaches right. A
+    pass-through or phantom draws no label and needs none; a ghost reserves its real individual's label.
+
+    A count beside the symbol is on the symbol's row, so it must also clear the right neighbour's *symbol*, whose
+    label may be narrower than it: ``_row_seps`` adds that as its own floor (``_count_clearance``).
     """
     out: dict[int, tuple[float, float]] = {}
     for level, row in enumerate(lay.nid):
@@ -297,23 +302,45 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
     return out
 
 
+def _count_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
+    """Each cell with a count beside its symbol -> the centre separation, in layout units, that clears the next symbol.
+
+    The count's reach right of centre, then half the label gap, then the neighbour's symbol half.
+    """
+    out: dict[int, float] = {}
+    for row in lay.nid:
+        for c in row:
+            if c in lay.passthrough or c in lay.phantom:
+                continue
+            if reach := _labels.outside_count_reach(p.individuals[lay.ghost_of.get(c, c)], geom):
+                out[c] = (reach + geom.label_size / 2 + geom.symbol_size / 2) / geom.x_unit
+    return out
+
+
 def _row_seps(
-    lay: _layout.Layout, couple_gap: float, sib_gap: float, clearance: dict[int, tuple[float, float]] | None = None
+    lay: _layout.Layout,
+    couple_gap: float,
+    sib_gap: float,
+    clearance: dict[int, tuple[float, float]] | None = None,
+    count_clearance: dict[int, float] | None = None,
 ) -> list[list[float]]:
     """Hard min-separation between each adjacent pair on a row.
 
     ``couple_gap`` within a couple, else ``sib_gap``, raised where the two cells' labels would otherwise collide
-    (``clearance``, in layout units). Both floors are >= ``couple_gap``, so the non-overlap invariant holds; the
+    (``clearance``, in layout units) or a count beside the left cell's symbol would reach the right cell's
+    (``count_clearance``). Both floors are >= ``couple_gap``, so the non-overlap invariant holds; the
     tighter couple gap realises the soft couple-adjacency preference as a separation floor (couples read tighter
     than sibships, as in v1). The label clearance is a separation, not a drawing-time widening, so the solve's
     centring holds in pixels.
     """
     reach = clearance or {}
+    count = count_clearance or {}
     return [
         [
             max(
                 couple_gap if lay.spouse[level][k] else sib_gap,
                 reach.get(lay.nid[level][k], (0.0, 0.0))[1] + reach.get(lay.nid[level][k + 1], (0.0, 0.0))[0],
+                count.get(lay.nid[level][k], 0.0),
             )
             for k in range(lay.n[level] - 1)
         ]

@@ -93,6 +93,8 @@ not depend on styling:
    both are black and visibly uneven the moment a consumer colours the stroke. Visually the two orders are identical at
    the default styling, so the goldens' appearance does not change.
 1. **`mark`** — count, slash, presymptomatic line, question mark, arrow: over the outline, as they cross or leave it.
+   The count is `mark count`, or `mark count outside` when it sits beside the symbol because another mark runs through
+   the centre.
 1. **`label`** — the text lines.
 1. **`hit`** — a rectangle covering the symbol, the reserved label box and, for a proband or consultand, the arrow; no
    fill, `pointer-events="all"`, drawn last. It is the one element a consumer needs for hover and click: it catches the
