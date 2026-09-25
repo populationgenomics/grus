@@ -12,6 +12,10 @@ says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders a
 ``layout`` writes an IR file's stored layout (a ``PedigreeLayout``, or a ``PedigreeSetLayout`` for a set) in the
 same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
 (docs/design/layout-store.md).
+
+Exit status: 0 on success; 1 when the input fails (``validate``) or the ``--layout`` file cannot be drawn from —
+unreadable, unparseable, the wrong kind for the input (a set's layout for a single pedigree or the reverse), invalid, or
+stale — reported as one line naming the file and the cause; 2 for a usage error.
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ import pathlib
 import sys
 from typing import Literal
 
+import protovalidate
 from google.protobuf import json_format, text_format
 
 from grus import convert, ir, render
@@ -95,25 +100,54 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
-def _load_stored(path: pathlib.Path, for_set: bool) -> lpb.PedigreeLayout | lpb.PedigreeSetLayout:
-    """Parse a stored-layout file of the kind the IR input needs (a set's layout for a set)."""
+class _LayoutFileError(Exception):
+    """A ``--layout`` file that cannot be used: unreadable, unparseable, the wrong kind, or invalid."""
+
+
+def _read_layout[Stored: (lpb.PedigreeLayout, lpb.PedigreeSetLayout)](path: pathlib.Path, kind: type[Stored]) -> Stored:
+    """Parse and validate a stored-layout file of ``kind`` (a set's layout for a set input, else one pedigree's)."""
     parse = json_format.Parse if _text_format(path, None) == "json" else text_format.Parse
-    return parse(path.read_text(), lpb.PedigreeSetLayout() if for_set else lpb.PedigreeLayout())
+    try:
+        text = path.read_text()
+    except OSError as e:
+        raise _LayoutFileError(f"cannot read it: {e.strerror or e}") from e
+    try:
+        record = parse(text, kind())
+    except (json_format.ParseError, text_format.ParseError) as e:
+        other = lpb.PedigreeLayout if kind is lpb.PedigreeSetLayout else lpb.PedigreeSetLayout
+        try:
+            parse(text, other())
+        except (json_format.ParseError, text_format.ParseError):
+            raise _LayoutFileError(f"not a {kind.__name__}: {e}") from e
+        input_kind = "a pedigree set" if kind is lpb.PedigreeSetLayout else "a single pedigree"
+        raise _LayoutFileError(f"holds a {other.__name__}, but the input is {input_kind}") from e
+    try:
+        protovalidate.validate(record)
+    except protovalidate.ValidationError as e:
+        raise _LayoutFileError(f"invalid {kind.__name__}: {'; '.join(_violation(v) for v in e.violations)}") from e
+    return record
+
+
+def _violation(v: protovalidate.Violation) -> str:
+    path = v.proto.field
+    parts = [
+        el.field_name if el.subscript is None else f"{el.field_name}[{el.subscript.value}]"
+        for el in (path.elements if path is not None else [])
+    ]
+    return f"{'.'.join(parts) or '(message)'}: {v.proto.message}"
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
     loaded = load_ir(args.input, _text_format(args.input, args.format))
     geom = _geometry(args)
-    is_set = isinstance(loaded, pb.PedigreeSet)
-    stored = _load_stored(args.layout, is_set) if args.layout is not None else None
     try:
         if isinstance(loaded, pb.PedigreeSet):
-            layouts = list(stored.pedigrees) if isinstance(stored, lpb.PedigreeSetLayout) else None
+            layouts = list(_read_layout(args.layout, lpb.PedigreeSetLayout).pedigrees) if args.layout else None
             svg = render.render_set_svg(loaded, geom, id_prefix=args.id_prefix, stored_layouts=layouts)
         else:
-            one = stored if isinstance(stored, lpb.PedigreeLayout) else None
+            one = _read_layout(args.layout, lpb.PedigreeLayout) if args.layout else None
             svg = render.render_svg(loaded, geom, id_prefix=args.id_prefix, stored_layout=one)
-    except render.StaleLayoutError as e:
+    except (_LayoutFileError, render.StaleLayoutError) as e:  # the stored layout cannot be drawn from
         print(f"grus render: error: {args.layout}: {e}", file=sys.stderr)
         return 1
     except ValueError as e:  # the renderer's argument checks (id_prefix), reported as a usage error
@@ -191,7 +225,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument(
         "--layout",
         type=pathlib.Path,
-        help="draw from this stored layout (from `grus layout`) instead of laying out; refused if stale",
+        help="draw from this stored layout (from `grus layout`) instead of laying out; exit 1 if unusable or stale",
     )
     render_cmd.set_defaults(func=_cmd_render)
 

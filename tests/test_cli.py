@@ -177,3 +177,50 @@ def test_layout_of_a_set_with_repeated_avuncular_marriages(tmp_path: pathlib.Pat
     assert cli.main(["layout", str(src), "-o", str(stored)]) == 0
     assert cli.main(["render", str(src), "--layout", str(stored), "-o", str(out)]) == 0
     assert out.read_text() == render_set_svg(ps)
+
+
+def _layout_files(tmp_path: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+    """A pedigree, a set, and each one's stored layout."""
+    one, many = tmp_path / "p.pbtxt", tmp_path / "s.pbtxt"
+    one.write_text(ir.dump_pbtxt(_trio()))
+    many.write_text(ir.dump_set_pbtxt(pb.PedigreeSet(pedigrees=[_trio()])))
+    one_layout, many_layout = tmp_path / "p.layout.pbtxt", tmp_path / "s.layout.pbtxt"
+    assert cli.main(["layout", str(one), "-o", str(one_layout)]) == 0
+    assert cli.main(["layout", str(many), "-o", str(many_layout)]) == 0
+    return one, many, one_layout, many_layout
+
+
+def _render_error(capsys: pytest.CaptureFixture[str], argv: list[str]) -> str:
+    assert cli.main(argv) == 1
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1 and err.startswith("grus render: error: ")
+    return err
+
+
+def test_render_reports_a_layout_of_the_wrong_kind(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, many, one_layout, many_layout = _layout_files(tmp_path)
+    err = _render_error(capsys, ["render", str(one), "--layout", str(many_layout)])
+    assert str(many_layout) in err and "holds a PedigreeSetLayout, but the input is a single pedigree" in err
+    err = _render_error(capsys, ["render", str(many), "--layout", str(one_layout)])
+    assert "holds a PedigreeLayout, but the input is a pedigree set" in err
+
+
+def test_render_reports_an_invalid_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, many, one_layout, many_layout = _layout_files(tmp_path)
+    one_layout.write_text(one_layout.read_text().replace("algorithm_version: 1", "algorithm_version: 0"))
+    err = _render_error(capsys, ["render", str(one), "--layout", str(one_layout)])
+    assert "invalid PedigreeLayout: key.algorithm_version:" in err
+    many_layout.write_text("pedigrees {}\n")
+    err = _render_error(capsys, ["render", str(many), "--layout", str(many_layout)])
+    assert "pedigrees[0].key: value is required" in err
+
+
+def test_render_reports_a_missing_or_garbled_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    one, _, _, _ = _layout_files(tmp_path)
+    missing = tmp_path / "nope.pbtxt"
+    err = _render_error(capsys, ["render", str(one), "--layout", str(missing)])
+    assert str(missing) in err and "cannot read it" in err
+    garbled = tmp_path / "garbled.pbtxt"
+    garbled.write_text("this is not a layout")
+    err = _render_error(capsys, ["render", str(one), "--layout", str(garbled)])
+    assert "not a PedigreeLayout" in err
