@@ -1286,7 +1286,7 @@ def _twin_pedigree(twin_type: pb.ZygosityType) -> pb.Pedigree:
 @pytest.mark.parametrize("twin_type", [pb.ZYGOSITY_TYPE_DIZYGOTIC, pb.ZYGOSITY_TYPE_UNKNOWN])
 def test_twin_zygosity_is_marked_and_drawn(twin_type: pb.ZygosityType) -> None:
     lay = render.layout(_twin_pedigree(twin_type))
-    assert lay.twins[1][0] == int(twin_type)
+    assert lay.twin_groups == [render.TwinGroup(level=1, columns=(0, 1), zygosity=int(twin_type))]
     svg = render.render_svg(_twin_pedigree(twin_type))
     assert svg.startswith("<svg ")
     if twin_type == pb.ZYGOSITY_TYPE_UNKNOWN:

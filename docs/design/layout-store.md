@@ -21,10 +21,10 @@ pedigree and geometry in hand fails rather than drawing something stale.
 
 The seam between the halves is the in-memory `Layout` in [`grus/render/_layout.py`](../../grus/render/_layout.py):
 per-row lists of cells, each cell an individual with an x, plus the relations drawing needs — each child's parent
-column, couple and twin flags with the right-hand neighbour, childlessness, founder sibships, routed matings (an
-overflow mating drawn as an orthogonal edge), the generation drawn on row 0, and per-child `lone` flags (a child that
-descends from one drawn parent rather than the couple its column heads). Drawing reads nothing else from the layout
-step; everything it needs about an individual's appearance it reads from the pedigree itself.
+column, couple flags with the right-hand neighbour, childlessness, twin groups by membership, founder sibships, routed
+matings (an overflow mating drawn as an orthogonal edge), the generation drawn on row 0, and per-child `lone` flags (a
+child that descends from one drawn parent rather than the couple its column heads). Drawing reads nothing else from the
+layout step; everything it needs about an individual's appearance it reads from the pedigree itself.
 
 Some cells are not individuals of the pedigree. The layout front end adds three kinds of **synthetic cell**:
 
@@ -61,7 +61,7 @@ The record is the `PedigreeLayout` message in
 [`schema/proto/grus/models/layout.proto`](../../schema/proto/grus/models/layout.proto). It holds a key and one outcome:
 
 - a **placement** — the rows of cells, left to right, each with its identity, x, parent column, `lone` flag and its
-  couple / twin / childless relation to its right-hand neighbour; the founder sibships and routed matings in (row,
+  couple / childless relation to its right-hand neighbour; the twin groups, founder sibships and routed matings in (row,
   column) terms; and the first generation. This is `Layout` field for field, so converting in either direction is
   lossless.
 - or a **deferral** — the reason the layout declined to draw the pedigree (`DeferredFeatureError`), so a figure render
@@ -130,9 +130,9 @@ who can edit it can edit the pedigree. Before drawing, the loader checks, in ord
 1. the key: algorithm version, layout-affecting geometry, pedigree digest;
 1. the cells: exactly the cells the pedigree lays out, each on its row, none twice;
 1. `first_generation`, against the pedigree;
-1. every relation that the row order and x determine — parent columns, couple, twin and childless flags, `lone`, founder
-   sibships, routed matings — rebuilt by the same code the layout uses and required to equal the stored values; every
-   couple whose partners are not adjacent must be routed;
+1. every relation that the row order and x determine — parent columns, couple and childless flags, `lone`, twin groups,
+   founder sibships, routed matings — rebuilt by the same code the layout uses and required to equal the stored values;
+   every couple whose partners are not adjacent must be routed;
 1. what the order and x must satisfy: each row in increasing x from 0, every adjacent pair at least its separation
    (label clearance included, less the position quantum), and no two sibships' bars overlapping.
 
@@ -158,6 +158,10 @@ The schema evolves additively like the IR's: fields and enum members are added, 
 record written by an older grus still parses. Whether it still *draws* is the version's call: a grus whose layout
 differs refuses the old record as stale, and a grus that only adds fields for a new layout feature draws old records
 unchanged.
+
+Version 2 records twin groups by membership (`Placement.twin_groups`), since a partner may stand between co-twins
+([`layout-v2.md`](layout-v2.md), Twins with partners); the per-cell `Cell.twin_right` it replaced is no longer written,
+and a record that sets it is refused.
 
 ## Alternatives considered
 

@@ -487,7 +487,7 @@ def test_descent_across_rows_passes_through_each_crossed_row() -> None:
     p = _couple_and_child(4, twins=True)
     lay = render.layout(p)
     assert [sum(c in lay.passthrough for c in row) for row in lay.nid] == [0, 1, 1, 0]
-    assert lay.twins[3][0] == pb.ZYGOSITY_TYPE_MONOZYGOTIC
+    assert lay.twin_groups == [render.TwinGroup(level=3, columns=(0, 1), zygosity=pb.ZYGOSITY_TYPE_MONOZYGOTIC)]
     assert [lay.nid[2][f] in lay.passthrough for f in lay.fam[3]] == [True, True]
 
 

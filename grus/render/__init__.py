@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from grus.render._draw import render_set_svg, render_svg, render_svgs
 from grus.render._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry
-from grus.render._layout import DeferredFeatureError, Layout
+from grus.render._layout import DeferredFeatureError, Layout, TwinGroup
 from grus.render._layout2 import layout
 from grus.render._ordering import Ordering, order
 from grus.render._raster import rasterize
@@ -32,6 +32,7 @@ __all__ = [
     "Layout",
     "Ordering",
     "StaleLayoutError",
+    "TwinGroup",
     "XSolver",
     "layout",
     "load_layout",

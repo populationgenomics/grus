@@ -60,10 +60,11 @@ Full spec in [`layout-v2.md`](layout-v2.md); the shape drawing depends on:
 **Layout ↔ drawing interface** — per-level parallel arrays (kinship2's shape): for each level, `n` (cell count), `nid`
 (individual row index per column), `pos` (x), `fam` (parent-couple column on the level above), `spouse` (0 /
 adjacent-spouse / adjacent-spouse-with-double-line — the last set straight from the explicit `Mating.consanguineous`
-flag, never inferred), `twins` (0 / MZ / DZ / unknown, with the sib to the right), `childless` (0 / by-choice /
-infertility on the couple's left column, from `Mating.childlessness`), plus `founder_sibships` (parentless sib groups),
-`ghost_of` (a ghost cell → the real individual it duplicates), and `routed` (matings drawn as routed edges rather than
-adjacent straight lines). Drawing reads only these arrays.
+flag, never inferred), `twin_groups` (each drawn twin group by its members' columns, with its zygosity — by membership,
+since a partner may stand between co-twins), `childless` (0 / by-choice / infertility on the couple's left column, from
+`Mating.childlessness`), plus `founder_sibships` (parentless sib groups), `ghost_of` (a ghost cell → the real individual
+it duplicates), and `routed` (matings drawn as routed edges rather than adjacent straight lines). Drawing reads only
+these arrays.
 
 ### Drawing (Bennett symbols)
 

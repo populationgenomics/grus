@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from grus import cli, ir
+from grus import cli, ir, render
 from grus.models import pedigree_pb2 as pb
 
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
@@ -207,7 +207,9 @@ def test_render_reports_a_layout_of_the_wrong_kind(tmp_path: pathlib.Path, capsy
 
 def test_render_reports_an_invalid_layout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
     one, many, one_layout, many_layout = _layout_files(tmp_path)
-    one_layout.write_text(one_layout.read_text().replace("algorithm_version: 1", "algorithm_version: 0"))
+    one_layout.write_text(
+        one_layout.read_text().replace(f"algorithm_version: {render.LAYOUT_VERSION}", "algorithm_version: 0")
+    )
     err = _render_error(capsys, ["render", str(one), "--layout", str(one_layout)])
     assert "invalid PedigreeLayout: key.algorithm_version:" in err
     many_layout.write_text("pedigrees {}\n")

@@ -382,6 +382,8 @@ class _Draw:
         self._side = {
             lay.nid[level][k]: lay.label_side(level, k) for level in range(len(lay.nid)) for k in range(lay.n[level])
         }
+        # Each twin-group member's cell -> its group; drawing groups a sibship's twins by membership, not adjacency.
+        self._twin_group = {(tg.level, k): tg for tg in lay.twin_groups for k in tg.columns}
         self._px = self._build_px_map()
         self._x_lo, self._x_hi = self._content_bounds()
         self._elbow = self._assign_elbows()
@@ -820,15 +822,19 @@ class _Draw:
         return out
 
     def _child_groups(self, level: int, cols: list[int]) -> list[list[int]]:
-        """Split a sibship's columns into consecutive twin runs (one group each) and lone singletons."""
+        """Split a sibship's columns into its twin groups (one group each) and lone singletons, left to right.
+
+        A twin group's members need not be adjacent: a partner may stand between co-twins (``Layout.twin_groups``).
+        """
         groups: list[list[int]] = []
-        j = 0
-        while j < len(cols):
-            r = j
-            while r + 1 < len(cols) and cols[r + 1] == cols[r] + 1 and self.lay.twins[level][cols[r]]:
-                r += 1
-            groups.append(cols[j : r + 1])
-            j = r + 1
+        seen: set[_layout.TwinGroup] = set()
+        for k in cols:
+            tg = self._twin_group.get((level, k))
+            if tg is None:
+                groups.append([k])
+            elif tg not in seen:
+                seen.add(tg)
+                groups.append(list(tg.columns))
         return groups
 
     def _twins(self, level: int, members: list[int], bar_y: float, top: float) -> list[str]:
@@ -836,7 +842,7 @@ class _Draw:
         xs = [self.px(self.lay.pos[level][k]) for k in members]
         gmid = sum(xs) / len(xs)
         out = [_line(gmid, bar_y, x, top) for x in xs]
-        kind = self.lay.twins[level][members[0]]
+        kind = self._twin_group[(level, members[0])].zygosity
         if kind == int(pb.ZYGOSITY_TYPE_MONOZYGOTIC):
             y = bar_y + 0.55 * (top - bar_y)
             lx = gmid + (xs[0] - gmid) * 0.55

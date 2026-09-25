@@ -326,6 +326,10 @@ def _crowd_a_couple(pl: lpb.Placement) -> None:
     pl.rows[0].cells[1].x = 0.5
 
 
+def _mark_twins_by_adjacency(pl: lpb.Placement) -> None:
+    pl.rows[1].cells[0].twin_right = pb.ZYGOSITY_TYPE_MONOZYGOTIC  # layout version 1's form, replaced by twin_groups
+
+
 _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
     "first_generation": ("three_generation", _bump_first_generation, "first_generation"),
     "swapped_couple": ("three_generation", lambda pl: _swap_identities(pl.rows[1], 0, 1), "fam"),
@@ -335,6 +339,8 @@ _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
     "flipped_lone": ("three_generation", _flip_lone, "lone"),
     "crowded": ("three_generation", _crowd_a_couple, "need"),
     "dropped_founder_sibship": ("founder_sibship", lambda pl: pl.ClearField("founder_sibships"), "founder_sibships"),
+    "dropped_twin_group": ("twins", lambda pl: pl.ClearField("twin_groups"), "twin_groups"),
+    "twin_right": ("twins", _mark_twins_by_adjacency, "twin_right"),
     "dropped_route": ("routed", lambda pl: pl.ClearField("routed"), "neither adjacent nor routed"),
 }
 

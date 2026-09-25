@@ -18,7 +18,7 @@ from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry, _layout, _layout2, _xsolve
 
-LAYOUT_VERSION = 1
+LAYOUT_VERSION = 2
 """The layout-algorithm version a stored layout records. Bump it in any change that alters a layout."""
 
 # A cell's identity as a hashable key. The pass-through key carries its row: one descent crossing several rows has one
@@ -145,12 +145,12 @@ def to_proto(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> l
                 cell.parent_column = lay.fam[level][k]
             if lay.spouse[level][k]:
                 cell.couple_right = _COUPLE_LINE[lay.spouse[level][k]]
-            if lay.twins[level][k]:
-                cell.MergeFrom(lpb.Cell(twin_right=pb.ZygosityType.Name(lay.twins[level][k])))
             if lay.childless[level][k]:
                 cell.MergeFrom(lpb.Cell(childless=pb.Childlessness.Name(lay.childless[level][k])))
     for level, cols in lay.founder_sibships:
         placement.founder_sibships.add(row=level, columns=cols)
+    for tg in lay.twin_groups:
+        placement.twin_groups.add(row=tg.level, columns=tg.columns, zygosity=pb.ZygosityType.ValueType(tg.zygosity))
     for rm in lay.routed:
         placement.routed.add(
             a=_ref(rm.a), b=_ref(rm.b), consanguineous=rm.consanguineous, children=[_ref(c) for c in rm.children]
@@ -162,10 +162,10 @@ def from_proto(p: pb.Pedigree, placement: lpb.Placement, geom: _geometry.Geometr
     """The ``Layout`` a stored placement of ``p`` under ``geom`` records — equal to the fresh layout it was taken from.
 
     Checked for consistency (a stored layout is a cache grus writes, not an authenticated input): the cells are exactly
-    the cells ``p`` lays out, row for row; ``first_generation``; every relation (parent columns, couple, twin and
-    childless flags, ``lone``, founder sibships, routed matings), rebuilt from the stored row order and x and required
-    to equal the stored values; each row's x in order and every adjacent pair at least its separation (label clearance
-    included); and no two sibships' bars overlapping. Not re-run: the ordering search and the x-solve.
+    the cells ``p`` lays out, row for row; ``first_generation``; every relation (parent columns, couple and childless
+    flags, ``lone``, twin groups, founder sibships, routed matings), rebuilt from the stored row order and x and
+    required to equal the stored values; each row's x in order and every adjacent pair at least its separation (label
+    clearance included); and no two sibships' bars overlapping. Not re-run: the ordering search and the x-solve.
 
     Raises:
         StaleLayoutError: any check above fails.
@@ -202,7 +202,10 @@ def from_proto(p: pb.Pedigree, placement: lpb.Placement, geom: _geometry.Geometr
         pos=[[c.x for c in row] for row in rows],
         fam=[[c.parent_column if c.HasField("parent_column") else -1 for c in row] for row in rows],
         spouse=[[_SPOUSE[c.couple_right] if c.HasField("couple_right") else 0 for c in row] for row in rows],
-        twins=[[int(c.twin_right) for c in row] for row in rows],
+        twin_groups=[
+            _layout.TwinGroup(level=tg.row, columns=tuple(tg.columns), zygosity=int(tg.zygosity))
+            for tg in placement.twin_groups
+        ],
         childless=[[int(c.childless) for c in row] for row in rows],
         ghost_of=prep.ghost_of,
         founder_sibships=[(fs.row, tuple(fs.columns)) for fs in placement.founder_sibships],
@@ -252,7 +255,7 @@ def _verify(p: pb.Pedigree, prep: _layout2._Prepared, stored: _layout.Layout, ge
     if built.nid != stored.nid or built.pos != stored.pos:
         raise StaleLayoutError("a stored row is not in increasing x, or its leftmost cell is not at 0")
     built = dataclasses.replace(built, routed=_layout2._routed_matings(g, built, _routed_indices(g, stored)))
-    for name in ("fam", "spouse", "twins", "childless", "lone", "founder_sibships", "routed"):
+    for name in ("fam", "spouse", "twin_groups", "childless", "lone", "founder_sibships", "routed"):
         if getattr(built, name) != getattr(stored, name):
             raise StaleLayoutError(f"the stored {name} relations are not the ones the stored order implies")
     seps = _layout2._row_seps(built, geom.couple_gap, geom.sib_gap, _layout2._label_clearance(p, built, geom))
@@ -374,12 +377,17 @@ def _check_columns(placement: lpb.Placement) -> None:
         for k, c in enumerate(row.cells):
             if c.HasField("parent_column") and not inside(level - 1, c.parent_column):
                 raise StaleLayoutError(f"cell {k} on row {level} names parent column {c.parent_column}, not a cell")
+            if c.HasField("twin_right"):
+                raise StaleLayoutError(f"cell {k} on row {level} sets twin_right, which twin_groups replaced")
             last = k == len(row.cells) - 1
-            if last and (c.HasField("couple_right") or c.HasField("twin_right") or c.HasField("childless")):
+            if last and (c.HasField("couple_right") or c.HasField("childless")):
                 raise StaleLayoutError(f"the last cell on row {level} is paired with a right-hand neighbour")
     for fs in placement.founder_sibships:
         if not all(inside(fs.row, col) for col in fs.columns):
             raise StaleLayoutError(f"a founder sibship on row {fs.row} names a column outside the row")
+    for tg in placement.twin_groups:
+        if not all(inside(tg.row, col) for col in tg.columns):
+            raise StaleLayoutError(f"a twin group on row {tg.row} names a column outside the row")
     for rm in placement.routed:
         if not all(inside(r.row, r.column) for r in (rm.a, rm.b, *rm.children)):
             raise StaleLayoutError("a routed mating names a cell outside the layout")

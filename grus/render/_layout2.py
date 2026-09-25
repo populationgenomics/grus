@@ -59,7 +59,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     The v2 constraint model, in four stages: validate and prepare the graph (``_prepare`` — the avuncular
     ``ghost`` duplication, cross/loop detection, rows from IR generation, pass-throughs); order
     each rank by crossing minimization (``_ordering.order``); ``_build`` the per-level arrays (``fam`` /
-    ``spouse`` / ``twins`` / founder sibships) from that order; then replace ``pos`` with the deterministic
+    ``spouse`` / twin groups / founder sibships) from that order; then replace ``pos`` with the deterministic
     x-solve (``_x_model`` + ``_xsolve.solve``, quantised) and attach any routed matings.
 
     A consanguinity-loop mating is an ordinary adjacent (double-line) couple once the ordering pulls each
@@ -399,7 +399,8 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
       which is a co-twin or a founder-sib floater: bonded, the couple would join that group into one rigid chain
       (twins who both marry lock spouse, twin, twin, spouse together), and the chain's drops could not spread to
       reach their own children, whose bars then met. Free, it stretches at the hinge couples' cost.
-    * **co-twins** (``twins`` flag) — a twin group never separates.
+    * **co-twins** standing side by side (``Layout.twin_groups``) — a twin group never separates. Co-twins with a
+      partner between them do not bond: the partner's couple stretches as a hinge couple does.
     * a **founder-sib floater**: a member of a partnerless mating's sibship that heads no descent (no drawn
       children) has no anchor of its own, so centring alone would not keep it beside an anchored sibling pulled
       away (c19's leaf ``1-1``). It bonds to one same-sibship neighbour — the left if present,
@@ -419,12 +420,15 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
     for gid, (level, cols) in enumerate(lay.founder_sibships):
         for c in cols:
             fs_group[(level, c)] = gid
+    side_by_side = {  # (level, left column) of each pair of co-twins that stand side by side
+        (tg.level, a) for tg in lay.twin_groups for a, b in itertools.pairwise(tg.columns) if b == a + 1
+    }
     out: list[list[_Block]] = []
     for level in range(len(lay.nid)):
         ncols = lay.n[level]
         bond = [False] * max(ncols - 1, 0)  # bond[k]: columns k and k+1 share a block
         for k in range(ncols - 1):
-            if lay.twins[level][k]:
+            if (level, k) in side_by_side:
                 bond[k] = True
         for k in range(ncols):
             gid = fs_group.get((level, k))
