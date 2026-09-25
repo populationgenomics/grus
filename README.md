@@ -61,4 +61,6 @@ are provenance, not links.
 (`.github/workflows/`): pre-commit, pytest (with and without the `raster` extra), stub freshness, and `buf breaking`
 against the base branch. A `v*` tag matching the pyproject version builds, publishes to PyPI (trusted publisher) and
 creates the GitHub release (`release.yml`). Protos are the source of truth; after editing one, `buf lint`,
-`buf breaking --against .git#branch=main`, and `uv run --group codegen python -m tools.schema.regen` (needs `buf`).
+`buf breaking --against .git#branch=main`, and `uv run --group codegen python -m tools.schema.regen` (needs `buf`). A
+renderer change runs the fuzz differential and shuffle check against `main` before its PR:
+[`tools/fuzz/README.md`](tools/fuzz/README.md).
