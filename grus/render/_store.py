@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import hashlib
 
+import protovalidate
+
 from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry, _layout, _layout2, _xsolve
@@ -71,6 +73,54 @@ def layout_key(p: pb.Pedigree, geom: _geometry.Geometry) -> lpb.LayoutKey:
         pedigree_digest=pedigree_digest(p),
         geometry=layout_geometry(geom),
     )
+
+
+def store_layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> lpb.PedigreeLayout:
+    """Lay ``p`` out under ``geometry`` and record the result, a deferral included.
+
+    Raises:
+        grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
+    """
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
+    try:
+        lay = _layout2.layout(p, geom)
+    except _layout.DeferredFeatureError as deferred:
+        return lpb.PedigreeLayout(key=layout_key(p, geom), deferred=str(deferred))
+    return to_proto(p, lay, geom)
+
+
+def load_layout(
+    p: pb.Pedigree, stored: lpb.PedigreeLayout, geometry: _geometry.Geometry | None = None
+) -> _layout.Layout:
+    """The ``Layout`` of ``p`` under ``geometry`` that ``stored`` records, after checking it is not stale.
+
+    Raises:
+        grus.ir.ValidationError: ``stored`` breaks a field rule of the layout schema.
+        StaleLayoutError: ``stored`` was laid out by another layout-algorithm version, from different pedigree content,
+            or under different layout-affecting geometry; or its cells are not the cells ``p`` lays out.
+        DeferredFeatureError: ``stored`` records that the layout deferred ``p``, as a fresh layout would raise.
+    """
+    geom = geometry or _geometry.DEFAULT_GEOMETRY
+    protovalidate.validate(stored)
+    _check_key(stored.key, p, geom)
+    if stored.WhichOneof("outcome") == "deferred":
+        raise _layout.DeferredFeatureError(stored.deferred)
+    return from_proto(p, stored.placement)
+
+
+def _check_key(key: lpb.LayoutKey, p: pb.Pedigree, geom: _geometry.Geometry) -> None:
+    if key.algorithm_version != LAYOUT_VERSION:
+        raise StaleLayoutError(
+            f"stored layout is from layout algorithm version {key.algorithm_version}; "
+            f"this grus lays out with version {LAYOUT_VERSION}"
+        )
+    want = layout_geometry(geom)
+    for field in lpb.LayoutGeometry.DESCRIPTOR.fields:
+        stored_value, value = getattr(key.geometry, field.name), getattr(want, field.name)
+        if stored_value != value:
+            raise StaleLayoutError(f"stored layout has {field.name}={stored_value!r}; the geometry has {value!r}")
+    if key.pedigree_digest != pedigree_digest(p):
+        raise StaleLayoutError("stored layout is of different pedigree content (its digest does not match)")
 
 
 def to_proto(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> lpb.PedigreeLayout:

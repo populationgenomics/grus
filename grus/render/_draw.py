@@ -57,10 +57,12 @@ import collections
 import json
 import math
 import re
+from collections.abc import Sequence
 from typing import Protocol
 
+from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
-from grus.render import _geometry, _labels, _layout, _layout2
+from grus.render import _geometry, _labels, _layout, _layout2, _store
 
 _position = _labels.position
 _label_lines = _labels.label_lines
@@ -87,16 +89,49 @@ _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _Tile = tuple[str, float, float, list[str], str]
 
 
-def render_svg(p: pb.Pedigree, geometry: _geometry.Geometry | None = None, *, id_prefix: str = "") -> str:
-    """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string."""
+def render_svg(
+    p: pb.Pedigree,
+    geometry: _geometry.Geometry | None = None,
+    *,
+    id_prefix: str = "",
+    stored_layout: lpb.PedigreeLayout | None = None,
+) -> str:
+    """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string.
+
+    With ``stored_layout`` (from ``store_layout``), draw from it instead of laying out: the same bytes, without the
+    layout's cost. It must be a layout of this pedigree content under this geometry's layout fields
+    (docs/design/layout-store.md); otherwise ``StaleLayoutError`` is raised and nothing is drawn.
+    """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    lay = _layout2.layout(p, geom)
-    return _Draw(p, lay, geom, id_prefix=id_prefix).svg()
+    return _Draw(p, _lay_out(p, geom, stored_layout), geom, id_prefix=id_prefix).svg()
+
+
+def _lay_out(p: pb.Pedigree, geom: _geometry.Geometry, stored: lpb.PedigreeLayout | None) -> _layout.Layout:
+    """``p``'s layout: read from ``stored`` when given (checked for staleness), else computed."""
+    if stored is None:
+        return _layout2.layout(p, geom)
+    return _store.load_layout(p, stored, geom)
+
+
+def _stored_per_pedigree(
+    pedigree_set: pb.PedigreeSet, stored_layouts: Sequence[lpb.PedigreeLayout] | None
+) -> list[lpb.PedigreeLayout | None]:
+    if stored_layouts is None:
+        return [None] * len(pedigree_set.pedigrees)
+    if len(stored_layouts) != len(pedigree_set.pedigrees):
+        raise _store.StaleLayoutError(
+            f"{len(stored_layouts)} stored layouts for a set of {len(pedigree_set.pedigrees)} pedigrees"
+        )
+    return list(stored_layouts)
 
 
 def render_set_svg(
-    pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None, *, id_prefix: str = ""
+    pedigree_set: pb.PedigreeSet,
+    geometry: _geometry.Geometry | None = None,
+    *,
+    id_prefix: str = "",
+    stored_layouts: Sequence[lpb.PedigreeLayout] | None = None,
 ) -> str:
     """Render a whole figure's ``PedigreeSet`` as one SVG (docs/design/renderer.md).
 
@@ -105,14 +140,15 @@ def render_set_svg(
     first). A pedigree the tier-1 layout defers becomes a labelled placeholder box so the rest of the
     figure still renders. An empty set yields a minimal empty canvas. ``id_prefix`` namespaces every id in
     the document (each tile adds its own ``p{n}-`` under it) for a page that inlines several figures.
+    ``stored_layouts``, one per pedigree in order, draws from stored layouts as ``render_svg`` does.
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     tiles: list[_Tile] = []
-    for ped in pedigree_set.pedigrees:
+    for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            draw = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=f"{id_prefix}p{len(tiles)}-")
+            draw = _Draw(ped, _lay_out(ped, geom, stored), geom, id_prefix=f"{id_prefix}p{len(tiles)}-")
             width, height = draw.dimensions()
             tiles.append((title, width, height, draw.body(), draw.root_attrs()))
         except _layout.DeferredFeatureError as deferred:
@@ -121,7 +157,11 @@ def render_set_svg(
 
 
 def render_svgs(
-    pedigree_set: pb.PedigreeSet, geometry: _geometry.Geometry | None = None, *, id_prefix: str = ""
+    pedigree_set: pb.PedigreeSet,
+    geometry: _geometry.Geometry | None = None,
+    *,
+    id_prefix: str = "",
+    stored_layouts: Sequence[lpb.PedigreeLayout] | None = None,
 ) -> list[tuple[str, str]]:
     """Render each pedigree in a set to its **own** standalone SVG document — one per family.
 
@@ -129,15 +169,15 @@ def render_svgs(
     ``(title, svg)`` per pedigree so a caller can present them separately (the review UI's render carousel).
     ``title`` is the display label (``_display_title``); a family the tier-1 layout defers becomes a labelled
     "deferred" placeholder SVG rather than raising, mirroring ``render_set_svg`` — so the list always has one
-    entry per pedigree, each a complete document.
+    entry per pedigree, each a complete document. ``stored_layouts`` is as for ``render_set_svg``.
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     out: list[tuple[str, str]] = []
-    for ped in pedigree_set.pedigrees:
+    for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            svg = _Draw(ped, _layout2.layout(ped, geom), geom, id_prefix=id_prefix).svg()
+            svg = _Draw(ped, _lay_out(ped, geom, stored), geom, id_prefix=id_prefix).svg()
         except _layout.DeferredFeatureError as deferred:
             _, width, height, body, attrs = _placeholder_tile(ped, str(deferred))
             svg = _svg_root(width, height, body, attrs)
