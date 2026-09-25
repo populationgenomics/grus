@@ -26,7 +26,7 @@ from buf.validate import validate_pb2 as buf_dot_validate_dot_validate__pb2
 from grus.models import pedigree_pb2 as grus_dot_models_dot_pedigree__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18grus/models/layout.proto\x12\x12grus.models.layout\x1a\x1b\x62uf/validate/validate.proto\x1a\x1agrus/models/pedigree.proto\"\xa7\x01\n\x0ePedigreeLayout\x12\x32\n\x03key\x18\x01 \x01(\x0b\x32\x1d.grus.models.layout.LayoutKeyB\x06\xbaH\x03\xc8\x01\x01\x12\x32\n\tplacement\x18\x02 \x01(\x0b\x32\x1d.grus.models.layout.PlacementH\x00\x12\x1b\n\x08\x64\x65\x66\x65rred\x18\x03 \x01(\tB\x07\xbaH\x04r\x02\x10\x01H\x00\x42\x10\n\x07outcome\x12\x05\xbaH\x02\x08\x01\"J\n\x11PedigreeSetLayout\x12\x35\n\tpedigrees\x18\x01 \x03(\x0b\x32\".grus.models.layout.PedigreeLayout\"\x8f\x01\n\tLayoutKey\x12\"\n\x11\x61lgorithm_version\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00\x12 \n\x0fpedigree_digest\x18\x02 \x01(\x0c\x42\x07\xbaH\x04z\x02h \x12<\n\x08geometry\x18\x03 \x01(\x0b\x32\".grus.models.layout.LayoutGeometryB\x06\xbaH\x03\xc8\x01\x01\"\xda\x01\n\x0eLayoutGeometry\x12\x1b\n\ncouple_gap\x18\x01 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x18\n\x07sib_gap\x18\x02 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x1b\n\nlabel_size\x18\x03 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12 \n\x0flabel_box_width\x18\x04 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x17\n\x06x_unit\x18\x05 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x39\n\x08x_solver\x18\x06 \x01(\x0e\x32\x1b.grus.models.layout.XSolverB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00\"\xc5\x01\n\tPlacement\x12!\n\x10\x66irst_generation\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x01\x12%\n\x04rows\x18\x02 \x03(\x0b\x32\x17.grus.models.layout.Row\x12<\n\x10\x66ounder_sibships\x18\x03 \x03(\x0b\x32\".grus.models.layout.FounderSibship\x12\x30\n\x06routed\x18\x04 \x03(\x0b\x32 .grus.models.layout.RoutedMating\".\n\x03Row\x12\'\n\x05\x63\x65lls\x18\x01 \x03(\x0b\x32\x18.grus.models.layout.Cell\"\xc4\x04\n\x04\x43\x65ll\x12\x34\n\nindividual\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionH\x00\x12*\n\x05ghost\x18\x02 \x01(\x0b\x32\x19.grus.models.layout.GhostH\x00\x12.\n\x07phantom\x18\x03 \x01(\x0b\x32\x1b.grus.models.layout.PhantomH\x00\x12\x37\n\x0cpass_through\x18\x04 \x01(\x0b\x32\x1f.grus.models.layout.PassThroughH\x00\x12\x12\n\x01x\x18\x05 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12#\n\rparent_column\x18\x06 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00H\x01\x88\x01\x01\x12\x0c\n\x04lone\x18\x07 \x01(\x08\x12\x45\n\x0c\x63ouple_right\x18\x08 \x01(\x0e\x32\x1e.grus.models.layout.CoupleLineB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00H\x02\x88\x01\x01\x12G\n\ntwin_right\x18\t \x01(\x0e\x32\".grus.models.pedigree.ZygosityTypeB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00H\x03\x88\x01\x01\x12G\n\tchildless\x18\n \x01(\x0e\x32#.grus.models.pedigree.ChildlessnessB\n\xbaH\x07\x82\x01\x04\x18\x02\x18\x03H\x04\x88\x01\x01\x42\x11\n\x08identity\x12\x05\xbaH\x02\x08\x01\x42\x10\n\x0e_parent_columnB\x0f\n\r_couple_rightB\r\n\x0b_twin_rightB\x0c\n\n_childless\"\xd4\x01\n\x05Ghost\x12\x34\n\x04real\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12\x37\n\x07partner\x18\x02 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12\x38\n\x0b\x66irst_child\x18\x03 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionH\x00\x88\x01\x01\x12\x12\n\noccurrence\x18\x04 \x01(\rB\x0e\n\x0c_first_child\"~\n\x07Phantom\x12\x36\n\x06parent\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12;\n\x0b\x66irst_child\x18\x02 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\"J\n\x0bPassThrough\x12;\n\x0b\x66irst_child\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\"G\n\x0e\x46ounderSibship\x12\x14\n\x03row\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00\x12\x1f\n\x07\x63olumns\x18\x02 \x03(\x05\x42\x0e\xbaH\x0b\x92\x01\x08\x08\x01\"\x04\x1a\x02(\x00\"\xb5\x01\n\x0cRoutedMating\x12.\n\x01\x61\x18\x01 \x01(\x0b\x32\x1b.grus.models.layout.CellRefB\x06\xbaH\x03\xc8\x01\x01\x12.\n\x01\x62\x18\x02 \x01(\x0b\x32\x1b.grus.models.layout.CellRefB\x06\xbaH\x03\xc8\x01\x01\x12\x16\n\x0e\x63onsanguineous\x18\x03 \x01(\x08\x12-\n\x08\x63hildren\x18\x04 \x03(\x0b\x32\x1b.grus.models.layout.CellRef\"8\n\x07\x43\x65llRef\x12\x14\n\x03row\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00\x12\x17\n\x06\x63olumn\x18\x02 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00*H\n\x07XSolver\x12\x18\n\x14X_SOLVER_UNSPECIFIED\x10\x00\x12\x0f\n\x0bX_SOLVER_Z3\x10\x01\x12\x12\n\x0eX_SOLVER_HIGHS\x10\x02*Y\n\nCoupleLine\x12\x1b\n\x17\x43OUPLE_LINE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x43OUPLE_LINE_SINGLE\x10\x01\x12\x16\n\x12\x43OUPLE_LINE_DOUBLE\x10\x02\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18grus/models/layout.proto\x12\x12grus.models.layout\x1a\x1b\x62uf/validate/validate.proto\x1a\x1agrus/models/pedigree.proto\"\xa7\x01\n\x0ePedigreeLayout\x12\x32\n\x03key\x18\x01 \x01(\x0b\x32\x1d.grus.models.layout.LayoutKeyB\x06\xbaH\x03\xc8\x01\x01\x12\x32\n\tplacement\x18\x02 \x01(\x0b\x32\x1d.grus.models.layout.PlacementH\x00\x12\x1b\n\x08\x64\x65\x66\x65rred\x18\x03 \x01(\tB\x07\xbaH\x04r\x02\x10\x01H\x00\x42\x10\n\x07outcome\x12\x05\xbaH\x02\x08\x01\"J\n\x11PedigreeSetLayout\x12\x35\n\tpedigrees\x18\x01 \x03(\x0b\x32\".grus.models.layout.PedigreeLayout\"\x8f\x01\n\tLayoutKey\x12\"\n\x11\x61lgorithm_version\x18\x01 \x01(\rB\x07\xbaH\x04*\x02 \x00\x12 \n\x0fpedigree_digest\x18\x02 \x01(\x0c\x42\x07\xbaH\x04z\x02h \x12<\n\x08geometry\x18\x03 \x01(\x0b\x32\".grus.models.layout.LayoutGeometryB\x06\xbaH\x03\xc8\x01\x01\"\xd9\x02\n\x0eLayoutGeometry\x12\x1b\n\ncouple_gap\x18\x01 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x18\n\x07sib_gap\x18\x02 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x1b\n\nlabel_size\x18\x03 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12 \n\x0flabel_box_width\x18\x04 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x17\n\x06x_unit\x18\x05 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x39\n\x08x_solver\x18\x06 \x01(\x0e\x32\x1b.grus.models.layout.XSolverB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00\x12\x1a\n\tlabel_gap\x18\x07 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x1c\n\x0bsymbol_size\x18\x08 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12\x43\n\rcarrier_style\x18\t \x01(\x0e\x32 .grus.models.layout.CarrierStyleB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00\"\xc5\x01\n\tPlacement\x12!\n\x10\x66irst_generation\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x01\x12%\n\x04rows\x18\x02 \x03(\x0b\x32\x17.grus.models.layout.Row\x12<\n\x10\x66ounder_sibships\x18\x03 \x03(\x0b\x32\".grus.models.layout.FounderSibship\x12\x30\n\x06routed\x18\x04 \x03(\x0b\x32 .grus.models.layout.RoutedMating\".\n\x03Row\x12\'\n\x05\x63\x65lls\x18\x01 \x03(\x0b\x32\x18.grus.models.layout.Cell\"\xc4\x04\n\x04\x43\x65ll\x12\x34\n\nindividual\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionH\x00\x12*\n\x05ghost\x18\x02 \x01(\x0b\x32\x19.grus.models.layout.GhostH\x00\x12.\n\x07phantom\x18\x03 \x01(\x0b\x32\x1b.grus.models.layout.PhantomH\x00\x12\x37\n\x0cpass_through\x18\x04 \x01(\x0b\x32\x1f.grus.models.layout.PassThroughH\x00\x12\x12\n\x01x\x18\x05 \x01(\x01\x42\x07\xbaH\x04\x12\x02@\x01\x12#\n\rparent_column\x18\x06 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00H\x01\x88\x01\x01\x12\x0c\n\x04lone\x18\x07 \x01(\x08\x12\x45\n\x0c\x63ouple_right\x18\x08 \x01(\x0e\x32\x1e.grus.models.layout.CoupleLineB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00H\x02\x88\x01\x01\x12G\n\ntwin_right\x18\t \x01(\x0e\x32\".grus.models.pedigree.ZygosityTypeB\n\xbaH\x07\x82\x01\x04\x10\x01 \x00H\x03\x88\x01\x01\x12G\n\tchildless\x18\n \x01(\x0e\x32#.grus.models.pedigree.ChildlessnessB\n\xbaH\x07\x82\x01\x04\x18\x02\x18\x03H\x04\x88\x01\x01\x42\x11\n\x08identity\x12\x05\xbaH\x02\x08\x01\x42\x10\n\x0e_parent_columnB\x0f\n\r_couple_rightB\r\n\x0b_twin_rightB\x0c\n\n_childless\"\xd4\x01\n\x05Ghost\x12\x34\n\x04real\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12\x37\n\x07partner\x18\x02 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12\x38\n\x0b\x66irst_child\x18\x03 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionH\x00\x88\x01\x01\x12\x12\n\noccurrence\x18\x04 \x01(\rB\x0e\n\x0c_first_child\"~\n\x07Phantom\x12\x36\n\x06parent\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\x12;\n\x0b\x66irst_child\x18\x02 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\"J\n\x0bPassThrough\x12;\n\x0b\x66irst_child\x18\x01 \x01(\x0b\x32\x1e.grus.models.pedigree.PositionB\x06\xbaH\x03\xc8\x01\x01\"G\n\x0e\x46ounderSibship\x12\x14\n\x03row\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00\x12\x1f\n\x07\x63olumns\x18\x02 \x03(\x05\x42\x0e\xbaH\x0b\x92\x01\x08\x08\x01\"\x04\x1a\x02(\x00\"\xb5\x01\n\x0cRoutedMating\x12.\n\x01\x61\x18\x01 \x01(\x0b\x32\x1b.grus.models.layout.CellRefB\x06\xbaH\x03\xc8\x01\x01\x12.\n\x01\x62\x18\x02 \x01(\x0b\x32\x1b.grus.models.layout.CellRefB\x06\xbaH\x03\xc8\x01\x01\x12\x16\n\x0e\x63onsanguineous\x18\x03 \x01(\x08\x12-\n\x08\x63hildren\x18\x04 \x03(\x0b\x32\x1b.grus.models.layout.CellRef\"8\n\x07\x43\x65llRef\x12\x14\n\x03row\x18\x01 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00\x12\x17\n\x06\x63olumn\x18\x02 \x01(\x05\x42\x07\xbaH\x04\x1a\x02(\x00*t\n\x0c\x43\x61rrierStyle\x12\x1d\n\x19\x43\x41RRIER_STYLE_UNSPECIFIED\x10\x00\x12#\n\x1f\x43\x41RRIER_STYLE_INHERITANCE_GLYPH\x10\x01\x12 \n\x1c\x43\x41RRIER_STYLE_PARTITION_FILL\x10\x02*H\n\x07XSolver\x12\x18\n\x14X_SOLVER_UNSPECIFIED\x10\x00\x12\x0f\n\x0bX_SOLVER_Z3\x10\x01\x12\x12\n\x0eX_SOLVER_HIGHS\x10\x02*Y\n\nCoupleLine\x12\x1b\n\x17\x43OUPLE_LINE_UNSPECIFIED\x10\x00\x12\x16\n\x12\x43OUPLE_LINE_SINGLE\x10\x01\x12\x16\n\x12\x43OUPLE_LINE_DOUBLE\x10\x02\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -57,6 +57,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_LAYOUTGEOMETRY'].fields_by_name['x_unit']._serialized_options = b'\272H\004\022\002@\001'
   _globals['_LAYOUTGEOMETRY'].fields_by_name['x_solver']._loaded_options = None
   _globals['_LAYOUTGEOMETRY'].fields_by_name['x_solver']._serialized_options = b'\272H\007\202\001\004\020\001 \000'
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['label_gap']._loaded_options = None
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['label_gap']._serialized_options = b'\272H\004\022\002@\001'
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['symbol_size']._loaded_options = None
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['symbol_size']._serialized_options = b'\272H\004\022\002@\001'
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['carrier_style']._loaded_options = None
+  _globals['_LAYOUTGEOMETRY'].fields_by_name['carrier_style']._serialized_options = b'\272H\007\202\001\004\020\001 \000'
   _globals['_PLACEMENT'].fields_by_name['first_generation']._loaded_options = None
   _globals['_PLACEMENT'].fields_by_name['first_generation']._serialized_options = b'\272H\004\032\002(\001'
   _globals['_CELL'].oneofs_by_name['identity']._loaded_options = None
@@ -93,10 +99,12 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CELLREF'].fields_by_name['row']._serialized_options = b'\272H\004\032\002(\000'
   _globals['_CELLREF'].fields_by_name['column']._loaded_options = None
   _globals['_CELLREF'].fields_by_name['column']._serialized_options = b'\272H\004\032\002(\000'
-  _globals['_XSOLVER']._serialized_start=2283
-  _globals['_XSOLVER']._serialized_end=2355
-  _globals['_COUPLELINE']._serialized_start=2357
-  _globals['_COUPLELINE']._serialized_end=2446
+  _globals['_CARRIERSTYLE']._serialized_start=2410
+  _globals['_CARRIERSTYLE']._serialized_end=2526
+  _globals['_XSOLVER']._serialized_start=2528
+  _globals['_XSOLVER']._serialized_end=2600
+  _globals['_COUPLELINE']._serialized_start=2602
+  _globals['_COUPLELINE']._serialized_end=2691
   _globals['_PEDIGREELAYOUT']._serialized_start=106
   _globals['_PEDIGREELAYOUT']._serialized_end=273
   _globals['_PEDIGREESETLAYOUT']._serialized_start=275
@@ -104,23 +112,23 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_LAYOUTKEY']._serialized_start=352
   _globals['_LAYOUTKEY']._serialized_end=495
   _globals['_LAYOUTGEOMETRY']._serialized_start=498
-  _globals['_LAYOUTGEOMETRY']._serialized_end=716
-  _globals['_PLACEMENT']._serialized_start=719
-  _globals['_PLACEMENT']._serialized_end=916
-  _globals['_ROW']._serialized_start=918
-  _globals['_ROW']._serialized_end=964
-  _globals['_CELL']._serialized_start=967
-  _globals['_CELL']._serialized_end=1547
-  _globals['_GHOST']._serialized_start=1550
-  _globals['_GHOST']._serialized_end=1762
-  _globals['_PHANTOM']._serialized_start=1764
-  _globals['_PHANTOM']._serialized_end=1890
-  _globals['_PASSTHROUGH']._serialized_start=1892
-  _globals['_PASSTHROUGH']._serialized_end=1966
-  _globals['_FOUNDERSIBSHIP']._serialized_start=1968
-  _globals['_FOUNDERSIBSHIP']._serialized_end=2039
-  _globals['_ROUTEDMATING']._serialized_start=2042
-  _globals['_ROUTEDMATING']._serialized_end=2223
-  _globals['_CELLREF']._serialized_start=2225
-  _globals['_CELLREF']._serialized_end=2281
+  _globals['_LAYOUTGEOMETRY']._serialized_end=843
+  _globals['_PLACEMENT']._serialized_start=846
+  _globals['_PLACEMENT']._serialized_end=1043
+  _globals['_ROW']._serialized_start=1045
+  _globals['_ROW']._serialized_end=1091
+  _globals['_CELL']._serialized_start=1094
+  _globals['_CELL']._serialized_end=1674
+  _globals['_GHOST']._serialized_start=1677
+  _globals['_GHOST']._serialized_end=1889
+  _globals['_PHANTOM']._serialized_start=1891
+  _globals['_PHANTOM']._serialized_end=2017
+  _globals['_PASSTHROUGH']._serialized_start=2019
+  _globals['_PASSTHROUGH']._serialized_end=2093
+  _globals['_FOUNDERSIBSHIP']._serialized_start=2095
+  _globals['_FOUNDERSIBSHIP']._serialized_end=2166
+  _globals['_ROUTEDMATING']._serialized_start=2169
+  _globals['_ROUTEDMATING']._serialized_end=2350
+  _globals['_CELLREF']._serialized_start=2352
+  _globals['_CELLREF']._serialized_end=2408
 # @@protoc_insertion_point(module_scope)

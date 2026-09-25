@@ -29,6 +29,10 @@ _NO_CHILD = _layout.NO_CHILD  # a childless ghost's first-child slot in its key
 _XSOLVER = {_xsolve.XSolver.Z3: lpb.X_SOLVER_Z3, _xsolve.XSolver.HIGHS: lpb.X_SOLVER_HIGHS}
 _COUPLE_LINE = {1: lpb.COUPLE_LINE_SINGLE, 2: lpb.COUPLE_LINE_DOUBLE}
 _SPOUSE = {v: k for k, v in _COUPLE_LINE.items()}
+_CARRIER_STYLE = {
+    _geometry.CarrierStyle.INHERITANCE_GLYPH: lpb.CARRIER_STYLE_INHERITANCE_GLYPH,
+    _geometry.CarrierStyle.PARTITION_FILL: lpb.CARRIER_STYLE_PARTITION_FILL,
+}
 
 
 class StaleLayoutError(Exception):
@@ -65,6 +69,9 @@ def layout_geometry(geom: _geometry.Geometry) -> lpb.LayoutGeometry:
         label_box_width=geom.label_box_width,
         x_unit=geom.x_unit,
         x_solver=_XSOLVER[geom.x_solver],
+        label_gap=geom.label_gap,
+        symbol_size=geom.symbol_size,
+        carrier_style=_CARRIER_STYLE[geom.carrier_style],
     )
 
 

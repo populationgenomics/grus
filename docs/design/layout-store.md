@@ -103,15 +103,19 @@ input to the layout:
   thing every layout change must keep in step. A change to a title then invalidates a layout it did not affect; that
   costs one recomputation and never a wrong drawing.
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
-  separations), `label_size`, `label_box_width` and `x_unit` (label clearance is computed in pixels and converted to
-  layout units), and `x_solver` (the HiGHS backend agrees with z3 only up to the position quantum, so the same key must
-  mean the same solver). Everything else in `Geometry` — row height, symbol size, stubs, margins, carrier style — is
-  read only by drawing and may vary freely.
+  separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
+  converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
+  (a count mark's size and reach scale with the symbol, and a carrier's dot sends a count outside it), and `x_solver`
+  (the HiGHS backend agrees with z3 only up to the position quantum, so the same key must mean the same solver).
+  Everything else in `Geometry` — row height, stubs, margins, the vertical label rhythm — is read only by drawing and
+  may vary freely. A test requires every `Geometry` field the layout modules read to be in the key, so a field that
+  starts to affect spacing cannot be left out.
 - **the layout-algorithm version**, an integer grus bumps whenever a change alters any layout. A test pins a digest of
   every golden's stored layout, under each x-solver, to the current version, so a change that moves a golden's layout
-  without a bump fails. The pins are append-only and keyed by the golden's pedigree digest: editing a golden's IR adds a
-  pin, and the only way a pin changes is a layout change, which takes a new version. A layout change that touches no
-  golden is not caught; the goldens are the coverage.
+  without a bump fails. Each pin, per golden and solver, holds the golden's pedigree digest and the placement's digest.
+  A placement may change only together with its pedigree digest (the golden's IR was edited); a changed placement under
+  an unchanged digest is a layout change and takes a new version, and a pin whose golden is gone fails until removed. A
+  layout change that touches no golden is not caught; the goldens are the coverage.
 
 Drawing from a stored layout checks all three and raises on the first mismatch, naming it. There is no fallback to a
 fresh layout: a caller who wants recompute-on-stale does it explicitly, and a silent recompute would hide a cache that

@@ -200,8 +200,10 @@ def test_drawing_from_a_stored_layout_is_byte_identical(name: str) -> None:
 def test_drawing_only_geometry_may_vary() -> None:
     p = _FIXTURES["carrier_inheritance"]
     stored = render.store_layout(p)
+    # Row pitch, margins, stubs and the vertical label rhythm move nothing horizontally. symbol_size and carrier_style
+    # did, once count marks and labels beside a drop entered the spacing; they are in the key now.
     geom = dataclasses.replace(
-        _GEOM, gen_height=120.0, symbol_size=30.0, margin=10.0, carrier_style=render.CarrierStyle.PARTITION_FILL
+        _GEOM, gen_height=120.0, margin=10.0, sib_stub=30.0, elbow_gap=10.0, label_line_gap=4.0, label_box_height=3.0
     )
     assert render.render_svg(p, geom, stored_layout=stored) == render.render_svg(p, geom)
 
@@ -212,11 +214,25 @@ def test_a_stored_layout_draws_a_shuffled_pedigree() -> None:
     assert render.render_svg(q, stored_layout=render.store_layout(p)) == render.render_svg(q)
 
 
-@pytest.mark.parametrize("field", ["couple_gap", "sib_gap", "label_size", "label_box_width", "x_unit", "x_solver"])
+_KEY_FIELDS = (
+    "couple_gap",
+    "sib_gap",
+    "label_size",
+    "label_box_width",
+    "x_unit",
+    "x_solver",
+    "label_gap",
+    "symbol_size",
+    "carrier_style",
+)
+
+
+@pytest.mark.parametrize("field", _KEY_FIELDS)
 def test_a_layout_under_other_layout_geometry_is_stale(field: str) -> None:
     p = _FIXTURES["three_generation"]
     stored = render.store_layout(p)
-    changed = render.XSolver.HIGHS if field == "x_solver" else getattr(_GEOM, field) + 1.0
+    enums = {"x_solver": render.XSolver.HIGHS, "carrier_style": render.CarrierStyle.PARTITION_FILL}
+    changed = enums[field] if field in enums else getattr(_GEOM, field) + 1.0
     geom = dataclasses.replace(_GEOM, **{field: changed})
     with pytest.raises(render.StaleLayoutError, match=field):
         render.render_svg(p, geom, stored_layout=stored)
@@ -344,3 +360,20 @@ def _deferred_pedigree() -> pb.Pedigree:
         for a, b in ((1, 2), (3, 4))
     ]
     return pb.Pedigree(individuals=people, matings=matings)
+
+
+def test_every_geometry_field_the_layout_reads_is_in_the_key() -> None:
+    # The key names the Geometry fields positions depend on, by hand; the layout path grew three (label_gap,
+    # symbol_size, carrier_style, with count marks and labels beside a drop) before the key did. Every `geom.<field>`
+    # the layout modules read must be in the key or be drawing-only by construction (none are, today).
+    import re
+
+    from grus.render import _labels, _layout, _layout2, _ordering, _xsolve
+
+    read: set[str] = set()
+    for module in (_layout, _layout2, _labels, _ordering, _xsolve):
+        assert module.__file__ is not None
+        read |= set(re.findall(r"\bgeom\.([a-z_]+)", pathlib.Path(module.__file__).read_text()))
+    key = {f.name for f in lpb.LayoutGeometry.DESCRIPTOR.fields}
+    assert set(_KEY_FIELDS) == key, "the staleness test must cover every key field"
+    assert read <= key, f"layout reads geometry not in the stored-layout key: {sorted(read - key)}"

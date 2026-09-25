@@ -9,6 +9,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class CarrierStyle(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CARRIER_STYLE_UNSPECIFIED: _ClassVar[CarrierStyle]
+    CARRIER_STYLE_INHERITANCE_GLYPH: _ClassVar[CarrierStyle]
+    CARRIER_STYLE_PARTITION_FILL: _ClassVar[CarrierStyle]
+
 class XSolver(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     X_SOLVER_UNSPECIFIED: _ClassVar[XSolver]
@@ -20,6 +26,9 @@ class CoupleLine(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     COUPLE_LINE_UNSPECIFIED: _ClassVar[CoupleLine]
     COUPLE_LINE_SINGLE: _ClassVar[CoupleLine]
     COUPLE_LINE_DOUBLE: _ClassVar[CoupleLine]
+CARRIER_STYLE_UNSPECIFIED: CarrierStyle
+CARRIER_STYLE_INHERITANCE_GLYPH: CarrierStyle
+CARRIER_STYLE_PARTITION_FILL: CarrierStyle
 X_SOLVER_UNSPECIFIED: XSolver
 X_SOLVER_Z3: XSolver
 X_SOLVER_HIGHS: XSolver
@@ -54,20 +63,26 @@ class LayoutKey(_message.Message):
     def __init__(self, algorithm_version: _Optional[int] = ..., pedigree_digest: _Optional[bytes] = ..., geometry: _Optional[_Union[LayoutGeometry, _Mapping]] = ...) -> None: ...
 
 class LayoutGeometry(_message.Message):
-    __slots__ = ("couple_gap", "sib_gap", "label_size", "label_box_width", "x_unit", "x_solver")
+    __slots__ = ("couple_gap", "sib_gap", "label_size", "label_box_width", "x_unit", "x_solver", "label_gap", "symbol_size", "carrier_style")
     COUPLE_GAP_FIELD_NUMBER: _ClassVar[int]
     SIB_GAP_FIELD_NUMBER: _ClassVar[int]
     LABEL_SIZE_FIELD_NUMBER: _ClassVar[int]
     LABEL_BOX_WIDTH_FIELD_NUMBER: _ClassVar[int]
     X_UNIT_FIELD_NUMBER: _ClassVar[int]
     X_SOLVER_FIELD_NUMBER: _ClassVar[int]
+    LABEL_GAP_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_SIZE_FIELD_NUMBER: _ClassVar[int]
+    CARRIER_STYLE_FIELD_NUMBER: _ClassVar[int]
     couple_gap: float
     sib_gap: float
     label_size: float
     label_box_width: float
     x_unit: float
     x_solver: XSolver
-    def __init__(self, couple_gap: _Optional[float] = ..., sib_gap: _Optional[float] = ..., label_size: _Optional[float] = ..., label_box_width: _Optional[float] = ..., x_unit: _Optional[float] = ..., x_solver: _Optional[_Union[XSolver, str]] = ...) -> None: ...
+    label_gap: float
+    symbol_size: float
+    carrier_style: CarrierStyle
+    def __init__(self, couple_gap: _Optional[float] = ..., sib_gap: _Optional[float] = ..., label_size: _Optional[float] = ..., label_box_width: _Optional[float] = ..., x_unit: _Optional[float] = ..., x_solver: _Optional[_Union[XSolver, str]] = ..., label_gap: _Optional[float] = ..., symbol_size: _Optional[float] = ..., carrier_style: _Optional[_Union[CarrierStyle, str]] = ...) -> None: ...
 
 class Placement(_message.Message):
     __slots__ = ("first_generation", "rows", "founder_sibships", "routed")

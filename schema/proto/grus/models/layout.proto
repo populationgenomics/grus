@@ -44,6 +44,17 @@ message LayoutGeometry {
   double label_box_width = 4 [(buf.validate.field).double.finite = true];
   double x_unit = 5 [(buf.validate.field).double.finite = true];
   XSolver x_solver = 6 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  // A label moved beside a descent that drops from its cell's centre reserves label_gap beside the line; a count's size
+  // and reach scale with symbol_size; carrier_style decides whether a carrier's dot sends a count outside its symbol.
+  double label_gap = 7 [(buf.validate.field).double.finite = true];
+  double symbol_size = 8 [(buf.validate.field).double.finite = true];
+  CarrierStyle carrier_style = 9 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+}
+
+enum CarrierStyle {
+  CARRIER_STYLE_UNSPECIFIED = 0;
+  CARRIER_STYLE_INHERITANCE_GLYPH = 1;  // X-linked carrier as a central dot, else a region fill
+  CARRIER_STYLE_PARTITION_FILL = 2;     // NSGC 2022: every carrier a region fill
 }
 
 enum XSolver {

@@ -13,6 +13,18 @@
         "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",
         "placement": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee"
       },
+      "count_collapsed_parents": {
+        "pedigree": "9c9c81762a5990a4bed4307d348a751455441aab221a7b24cf1530e1921b4067",
+        "placement": "21a84412d40991a13fc85ecbd3e5369042f09590d2d1ca15a36e0aa6590dbf6c"
+      },
+      "count_marks": {
+        "pedigree": "6955e03041564c5e04b1fe4c6e1d0d4f90488db033318b7dca77ec5649e1def5",
+        "placement": "2cfb5f4b21dcc10d3f1eeb3ce555ef8bf110964082dfaf6d2e0b9d10a34dba15"
+      },
+      "counts": {
+        "pedigree": "bd6906128ca63925e20bb3442ef6e7a72fdcf223c98a11ec60d4e01989fb10a0",
+        "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
+      },
       "cousins_across_family": {
         "pedigree": "dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d",
         "placement": "d54dbea6c0166d942f80bc879386ddc87be91e9562185194d099d65eac6947a6"
@@ -98,6 +110,18 @@
       "consanguineous": {
         "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",
         "placement": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee"
+      },
+      "count_collapsed_parents": {
+        "pedigree": "9c9c81762a5990a4bed4307d348a751455441aab221a7b24cf1530e1921b4067",
+        "placement": "21a84412d40991a13fc85ecbd3e5369042f09590d2d1ca15a36e0aa6590dbf6c"
+      },
+      "count_marks": {
+        "pedigree": "6955e03041564c5e04b1fe4c6e1d0d4f90488db033318b7dca77ec5649e1def5",
+        "placement": "2cfb5f4b21dcc10d3f1eeb3ce555ef8bf110964082dfaf6d2e0b9d10a34dba15"
+      },
+      "counts": {
+        "pedigree": "bd6906128ca63925e20bb3442ef6e7a72fdcf223c98a11ec60d4e01989fb10a0",
+        "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
       },
       "cousins_across_family": {
         "pedigree": "dbfd0effca0d88fb5f3b3b1114112bf62ffd762917bf7e8ccbaa1432bb98312d",
