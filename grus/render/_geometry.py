@@ -73,8 +73,8 @@ class Geometry:
     sib_stub: float = 22.0
     double_line_offset: float = 4.0
     elbow_gap: float = 8.0  # pixels between elbow tracks above a sib bar (and the lowest track above the bar)
-    childless_stub: float = 18.0  # vertical drop below a childless couple's mating line to the bar
-    childless_bar: float = 12.0  # half-width of the horizontal bar (no children / infertility)
+    childless_stub: float = 10.0  # vertical drop below a childless couple's mating line to the bar
+    childless_bar: float = 7.0  # half-width of the horizontal bar (no children / infertility)
     childless_bar_gap: float = 5.0  # vertical gap between the two bars of the infertility glyph
     label_size: float = 11.0
     label_gap: float = 6.0

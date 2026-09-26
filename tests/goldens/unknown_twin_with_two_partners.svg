@@ -14,8 +14,8 @@
 </g>
 <g class="mating childless-by-choice" data-partners="II-3 II-1">
 <line x1="124" y1="156" x2="144" y2="156" stroke="#000000" stroke-width="2"/>
-<line x1="134" y1="156" x2="134" y2="174" stroke="#000000" stroke-width="2"/>
-<line x1="122" y1="174" x2="146" y2="174" stroke="#000000" stroke-width="2"/>
+<line x1="134" y1="156" x2="134" y2="166" stroke="#000000" stroke-width="2"/>
+<line x1="127" y1="166" x2="141" y2="166" stroke="#000000" stroke-width="2"/>
 <line class="hit" x1="124" y1="156" x2="144" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="II-1 II-4">
