@@ -72,6 +72,7 @@ _roman = _labels.roman
 _STROKE = "#000000"
 _WIDTH = 2.0
 _FONT = "sans-serif"
+_GLYPH_CLEAR = 3.0  # px a childless glyph keeps from the partners' symbols and their bottom edge
 _MEET_EPS = 1e-5  # layout units: a drop this close to its bar meets it (10x the position quantum)
 _GEN_MARKER_SIZE = 16.0
 _SET_GAP = 28.0  # vertical gap between stacked pedigrees in a figure render
@@ -579,13 +580,23 @@ class _Draw:
         A vertical stub from the mating-line midpoint down to a short horizontal bar — one bar for
         childlessness by choice, two parallel bars for infertility. Drawn instead of a descent (the couple
         has no offspring).
+
+        The glyph stands in the gap between the partners, clear of both: every bar sits at least ``_GLYPH_CLEAR``
+        above the symbols' bottom edge, where it would read as part of a square's edge, and ends at least
+        ``_GLYPH_CLEAR`` short of each partner's symbol. The geometry's stub and bar are shortened to fit when a
+        couple is at its minimum separation or the symbols are large.
         """
         y = self.py(level)
-        mid_x = (self.px(self.lay.pos[level][k]) + self.px(self.lay.pos[level][k + 1])) / 2
-        bar_y = y + self.geom.childless_stub
-        half = self.geom.childless_bar
+        left, right = self.px(self.lay.pos[level][k]), self.px(self.lay.pos[level][k + 1])
+        mid_x = (left + right) / 2
+        infertile = kind == int(pb.CHILDLESSNESS_INFERTILITY)
+        lowest = self.half - _GLYPH_CLEAR - (self.geom.childless_bar_gap if infertile else 0.0)
+        bar_y = y + max(_GLYPH_CLEAR, min(self.geom.childless_stub, lowest))
+        half = max(
+            _GLYPH_CLEAR, min(self.geom.childless_bar, (right - left - self.geom.symbol_size) / 2 - _GLYPH_CLEAR)
+        )
         out = [_line(mid_x, y, mid_x, bar_y), _line(mid_x - half, bar_y, mid_x + half, bar_y)]
-        if kind == int(pb.CHILDLESSNESS_INFERTILITY):
+        if infertile:
             bar2 = bar_y + self.geom.childless_bar_gap
             out.append(_line(mid_x - half, bar2, mid_x + half, bar2))
         return out
