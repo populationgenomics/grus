@@ -647,10 +647,8 @@ def test_more_than_two_matings_is_deferred() -> None:
             ),
         ],
     )
-    # A >2-mate individual routes its overflow mating (design), but routing a mating that HAS offspring is not
-    # yet drawn — its child's descent hangs from a non-adjacent parent pair, which _build cannot express — so
-    # this shape (every mating bears a child) still defers rather than mislay the descent out.
-    with pytest.raises(render.DeferredFeatureError, match="not an adjacent couple"):
+    # A >2-mate individual's third mating cannot stand beside it; a routed mating is not drawn, so this defers.
+    with pytest.raises(render.DeferredFeatureError, match="1-1 x 1-4 cannot stand side by side"):
         render.layout(p)
 
 
@@ -1286,7 +1284,7 @@ def _twin_pedigree(twin_type: pb.ZygosityType) -> pb.Pedigree:
 @pytest.mark.parametrize("twin_type", [pb.ZYGOSITY_TYPE_DIZYGOTIC, pb.ZYGOSITY_TYPE_UNKNOWN])
 def test_twin_zygosity_is_marked_and_drawn(twin_type: pb.ZygosityType) -> None:
     lay = render.layout(_twin_pedigree(twin_type))
-    assert lay.twins[1][0] == int(twin_type)
+    assert lay.twin_groups == [render.TwinGroup(level=1, columns=(0, 1), zygosity=int(twin_type))]
     svg = render.render_svg(_twin_pedigree(twin_type))
     assert svg.startswith("<svg ")
     if twin_type == pb.ZYGOSITY_TYPE_UNKNOWN:

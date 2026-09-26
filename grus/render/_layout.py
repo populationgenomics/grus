@@ -17,7 +17,7 @@ solver in ``_layout2`` (``layout``), which reuses everything here. What lives he
 5. pass-throughs (``_insert_passthroughs``): a descent spanning several rows gets one synthetic cell on
    each row it crosses, the layered-drawing dummy node, so ordering, x-solve and ``_build`` see only
    adjacent-row edges and drawing emits one line through the crossed rows;
-6. ``_build`` — emit the per-level arrays (``n / nid / pos / fam / spouse / twins / ...``), the only
+6. ``_build`` — emit the per-level arrays (``n / nid / pos / fam / spouse / ...``) and the twin groups, the only
    interface the drawing step reads, from a within-rank order. A lone parent's sibship reaches drawing as a
    couple's whose right or left member is a phantom (``Layout.phantom``); only a pass-through heads a
    sibship alone.
@@ -47,41 +47,32 @@ class DeferredFeatureError(Exception):
     """The IR uses a topology the layout deliberately does not draw — surfaced, not mislaid out.
 
     The v2 constraint layout draws far more than v1 did (loops that close on a single cross-mating,
-    >2-mate individuals via routed edges, two-lineage joins brought adjacent by the ordering), so the
+    two-lineage joins brought adjacent by the ordering, a partner standing between co-twins), so the
     residual deferral set is small: an interlocking consanguinity loop (a cycle that survives excluding the
     cross-lineage joins — ``_detect_loops``); an individual who is a child of more than one mating
     (``_derive``); a couple whose partners are on different generations other than an avuncular join between
-    two born-in partners, which draws via the ghost (``_rank``); an order ``_build`` cannot express (a routed
-    or overflow mating that *has* offspring — descent from a non-adjacent parent pair); and a torn sibship
-    whose descent bars would overlap. The IR still round-trips; the gap is meant to surface in the eval diff
-    rather than a wrong drawing.
+    two born-in partners, which draws via the ghost (``_rank``); a routed mating, whose partners cannot stand
+    side by side (``_layout2.layout``); and a torn sibship whose descent bars would overlap. The IR still
+    round-trips; the gap is meant to surface in the eval diff rather than a wrong drawing.
     """
 
 
-@dataclass(frozen=True)
-class RoutedMating:
-    """A mating drawn as a routed orthogonal polyline, not a straight adjacent line (layout v2, Stage C).
+@dataclass(frozen=True, order=True)
+class TwinGroup:
+    """One drawn twin group: co-twins of one sibship on one row, named by their columns.
 
-    A mating whose partners are not adjacent same-rank cells cannot be expressed by ``spouse`` (which flags
-    only an adjacent couple ``k, k+1``); it is carried here instead, in cell coordinates, so drawing can route
-    an edge between the partners without re-deriving adjacency. ``Layout.routed`` is empty for v1 and for every
-    adjacency-drawable shape, so v1 output — and any pedigree without a routed mating — is unchanged.
+    Consecutive members stand side by side, or with one partner of either of the two between them (layout-v2.md,
+    Twins with partners), so membership cannot be read from adjacency.
 
     Attributes:
-        a: ``(level, column)`` of one partner.
-        b: ``(level, column)`` of the other partner (same ``level`` as ``a`` for a same-rank routed mating —
-            an overflow >2-mate connector; a cross-rank avuncular join is still handled by the ``ghost``).
-        consanguineous: draw the routed edge doubled.
-        children: each child's ``(level, column)`` — empty for a childless routed mating. Stage C routes only
-            childless matings (the >2-mate overflow case); a routed mating *with* offspring still defers, so
-            ``children`` is presently always empty. Kept on the seam so a later stage can drop descent from
-            the routed edge's midpoint without another seam change.
+        level: the row.
+        columns: the members' columns, left to right; at least two.
+        zygosity: the ``pb.ZygosityType`` drawn for the group: its leftmost member's ``twin_type``.
     """
 
-    a: tuple[int, int]
-    b: tuple[int, int]
-    consanguineous: bool
-    children: tuple[tuple[int, int], ...] = ()
+    level: int
+    columns: tuple[int, ...]
+    zygosity: int
 
 
 @dataclass(frozen=True)
@@ -103,8 +94,7 @@ class Layout:
         spouse: ``spouse[L][k]`` — 0 if cell ``k`` is not the left member of a couple, 1 if it mates the
             cell to its right, 2 if that mating is consanguineous (a double line). A lone single parent is
             0 (no mate) — which is how drawing tells a lone-parent descent from a couple's.
-        twins: ``twins[L][k]`` — 0, or a ``pb.ZygosityType`` value if cell ``k`` and the cell to its right
-            are co-twins (1 MZ, 2 DZ, 3 unknown zygosity).
+        twin_groups: every drawn twin group (``TwinGroup``), in ``(level, columns)`` order. Empty when none.
         childless: ``childless[L][k]`` — 0 if cell ``k`` is not the left member of a childless couple, else
             the couple's ``pb.Childlessness`` value (2 by choice, 3 infertility). Drawing hangs the Bennett
             childless glyph (a stub to one bar for choice, two for infertility) from the mating midpoint.
@@ -118,10 +108,6 @@ class Layout:
             Drawing hangs these from an implied hanger stub with a sib bar and no parent cells (they carry no
             ``fam`` entry). ``columns`` are cell columns on ``level``, left to right; the list is in ``(level,
             columns)`` order. Empty when none.
-        routed: matings drawn as routed edges rather than adjacent straight lines (a >2-mate individual's
-            overflow mating — the partners cannot both be its neighbour). Empty for v1 and for every
-            adjacency-drawable shape, so it never perturbs existing output. In ``(a, b)`` order. See
-            ``RoutedMating``.
         first_generation: the IR ``generation`` drawn on level 0; level ``L`` draws generation
             ``first_generation + L``. Rows between the first and last generation are kept even when empty
             (a detached branch several generations down).
@@ -145,11 +131,10 @@ class Layout:
     pos: list[list[float]]
     fam: list[list[int]]
     spouse: list[list[int]]
-    twins: list[list[int]]
+    twin_groups: list[TwinGroup] = field(default_factory=list)
     childless: list[list[int]] = field(default_factory=list)
     ghost_of: dict[int, int] = field(default_factory=dict)
     founder_sibships: list[tuple[int, tuple[int, ...]]] = field(default_factory=list)
-    routed: list[RoutedMating] = field(default_factory=list)
     first_generation: int = 1
     passthrough: frozenset[int] = frozenset()
     phantom: frozenset[int] = frozenset()
@@ -293,6 +278,9 @@ class _Graph:
             return f"descent to {self.label(self.passthrough_to[i])}"
         if i in self.phantom_of:
             return f"omitted partner of {self.label(self.phantom_of[i])}"
+        if i in self.ghost_key:  # a duplicate is drawn as, and named by, the real individual
+            generation, index = self.ghost_key[i].real
+            return f"{generation}-{index}"
         ind = self.individuals[i]
         return f"{ind.generation}-{ind.index}"
 
@@ -696,7 +684,7 @@ def _build(
     passthrough: frozenset[int],
     phantom: frozenset[int] = frozenset(),
 ) -> Layout:
-    """Bucket placed individuals into per-level arrays and derive fam / spouse / twins / founder sibships."""
+    """Bucket placed individuals into per-level arrays and derive fam / spouse / twin groups / founder sibships."""
     base_x = min(xpos.values()) if xpos else 0.0
     x = {k: v - base_x for k, v in xpos.items()}
     nlev = max(g.level) + 1 if g.level else 0
@@ -732,17 +720,7 @@ def _build(
             if value in _CHILDLESS_DRAWN:
                 childless[level][k] = value
 
-    cotwin: dict[int, tuple[int, int, int]] = {}
-    for mr in g.matings:
-        for o in mr.offspring:
-            if o.twin_group is not None:
-                cotwin[o.child] = (mr.index, o.twin_group, o.twin_type)
-    twins = [[0] * n[level] for level in range(nlev)]
-    for level in range(nlev):
-        for k in range(n[level] - 1):
-            left, right = cotwin.get(cols[level][k]), cotwin.get(cols[level][k + 1])
-            if left is not None and right is not None and left[0] == right[0] and left[1] == right[1]:
-                twins[level][k] = left[2]
+    twin_groups = _twin_groups(g, cols, colof)
 
     fam = [[-1] * n[level] for level in range(nlev)]
     for level in range(1, nlev):
@@ -762,8 +740,8 @@ def _build(
                 ca, cb = colof[pa], colof[pb]
                 if g.level[pa] != level - 1 or g.level[pb] != level - 1 or abs(ca - cb) != 1:
                     # the order cannot express this child's descent: its parents are not an adjacent couple on
-                    # the row above (a routed / >2-mate overflow mating that has offspring). Defer — descent
-                    # from a non-adjacent parent pair is drawn by a later stage.
+                    # the row above. The layout defers every routed mating before this, so it guards a stored
+                    # order; descent from a non-adjacent parent pair has no drawn form.
                     raise DeferredFeatureError(f"parents of {g.label(i)!r} are not an adjacent couple on the row above")
                 fam[level][k] = min(ca, cb)
 
@@ -784,7 +762,7 @@ def _build(
         pos=pos,
         fam=fam,
         spouse=spouse,
-        twins=twins,
+        twin_groups=twin_groups,
         childless=childless,
         ghost_of=ghost_of,
         founder_sibships=founder_sibships,
@@ -793,3 +771,37 @@ def _build(
         phantom=phantom,
         lone=[[len(g.parents.get(i, ())) == 1 for i in row] for row in cols],
     )
+
+
+def _twin_groups(g: _Graph, cols: list[list[int]], colof: dict[int, int]) -> list[TwinGroup]:
+    """Each twin group of two or more drawn members, by column; its zygosity is its leftmost member's ``twin_type``.
+
+    Raises:
+        DeferredFeatureError: two co-twins consecutive in the group stand apart other than with one partner of either
+            between them — a placement bug the check keeps from reaching a figure.
+    """
+    members: dict[tuple[int, int], list[_Off]] = collections.defaultdict(list)
+    for mr in g.matings:
+        for o in mr.offspring:
+            if o.twin_group is not None:
+                members[(mr.index, o.twin_group)].append(o)
+    partners = {frozenset(mr.partners) for mr in g.matings if mr.b is not None}
+    out: list[TwinGroup] = []
+    for group in members.values():
+        if len(group) < 2:
+            continue  # a twin group of one drawn child draws as a singleton
+        level = g.level[group[0].child]
+        placed = sorted(group, key=lambda o: colof[o.child])
+        columns = tuple(colof[o.child] for o in placed)
+        for (a, ca), (b, cb) in itertools.pairwise(zip(placed, columns, strict=True)):
+            if cb - ca == 1:
+                continue
+            between = cols[level][ca + 1] if cb - ca == 2 else None
+            if between is None or not ({frozenset((a.child, between)), frozenset((b.child, between))} & partners):
+                raise DeferredFeatureError(  # pragma: no cover - guards against an ordering bug
+                    f"co-twins {g.label(a.child)!r} and {g.label(b.child)!r} stand apart other than with one "
+                    "partner between them"
+                )
+        out.append(TwinGroup(level=level, columns=columns, zygosity=placed[0].twin_type))
+    out.sort()
+    return out

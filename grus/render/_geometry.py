@@ -39,10 +39,6 @@ class Geometry:
         sib_gap: layout-unit clearance between two sibling subtrees when packed side by side.
         sib_stub: pixels the horizontal sibship bar sits above the children's symbol tops.
         double_line_offset: pixel separation of the two parallel lines of a consanguineous mating.
-        routed_stub: pixels a routed mating's horizontal track sits above the row's symbol tops (an
-            orthogonal edge for a >2-mate overflow, running over the intervening symbols).
-        routed_track_gap: extra rise per additional routed track sharing one row, so multiple routed
-            edges stagger deterministically instead of coinciding.
         elbow_gap: pixels between elbow tracks above a sib bar. A drop the order leaves beside its own children
             (a crossing descent, a cousin standing beside its mate) turns at its own track above the bar, runs
             across and drops onto its bar, so it never runs along another sibship's bar; the row pitch opens by
@@ -76,8 +72,6 @@ class Geometry:
     sib_gap: float = 1.5
     sib_stub: float = 22.0
     double_line_offset: float = 4.0
-    routed_stub: float = 14.0  # pixels a routed mating's horizontal track sits above the row's symbol tops
-    routed_track_gap: float = 8.0  # extra rise per additional routed track on one row (deterministic stagger)
     elbow_gap: float = 8.0  # pixels between elbow tracks above a sib bar (and the lowest track above the bar)
     childless_stub: float = 18.0  # vertical drop below a childless couple's mating line to the bar
     childless_bar: float = 12.0  # half-width of the horizontal bar (no children / infertility)

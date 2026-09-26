@@ -70,8 +70,12 @@ message Placement {
   repeated Row rows = 2;
   // Sibships whose parents are undrawn (a partnerless mating), hung from an implied stub.
   repeated FounderSibship founder_sibships = 3;
-  // Matings drawn as orthogonal edges because their partners are not adjacent (a >2-mate individual's overflow).
-  repeated RoutedMating routed = 4;
+  // Up to layout version 1: matings drawn as orthogonal edges because their partners are not adjacent. Not written
+  // since version 2, which defers a mating whose partners cannot stand side by side; a record that sets it is refused.
+  repeated RoutedMating routed = 4 [deprecated = true];
+  // Each drawn twin group of two or more members. Since layout version 2 a partner may stand between co-twins, so
+  // membership is stored rather than read from adjacent cells (Cell.twin_right, no longer written).
+  repeated TwinGroup twin_groups = 5;
 }
 
 message Row {
@@ -96,8 +100,9 @@ message Cell {
   bool lone = 7;
   // This cell and its right-hand neighbour are a couple. Absent = not.
   optional CoupleLine couple_right = 8 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
-  // This cell and its right-hand neighbour are co-twins of this zygosity. Absent = not.
-  optional grus.models.pedigree.ZygosityType twin_right = 9 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
+  // Up to layout version 1: this cell and its right-hand neighbour are co-twins of this zygosity. Not written since
+  // version 2 (Placement.twin_groups); a record that sets it is refused.
+  optional grus.models.pedigree.ZygosityType twin_right = 9 [deprecated = true, (buf.validate.field).enum = {defined_only: true, not_in: [0]}];
   // This cell is the left member of a childless couple drawn with the Bennett glyph (BY_CHOICE or INFERTILITY).
   // Absent = no glyph.
   optional grus.models.pedigree.Childlessness childless = 10 [(buf.validate.field).enum = {in: [2, 3]}];
@@ -137,6 +142,19 @@ message FounderSibship {
     min_items: 1,
     items: {int32: {gte: 0}}
   }];
+}
+
+// Co-twins of one sibship on one row. Consecutive members stand side by side, or with one partner of either between
+// them.
+message TwinGroup {
+  int32 row = 1 [(buf.validate.field).int32.gte = 0];
+  // The members' columns, left to right.
+  repeated int32 columns = 2 [(buf.validate.field).repeated = {
+    min_items: 2,
+    items: {int32: {gte: 0}}
+  }];
+  // The zygosity drawn: the leftmost member's twin_type.
+  grus.models.pedigree.ZygosityType zygosity = 3 [(buf.validate.field).enum = {defined_only: true, not_in: [0]}];
 }
 
 message RoutedMating {

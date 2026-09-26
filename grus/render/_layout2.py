@@ -1,11 +1,11 @@
-"""Pedigree layout: the constraint model (``layout``) — rank -> ordering -> block x-solve -> routed edges.
+"""Pedigree layout: the constraint model (``layout``) — rank -> ordering -> block x-solve.
 
 This is the layout half of the renderer (docs/design/layout-v2.md). ``_layout`` provides the shared front
 end (validation, the avuncular ``ghost``, cross/loop detection, ranking by IR generation, pass-throughs for a
 descent spanning rows) and the ``_build`` seam to the drawing arrays; ``_ordering`` provides the
 crossing-minimizing within-rank order.
 ``layout`` wires them: prepare the graph, order each rank, ``_build`` the per-level arrays from that order,
-then replace ``pos`` with the deterministic x-solve below and attach any routed matings.
+then replace ``pos`` with the deterministic x-solve below.
 
 The x-solve (``_x_model`` + ``_xsolve.solve``) chooses every x from one lexicographic linear program over the
 fixed order: descent centring first, then even spacing, then compactness, then a fixed tie-break, subject to the
@@ -59,31 +59,33 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     The v2 constraint model, in four stages: validate and prepare the graph (``_prepare`` — the avuncular
     ``ghost`` duplication, cross/loop detection, rows from IR generation, pass-throughs); order
     each rank by crossing minimization (``_ordering.order``); ``_build`` the per-level arrays (``fam`` /
-    ``spouse`` / ``twins`` / founder sibships) from that order; then replace ``pos`` with the deterministic
-    x-solve (``_x_model`` + ``_xsolve.solve``, quantised) and attach any routed matings.
+    ``spouse`` / twin groups / founder sibships) from that order; then replace ``pos`` with the deterministic
+    x-solve (``_x_model`` + ``_xsolve.solve``, quantised).
 
     A consanguinity-loop mating is an ordinary adjacent (double-line) couple once the ordering pulls each
     partner to its sibship end, so boundary-bridge cross-joins and cousin marriages with siblings draw with
-    zero crossings from the order alone. An individual with >2 matings overflows: the ordering keeps its two
-    heaviest adjacencies and demotes the rest to :attr:`grus.render.Ordering.routed`, carried as a
-    :class:`RoutedMating` for the drawing step to route as an orthogonal edge. An avuncular cross-generation
-    join draws via the ``ghost`` (a same-row couple on the deeper partner's rank).
+    zero crossings from the order alone. An individual with more partners than sides overflows: the ordering keeps
+    its heaviest adjacencies and demotes the rest to :attr:`grus.render.Ordering.routed`, and a routed mating
+    defers — its one drawn form, a track over the row, read as a sibship (docs/design/layout-v2.md). An avuncular
+    cross-generation join draws via the ``ghost`` (a same-row couple on the deeper partner's rank).
 
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
         DeferredFeatureError: a topology the model does not draw (see :class:`DeferredFeatureError`) — an
             interlocking loop, a child of more than one mating, a couple across generations other than an
-            avuncular join, an order ``_build`` cannot express (a routed/overflow mating that *has* offspring),
-            or a torn sibship whose descent bars would overlap.
+            avuncular join, a routed mating (partners that cannot stand side by side), or a torn sibship whose
+            descent bars would overlap.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     prep = _prepare(p)
     g = prep.graph
 
     ordering = _ordering.order(g, prep.cross)
+    if ordering.routed:
+        raise _layout.DeferredFeatureError(_routed_reason(g, ordering.routed))
     xpos = {i: float(k) for row in ordering.ranks for k, i in enumerate(row)}
     foundersib_groups = [mr.kids for mr in g.partnerless]
-    built = _layout._build(  # a routed/overflow mating with offspring defers here
+    built = _layout._build(
         g,
         xpos,
         prep.ghost_of,
@@ -93,7 +95,6 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
         phantom=prep.phantom,
     )
 
-    routed = _routed_matings(g, built, ordering.routed)
     sibships = _relations(built)
     seps = _row_seps(
         built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom), _count_clearance(p, built, geom)
@@ -109,7 +110,7 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
         x = _xsolve.solve(model, geom.x_solver)
     origin = min((x[c] for row in built.nid for c in row), default=0.0)
     pos = [[round(x[c] - origin, _POS_QUANTUM) for c in row] for row in built.nid]
-    result = dataclasses.replace(built, pos=pos, routed=routed)
+    result = dataclasses.replace(built, pos=pos)
     if (why := _overlapping_sibships(g, result)) is not None:
         raise _layout.DeferredFeatureError(f"{why}; deferred")
     return result
@@ -144,33 +145,14 @@ def _prepare(p: pb.Pedigree) -> _Prepared:
     return _Prepared(g, ghost_of, cross, first_generation, passthrough, phantom)
 
 
-def _routed_matings(g: _layout._Graph, lay: _layout.Layout, routed: frozenset[int]) -> list[_layout.RoutedMating]:
-    """Turn the ordering's routed mating indices into drawable ``RoutedMating``s in cell coordinates.
-
-    Each routed mating is an overflow adjacency an individual with >2 matings could not keep — its two partners
-    sit non-adjacent on the same rank. The partners' cells come from the built ``nid`` order (their columns).
-    A routed mating with offspring never reaches here: ``_build`` cannot express its children's ``fam`` (parents
-    non-adjacent) and raises, so ``layout`` has already deferred — ``children`` is therefore always empty, but
-    is carried for a later stage that draws descent from a routed node.
-    """
-    if not routed:
-        return []
-    cellof = {i: (lvl, k) for lvl, row in enumerate(lay.nid) for k, i in enumerate(row)}
-    out: list[_layout.RoutedMating] = []
-    for mi in sorted(routed):
-        mr = g.matings[mi]
-        if mr.b is None:  # pragma: no cover - only two-partner matings overflow (a lone parent has no mate)
-            continue
-        out.append(
-            _layout.RoutedMating(
-                a=cellof[mr.a],
-                b=cellof[mr.b],
-                consanguineous=mr.consanguineous,
-                children=tuple(cellof[k] for k in mr.kids if k in cellof),
-            )
-        )
-    out.sort(key=lambda rm: (rm.a, rm.b))  # layout order, not the input's mating order
-    return out
+def _routed_reason(g: _layout._Graph, routed: frozenset[int]) -> str:
+    """Why the layout defers the matings the ordering routed: each by its partners, in identity order."""
+    pairs = sorted(sorted((g.ident(p), g.label(p)) for p in g.matings[mi].partners) for mi in routed)
+    names = "; ".join(" x ".join(label for _, label in pair) for pair in pairs)
+    return (
+        f"the partners of {names} cannot stand side by side (more partners than one symbol has sides, or a twin whose "
+        "sides are both taken), and a routed marriage line is not drawn"
+    )
 
 
 def _overlapping_sibships(g: _layout._Graph, lay: _layout.Layout) -> str | None:
@@ -399,7 +381,8 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
       which is a co-twin or a founder-sib floater: bonded, the couple would join that group into one rigid chain
       (twins who both marry lock spouse, twin, twin, spouse together), and the chain's drops could not spread to
       reach their own children, whose bars then met. Free, it stretches at the hinge couples' cost.
-    * **co-twins** (``twins`` flag) — a twin group never separates.
+    * **co-twins** standing side by side (``Layout.twin_groups``) — a twin group never separates. Co-twins with a
+      partner between them do not bond: the partner's couple stretches as a hinge couple does.
     * a **founder-sib floater**: a member of a partnerless mating's sibship that heads no descent (no drawn
       children) has no anchor of its own, so centring alone would not keep it beside an anchored sibling pulled
       away (c19's leaf ``1-1``). It bonds to one same-sibship neighbour — the left if present,
@@ -419,12 +402,15 @@ def _blocks(lay: _layout.Layout, seps: list[list[float]], sibships: list[_Sibshi
     for gid, (level, cols) in enumerate(lay.founder_sibships):
         for c in cols:
             fs_group[(level, c)] = gid
+    side_by_side = {  # (level, left column) of each pair of co-twins that stand side by side
+        (tg.level, a) for tg in lay.twin_groups for a, b in itertools.pairwise(tg.columns) if b == a + 1
+    }
     out: list[list[_Block]] = []
     for level in range(len(lay.nid)):
         ncols = lay.n[level]
         bond = [False] * max(ncols - 1, 0)  # bond[k]: columns k and k+1 share a block
         for k in range(ncols - 1):
-            if lay.twins[level][k]:
+            if (level, k) in side_by_side:
                 bond[k] = True
         for k in range(ncols):
             gid = fs_group.get((level, k))

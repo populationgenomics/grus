@@ -1,0 +1,12 @@
+id: "unknown_twin_with_two_partners"
+labels { text: "Twins of unknown zygosity; the elder has two partners, one of them standing between the co-twins" kind: LABEL_KIND_OTHER }
+individuals { generation: 1 index: 1 gender: GENDER_MAN }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 1 gender: GENDER_MAN }
+individuals { generation: 2 index: 2 gender: GENDER_MAN }
+individuals { generation: 2 index: 3 gender: GENDER_WOMAN }
+individuals { generation: 2 index: 4 gender: GENDER_WOMAN }
+individuals { generation: 3 index: 1 gender: GENDER_WOMAN }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } twin_group: 1 twin_type: ZYGOSITY_TYPE_UNKNOWN } offspring { child { generation: 2 index: 2 } twin_group: 1 twin_type: ZYGOSITY_TYPE_UNKNOWN } }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 3 } childlessness: CHILDLESSNESS_BY_CHOICE }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 4 } offspring { child { generation: 3 index: 1 } } }

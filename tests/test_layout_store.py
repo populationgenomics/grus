@@ -1,7 +1,7 @@
 """Stored layouts (``grus.render._store``, docs/design/layout-store.md).
 
 * **Lossless** — ``Layout`` -> ``PedigreeLayout`` -> ``Layout`` is the identity for every golden and for the synthetic
-  cells no golden has (a ghost, a routed mating).
+  cells no golden has (a ghost).
 * **Order-independent** — shuffling a pedigree's individuals and matings leaves the stored bytes unchanged, because
   cells are keyed by identity and the digest is canonical.
 * **Exact** — drawing from a stored layout is byte-identical to a fresh render.
@@ -34,11 +34,10 @@ _GEOM = render.DEFAULT_GEOMETRY
 
 
 def _fixtures() -> dict[str, pb.Pedigree]:
-    """Every drawable golden, plus the shapes with synthetic cells or routes no golden has."""
+    """Every drawable golden, plus the shapes with synthetic cells no golden has."""
     out = {name: test_render._load(name) for name in test_layout2._DRAWABLE}
     out["ghost"] = test_svg_output._avuncular()
     out["two_ghosts"] = test_svg_output._avuncular(second_niece=True)
-    out["routed"] = test_layout2._overflow_pedigree()
     out.update(test_layout2.GHOST_PEDIGREES)
     return out
 
@@ -55,7 +54,6 @@ def test_fixtures_cover_every_kind_of_cell() -> None:
     assert any(lay.ghost_of for lay in layouts)
     assert any(lay.phantom for lay in layouts)
     assert any(lay.passthrough for lay in layouts)
-    assert any(lay.routed for lay in layouts)
     assert any(lay.founder_sibships for lay in layouts)
 
 
@@ -326,6 +324,14 @@ def _crowd_a_couple(pl: lpb.Placement) -> None:
     pl.rows[0].cells[1].x = 0.5
 
 
+def _route_a_couple(pl: lpb.Placement) -> None:
+    pl.routed.add(a=lpb.CellRef(row=0, column=0), b=lpb.CellRef(row=0, column=1))
+
+
+def _mark_twins_by_adjacency(pl: lpb.Placement) -> None:
+    pl.rows[1].cells[0].twin_right = pb.ZYGOSITY_TYPE_MONOZYGOTIC  # layout version 1's form, replaced by twin_groups
+
+
 _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
     "first_generation": ("three_generation", _bump_first_generation, "first_generation"),
     "swapped_couple": ("three_generation", lambda pl: _swap_identities(pl.rows[1], 0, 1), "fam"),
@@ -335,7 +341,10 @@ _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
     "flipped_lone": ("three_generation", _flip_lone, "lone"),
     "crowded": ("three_generation", _crowd_a_couple, "need"),
     "dropped_founder_sibship": ("founder_sibship", lambda pl: pl.ClearField("founder_sibships"), "founder_sibships"),
-    "dropped_route": ("routed", lambda pl: pl.ClearField("routed"), "neither adjacent nor routed"),
+    "dropped_twin_group": ("twins", lambda pl: pl.ClearField("twin_groups"), "twin_groups"),
+    "twin_right": ("twins", _mark_twins_by_adjacency, "twin_right"),
+    "routed": ("three_generation", _route_a_couple, "routes a mating"),
+    "couple_apart": ("childless", lambda pl: _swap_identities(pl.rows[1], 1, 2), "not adjacent"),
 }
 
 

@@ -85,16 +85,18 @@ class LayoutGeometry(_message.Message):
     def __init__(self, couple_gap: _Optional[float] = ..., sib_gap: _Optional[float] = ..., label_size: _Optional[float] = ..., label_box_width: _Optional[float] = ..., x_unit: _Optional[float] = ..., x_solver: _Optional[_Union[XSolver, str]] = ..., label_gap: _Optional[float] = ..., symbol_size: _Optional[float] = ..., carrier_style: _Optional[_Union[CarrierStyle, str]] = ...) -> None: ...
 
 class Placement(_message.Message):
-    __slots__ = ("first_generation", "rows", "founder_sibships", "routed")
+    __slots__ = ("first_generation", "rows", "founder_sibships", "routed", "twin_groups")
     FIRST_GENERATION_FIELD_NUMBER: _ClassVar[int]
     ROWS_FIELD_NUMBER: _ClassVar[int]
     FOUNDER_SIBSHIPS_FIELD_NUMBER: _ClassVar[int]
     ROUTED_FIELD_NUMBER: _ClassVar[int]
+    TWIN_GROUPS_FIELD_NUMBER: _ClassVar[int]
     first_generation: int
     rows: _containers.RepeatedCompositeFieldContainer[Row]
     founder_sibships: _containers.RepeatedCompositeFieldContainer[FounderSibship]
     routed: _containers.RepeatedCompositeFieldContainer[RoutedMating]
-    def __init__(self, first_generation: _Optional[int] = ..., rows: _Optional[_Iterable[_Union[Row, _Mapping]]] = ..., founder_sibships: _Optional[_Iterable[_Union[FounderSibship, _Mapping]]] = ..., routed: _Optional[_Iterable[_Union[RoutedMating, _Mapping]]] = ...) -> None: ...
+    twin_groups: _containers.RepeatedCompositeFieldContainer[TwinGroup]
+    def __init__(self, first_generation: _Optional[int] = ..., rows: _Optional[_Iterable[_Union[Row, _Mapping]]] = ..., founder_sibships: _Optional[_Iterable[_Union[FounderSibship, _Mapping]]] = ..., routed: _Optional[_Iterable[_Union[RoutedMating, _Mapping]]] = ..., twin_groups: _Optional[_Iterable[_Union[TwinGroup, _Mapping]]] = ...) -> None: ...
 
 class Row(_message.Message):
     __slots__ = ("cells",)
@@ -159,6 +161,16 @@ class FounderSibship(_message.Message):
     row: int
     columns: _containers.RepeatedScalarFieldContainer[int]
     def __init__(self, row: _Optional[int] = ..., columns: _Optional[_Iterable[int]] = ...) -> None: ...
+
+class TwinGroup(_message.Message):
+    __slots__ = ("row", "columns", "zygosity")
+    ROW_FIELD_NUMBER: _ClassVar[int]
+    COLUMNS_FIELD_NUMBER: _ClassVar[int]
+    ZYGOSITY_FIELD_NUMBER: _ClassVar[int]
+    row: int
+    columns: _containers.RepeatedScalarFieldContainer[int]
+    zygosity: _pedigree_pb2.ZygosityType
+    def __init__(self, row: _Optional[int] = ..., columns: _Optional[_Iterable[int]] = ..., zygosity: _Optional[_Union[_pedigree_pb2.ZygosityType, str]] = ...) -> None: ...
 
 class RoutedMating(_message.Message):
     __slots__ = ("a", "b", "consanguineous", "children")

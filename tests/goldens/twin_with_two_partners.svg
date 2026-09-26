@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="368" height="239" viewBox="0 0 368 239" class="pedigree" data-title="A twin with two childless partners: one stands between the co-twins" data-conditions="[]">
+<g class="generation" data-generation="1">
+<text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
+</g>
+<g class="generation" data-generation="2">
+<text x="20" y="156" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">II</text>
+</g>
+<g class="mating" data-partners="I-1 I-2">
+<line x1="166" y1="66" x2="186" y2="66" stroke="#000000" stroke-width="2"/>
+<line class="hit" x1="166" y1="66" x2="186" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
+</g>
+<g class="mating" data-partners="II-3 II-2">
+<line x1="208" y1="156" x2="228" y2="156" stroke="#000000" stroke-width="2"/>
+<line class="hit" x1="208" y1="156" x2="228" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
+</g>
+<g class="mating" data-partners="II-2 II-4">
+<line x1="264" y1="156" x2="284" y2="156" stroke="#000000" stroke-width="2"/>
+<line class="hit" x1="264" y1="156" x2="284" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
+</g>
+<g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2">
+<line x1="176" y1="66" x2="176" y2="116" stroke="#000000" stroke-width="2"/>
+<line x1="176" y1="116" x2="106" y2="138" stroke="#000000" stroke-width="2"/>
+<line x1="176" y1="116" x2="246" y2="138" stroke="#000000" stroke-width="2"/>
+</g>
+<g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
+<rect class="backing" x="130" y="48" width="36" height="36" fill="#ffffff"/>
+<rect class="symbol" x="130" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="148" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
+<rect class="hit" x="130" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-I-2" class="individual" data-position="I-2" data-generation="1" data-index="2" data-gender="woman">
+<circle class="backing" cx="204" cy="66" r="18" fill="#ffffff"/>
+<circle class="symbol" cx="204" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="204" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
+<rect class="hit" x="186" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-1" class="individual" data-position="II-1" data-generation="2" data-index="1" data-gender="woman">
+<circle class="backing" cx="106" cy="156" r="18" fill="#ffffff"/>
+<circle class="symbol" cx="106" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="106" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
+<rect class="hit" x="88" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-3" class="individual" data-position="II-3" data-generation="2" data-index="3" data-gender="man">
+<rect class="backing" x="172" y="138" width="36" height="36" fill="#ffffff"/>
+<rect class="symbol" x="172" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="190" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-3</text>
+<rect class="hit" x="172" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-2" class="individual" data-position="II-2" data-generation="2" data-index="2" data-gender="woman">
+<circle class="backing" cx="246" cy="156" r="18" fill="#ffffff"/>
+<circle class="symbol" cx="246" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="246" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
+<rect class="hit" x="228" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-4" class="individual" data-position="II-4" data-generation="2" data-index="4" data-gender="man">
+<rect class="backing" x="284" y="138" width="36" height="36" fill="#ffffff"/>
+<rect class="symbol" x="284" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="302" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-4</text>
+<rect class="hit" x="284" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+</svg>
