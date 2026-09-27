@@ -257,11 +257,12 @@ Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, 
 
 A figure is a *set* of pedigrees (`ir.md`), so `render_set_svg(PedigreeSet)` composes one SVG from the per-pedigree
 `render_svg`: each pedigree is laid out and drawn unchanged, then the tiles are stacked vertically and titled by their
-`Pedigree.title`, each wrapped in a nested `<svg viewBox>` that carries its own coordinate system — so drawing stays
-byte-identical and single-pedigree goldens are untouched. A pedigree the layout **defers** (an interlocking loop, a
-child of two matings, a routed mating — see Deferred) degrades to a labelled dashed placeholder so the rest of the
-figure still renders rather than the whole figure failing; an empty set is a minimal canvas. v1 stacks vertically; a
-grid for many-family figures is a later refinement (slice 13).
+display title (the family label, else the first panel or other label; a phenotype or gene label names a condition or
+gene, never the pedigree, so a pedigree with only those has no title), each wrapped in a nested `<svg viewBox>` that
+carries its own coordinate system — so drawing stays byte-identical and single-pedigree goldens are untouched. A
+pedigree the layout **defers** (an interlocking loop, a child of two matings, a routed mating — see Deferred) degrades
+to a labelled dashed placeholder so the rest of the figure still renders rather than the whole figure failing; an empty
+set is a minimal canvas. v1 stacks vertically; a grid for many-family figures is a later refinement (slice 13).
 
 ## Deferred
 

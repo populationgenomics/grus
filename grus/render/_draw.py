@@ -187,9 +187,10 @@ def render_set_svg(
 
     Each pedigree is laid out and drawn exactly as ``render_svg`` does, then the tiles are stacked
     vertically and titled by their display label (``_display_title`` — the FAMILY label if any, else the
-    first). A pedigree the tier-1 layout defers becomes a labelled placeholder box so the rest of the
-    figure still renders. An empty set yields a minimal empty canvas. ``id_prefix`` namespaces every id in
-    the document (each tile adds its own ``p{n}-`` under it) for a page that inlines several figures.
+    first PANEL or OTHER label; none from a phenotype or gene). A pedigree the tier-1 layout defers becomes a
+    labelled placeholder box so the rest of the figure still renders. An empty set yields a minimal empty
+    canvas. ``id_prefix`` namespaces every id in the document (each tile adds its own ``p{n}-`` under it) for
+    a page that inlines several figures.
     ``stored_layouts``, one per pedigree in order, draws from stored layouts as ``render_svg`` does.
     """
     _check_prefix(id_prefix)
@@ -248,12 +249,18 @@ def _pedigree_attrs(p: pb.Pedigree, *, deferred: bool = False) -> str:
     return f'class="{cls}" data-title="{_attr(_display_title(p))}" data-conditions="{_attr(legend)}"'
 
 
+_TITLE_KINDS = (pb.LABEL_KIND_PANEL, pb.LABEL_KIND_OTHER)
+
+
 def _display_title(ped: pb.Pedigree) -> str:
-    """The label to show above a pedigree tile: the FAMILY label if present, else the first label."""
+    """The label to show above a pedigree tile: the FAMILY label, else the first PANEL or OTHER label, else none.
+
+    A phenotype or gene label names a condition or a gene the key already shows, never the pedigree.
+    """
     for label in ped.labels:
         if label.kind == pb.LABEL_KIND_FAMILY:
             return label.text
-    return ped.labels[0].text if ped.labels else ""
+    return next((label.text for label in ped.labels if label.kind in _TITLE_KINDS), "")
 
 
 def _compose_tiles(tiles: list[_Tile], geom: _geometry.Geometry) -> str:
