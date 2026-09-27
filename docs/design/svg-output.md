@@ -89,8 +89,8 @@ not depend on styling:
 1. **`fill`** — status paint inside the shape: the whole shape for an individual affected with one condition, else one
    legend-indexed section per affected or carried condition, or the central dot an X-linked carrier gets under the
    inheritance-glyph style (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status
-   (`data-status`) and paints with that pair's named pattern; status is never the backing's colour, so one selector
-   reaches all status paint.
+   (`data-status`) and paints with that pair's named pattern (the dot, a plain glyph, has none); status is never the
+   backing's colour, so one selector reaches all status paint.
 1. **`divider`** — on a divided symbol, the lines through the centre that separate its sections: under the outline, so
    the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
@@ -145,7 +145,8 @@ The groups, and what each promises:
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
-attributes. Every fill part and every key swatch references its pattern by `fill="url(#…)"`; none repeats the paint.
+attributes. Every fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none
+repeats the paint.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's

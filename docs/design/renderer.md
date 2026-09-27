@@ -98,7 +98,7 @@ line).
 
 The drawing follows the NSGC 2022 revision (Bennett et al., §4.5 and Figure 2), which says three things about status:
 
-1. A symbol showing **one** condition is undivided. Only a symbol showing more than one is divided into sections, one
+1. A symbol showing **one** condition is not divided. Only a symbol showing more than one is divided into sections, one
    per condition, each with its own fill.
 1. **Carrier status is a fill**, not the central dot of the 2008 standard: a dot cannot say *which* of several
    conditions a person carries, and a condition's fill can hide it. The standard's example is a HEXA and CFTR carrier
@@ -141,8 +141,10 @@ presymptomatic glyph.
 - Affected with exactly one condition and carrying none: the whole shape in that condition's affected fill. An affected
   symbol of a single-condition pedigree is solid black, as before.
 - Otherwise every affected and every carried condition fills its own section, and the symbol is divided. A carrier of
-  one condition is one hatched section; affected with one condition and a carrier of another is two sections, one tone
-  and one hatch. A condition that is both affected and carried on one individual (same-named entries) draws as affected.
+  one condition is one hatched section, in its index's place and with no divider — a whole-shape hatch would move the
+  condition off its place and read as a different fill; affected with one condition and a carrier of another is two
+  sections, one tone and one hatch. A condition that is both affected and carried on one individual (same-named entries)
+  draws as affected.
 - Presymptomatic, unknown (`?`), deceased and proband marks are unchanged, drawn over the fills. On a symbol divided in
   halves the presymptomatic line coincides with the vertical divider, so there it does not read; the standard gives no
   form for a presymptomatic individual who also shows two conditions.
@@ -155,10 +157,11 @@ dot, edged white so it reads over a hatch; every other carrier is a section as a
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a hatch means nothing to a reader who does not hold the IR. It has one entry per (index, status)
 drawn, ordered by index with affected first: a square swatch in that fill and a label — the condition's name when
-affected, `Carrier: <name>` when carried, and `Affected` / `Carrier` for an unnamed condition. Entries run left to right
-and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP` below the lowest label or
-arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no fills has no key and an
-unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per pedigree.
+affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an
+unnamed condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key
+sits `KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a
+pedigree with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since
+indices are per pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree
@@ -232,8 +235,8 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **A routed mating** — partners that cannot stand side by side: a third partner, or a twin whose sides are both taken
   (a twin pair holds three partners). Its drawn form, a track over the row, read as a sibship
   ([`layout-v2.md`](layout-v2.md), Alternatives considered), so it defers (`_layout2.layout`).
-- **A fifth filled condition** — an individual affected with, or carrying, a condition at legend index 4 or above. The
-  fills table has four distinct fills per status, and reusing one would draw two conditions alike (`_draw`).
+- **A fifth filled condition** — a fill (not the X-linked dot) for a condition at legend index 4 or above. The fills
+  table has four distinct fills per status, and reusing one would draw two conditions alike (`_draw`).
 - **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).
