@@ -61,8 +61,9 @@ class Geometry:
         carrier_style: how a carrier is drawn (``CarrierStyle``); drawing-only except that the X-linked dot sends a
             count beside its symbol.
         key_gap: pixels between the drawing's lowest label or arrow and the key below it.
-        key_entry_gap: pixels between adjacent key entries on one row; rows are a quarter of ``symbol_size``
-            apart. A key swatch is one quadrant of a symbol (``symbol_size / 2``), so its fill has the symbol's phase.
+        key_entry_gap: pixels between adjacent key entries on one row; rows are half a swatch apart. A key swatch is
+            a plain square half the ``symbol_size``, or in a divided pedigree a small divided square three quarters
+            of it (docs/design/renderer.md, The key).
 
     ``gen_height`` and ``x_unit`` are floors: drawing opens the row pitch and column pitch further
     when a pedigree's label stacks need it (see ``_draw``). The label stack under each symbol lists the

@@ -595,11 +595,11 @@ def test_three_or_four_conditions_divide_into_quadrants() -> None:
     assert float(c.get("y", "0")) > float(a.get("y", "0")), "index 2 is the bottom-left quadrant"
 
 
-def test_a_fifth_filled_condition_defers() -> None:
-    p = pb.Pedigree(individuals=[_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCDE")])
-    with pytest.raises(render.DeferredFeatureError, match="legend index 4"):
+def test_a_seventh_filled_condition_defers() -> None:
+    p = pb.Pedigree(individuals=[_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCDEFG")])
+    with pytest.raises(render.DeferredFeatureError, match="legend index 6; at most 6 conditions can be drawn"):
         render.render_svg(p)
-    p.individuals[4].conditions[0].status = pb.CONDITION_STATUS_UNKNOWN  # in the legend, but drawn with no fill
+    p.individuals[6].conditions[0].status = pb.CONDITION_STATUS_UNKNOWN  # in the legend, but drawn with no fill
     render.render_svg(p)
 
 
@@ -660,6 +660,7 @@ def test_key_sits_below_every_individual(name: str) -> None:
     swatches = [
         (tx + float(sw.get("x", "0")), ty + float(sw.get("y", "0")), float(sw.get("height", "0")))
         for sw in key.iter(f"{_SVG}rect")
+        if sw.get("transform")  # not a key symbol's clip rectangle
         for tx, ty in [_translate(sw)]
     ]
     top = min(y for _, y, _ in swatches)
@@ -759,17 +760,24 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
         )
     out: list[tuple[str, float]] = []
     for group in root.iter(f"{_SVG}g"):
-        symbol = next((c for c in group if "symbol" in _classes(c)), None)
+        # A symbol's outline; a divided pedigree's key symbol has a swatch outline instead.
+        symbol = next((c for c in group if {"symbol", "swatch-outline"} & set(_classes(c))), None)
         for part in group:
             ref = re.fullmatch(r"url\(#(.+)\)", part.get("fill", ""))
             if not ref or ref.group(1) not in hatches:
                 continue
             tile, thick, segments = hatches[ref.group(1)]
             tx, ty = _translate(part)
-            x, y = float(part.get("x", "0")), float(part.get("y", "0"))
-            w, h = float(part.get("width", "0")), float(part.get("height", "0"))
-            corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]  # the section or swatch, local frame
+            if part.tag == f"{_SVG}polygon":  # a sixth's wedge, whose far edges lie outside the shape
+                corners = [(float(a), float(b)) for a, b in (xy.split(",") for xy in part.get("points", "").split())]
+                xs, ys = [c[0] for c in corners], [c[1] for c in corners]
+                x, y, w, h = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+            else:
+                x, y = float(part.get("x", "0")), float(part.get("y", "0"))
+                w, h = float(part.get("width", "0")), float(part.get("height", "0"))
+                corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]  # the section or swatch, local frame
             circle = None
+            local = symbol is not None and "swatch-outline" in _classes(symbol)  # drawn in the part's own frame
             if symbol is not None and symbol.tag == f"{_SVG}polygon":
                 pts = [tuple(map(float, xy.split(","))) for xy in symbol.get("points", "").split()]
                 outline = [(px - tx, py - ty) for px, py in pts]
@@ -783,13 +791,24 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
                 edges = []
             else:
                 sx, sy = (
-                    (float(symbol.get("x", "0")) - tx, float(symbol.get("y", "0")) - ty)
+                    (
+                        float(symbol.get("x", "0")) - (0 if local else tx),
+                        float(symbol.get("y", "0")) - (0 if local else ty),
+                    )
                     if symbol is not None
                     else (x, y)
                 )
                 sw = float(symbol.get("width", "0")) if symbol is not None else w
                 edges = list(itertools.pairwise([(sx, sy), (sx + sw, sy), (sx + sw, sy + sw), (sx, sy + sw), (sx, sy)]))
-            edges += list(itertools.pairwise([*corners, corners[0]]))
+            shape = [e[0] for e in edges] or [(circle[0] - circle[2], circle[1]), (circle[0] + circle[2], circle[1])]  # type: ignore[index]
+            scx = sum(px for px, _ in shape) / len(shape) if circle is None else circle[0]
+            scy = sum(py for _, py in shape) / len(shape) if circle is None else circle[1]
+            bound = max(math.hypot(px - scx, py - scy) for px, py in shape) + 1.0
+            # A section edge counts only where it passes through the shape; one wholly outside is clipped away.
+            for a, b in itertools.pairwise([*corners, corners[0]]):
+                elen = math.hypot(b[0] - a[0], b[1] - a[1])
+                if abs((b[0] - a[0]) * (a[1] - scy) - (b[1] - a[1]) * (a[0] - scx)) / elen < bound:
+                    edges.append((a, b))
             what = f"{ref.group(1)} {group.get('id')}"
             for (x1, y1), (x2, y2) in segments:
                 length = math.hypot(x2 - x1, y2 - y1)
@@ -811,26 +830,28 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
     return out
 
 
-def _all_hatches() -> pb.Pedigree:
-    """Every carrier hatch in its quadrant on each shape (indices 2 and 3 only ever sit in quadrants)."""
+def _all_hatches(names: str = "ABCD") -> pb.Pedigree:
+    """Every carrier hatch in its section on each shape, singly and all together: quadrants for four, sixths for six."""
     genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
     people = [
         _person(i + 1, (name, _CAR), gender=gender)
-        for i, (gender, name) in enumerate(itertools.product(genders, "ABCD"))
+        for i, (gender, name) in enumerate(itertools.product(genders, names))
     ]
     people += [
-        _person(len(people) + i + 1, *((n, _CAR) for n in "ABCD"), gender=gender) for i, gender in enumerate(genders)
+        _person(len(people) + i + 1, *((n, _CAR) for n in names), gender=gender) for i, gender in enumerate(genders)
     ]
-    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"], individuals=people)
+    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
 
 
-@pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "halves", "undivided"])
+@pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "sixths", "halves", "undivided"])
 def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
     # Every carrier stroke is diagonal and each fill part is drawn in its symbol's own frame (a swatch from its
     # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, a square's or
     # diamond's outline edge, or close inside a circle's outline, where it would read as a thicker edge or a mark.
     if name == "all_hatches":
         svg = render.render_svg(_all_hatches())
+    elif name == "sixths":
+        svg = render.render_svg(_all_hatches("ABCDEF"))
     elif name == "halves":
         genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
         svg = render.render_svg(
@@ -846,7 +867,80 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
     gaps = _hatch_gaps(svg)
     stroke = 2.0  # the outline's stroke width
     assert all(gap >= stroke - 1e-6 for _, gap in gaps), sorted(g for g in gaps if g[1] < stroke - 1e-6)[:5]
-    if name in ("all_hatches", "halves", "undivided"):
+    if name in ("all_hatches", "sixths", "halves", "undivided"):
         kinds = {what.split()[0] for what, _ in gaps}
-        want = {f"fill-carrier-{i}" for i in {"all_hatches": range(4), "halves": range(2), "undivided": range(1)}[name]}
+        want = {
+            f"fill-carrier-{i}"
+            for i in {"all_hatches": range(4), "sixths": range(6), "halves": range(2), "undivided": range(1)}[name]
+        }
         assert kinds == want, "the check saw every hatch run alongside some edge"
+
+
+# --- sixths: five or six conditions -----------------------------------------------------------------------------
+
+
+def _sixths(*people: pb.Individual, names: str = "ABCDEF") -> pb.Pedigree:
+    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
+
+
+@pytest.mark.parametrize("names", ["ABCDE", "ABCDEF"])
+def test_five_or_six_conditions_divide_every_symbol_into_six_wedges(names: str) -> None:
+    genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
+    root = _parse(render.render_svg(_sixths(*(_person(i + 1, gender=g) for i, g in enumerate(genders)), names=names)))
+    for g in _groups(root, "individual"):
+        dividers = _dividers(g)
+        assert len(dividers) == 3, "three lines through the centre: six wedges"
+        assert all(d.get("x1") != d.get("x2") for d in dividers), (
+            "none vertical, so none lies on the presymptomatic line"
+        )
+        assert all(d.get("stroke-width") == "1" for d in dividers), "half the outline's width"
+
+
+@pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
+def test_a_sixth_is_a_wedge_toward_its_clock_position(gender: pb.Gender) -> None:
+    # Index order is the reading order of halves and quadrants: 10, 12 and 2 o'clock, then 8, 6 and 4 o'clock. The
+    # wedge's point is the symbol's centre on every shape, a circle's offset fill frame included.
+    people = [_person(i + 1, (n, _AFF), gender=gender) for i, n in enumerate("ABCDEF")]
+    groups = _groups(_parse(render.render_svg(_sixths(*people))), "individual")
+    for g, clock in zip(groups, (10, 12, 2, 8, 6, 4), strict=True):
+        (wedge,) = _fills(g)
+        assert wedge.tag == f"{_SVG}polygon", "in sixths one affected condition keeps its section"
+        tx, ty = _translate(wedge)
+        (c, _, mid, _) = [tuple(map(float, xy.split(","))) for xy in wedge.get("points", "").split()]
+        assert (c[0] + tx, c[1] + ty) == _centre(next(e for e in g if "symbol" in _classes(e)))
+        angle = math.degrees(math.atan2(mid[0] - c[0], -(mid[1] - c[1]))) % 360  # clockwise from 12
+        assert abs(angle - clock * 30 % 360) < 1e-2, "3-decimal coordinates"
+
+
+def test_a_presymptomatic_line_reads_over_sixth_dividers() -> None:
+    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC))
+    (g, *_) = _groups(_parse(render.render_svg(_sixths(ind, _person(2, ("E", _AFF))))), "individual")
+    (line,) = [c for c in g if "presymptomatic" in _classes(c)]
+    assert line.get("x1") == line.get("x2") and line.get("stroke-width") == "2"
+    assert all(d.get("x1") != d.get("x2") for d in _dividers(g))
+
+
+def test_a_divided_pedigrees_key_shows_each_entrys_section() -> None:
+    # The key draws a small divided square per entry, filled in that entry's section only, so it shows where a
+    # condition sits as well as its fill; an undivided pedigree keeps plain swatches.
+    root = _parse(render.render_svg(_sixths(_person(1, ("C", _CAR)), _person(2, ("E", _AFF)))))
+    (key,) = _groups(root, "key")
+    for e in _groups(key, "key-entry"):
+        (swatch,) = [c for c in e if "swatch" in _classes(c)]
+        assert swatch.tag == f"{_SVG}polygon" and swatch.get("clip-path")
+        assert len(_dividers(e)) == 3 and [c for c in e if "swatch-outline" in _classes(c)]
+    undivided = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _CAR))])))
+    (key,) = _groups(undivided, "key")
+    assert not any(_dividers(e) for e in _groups(key, "key-entry"))
+
+
+def test_conditions_4_and_5_have_their_own_tones_and_hatches() -> None:
+    people = [_person(i + 1, (n, s)) for i, (n, s) in enumerate((n, s) for n in "ABCDEF" for s in (_AFF, _CAR))]
+    pats = _patterns(_parse(render.render_svg(_sixths(*people))))
+    tones = [pats[f"fill-affected-{i}"].find(f"{_SVG}rect").get("fill") for i in range(6)]  # type: ignore[union-attr]
+    assert len(set(tones)) == 6
+    for i in (4, 5):
+        carrier = pats[f"fill-carrier-{i}"]
+        assert carrier.find(f"{_SVG}rect").get("fill") == tones[i]  # type: ignore[union-attr]
+        (x1, y1), (x2, y2) = _segments_of(carrier.find(f"{_SVG}path").get("d", ""))[0]  # type: ignore[union-attr]
+        assert ((x2 - x1) * (y2 - y1) < 0) == (i % 2 == 0), "/ for even indices, \\ for odd"

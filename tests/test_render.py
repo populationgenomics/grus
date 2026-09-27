@@ -1676,5 +1676,5 @@ def test_the_dot_goes_to_the_lowest_index_whatever_the_ir_order() -> None:
 
     svg = render.render_svg(pb.Pedigree(individuals=[woman(1, ("A", "B")), woman(2, ("B", "A"))]), _GLYPH)
     assert svg.count('class="fill dot" data-condition="0"') == 2
-    assert re.findall(r'id="(key-[^"]+)"', svg) == ["key-carrier-dot-0", "key-carrier-1"]
+    assert re.findall(r'id="(key-(?!clip)[^"]+)"', svg) == ["key-carrier-dot-0", "key-carrier-1"]
     assert ">X-linked carrier: A<" in svg

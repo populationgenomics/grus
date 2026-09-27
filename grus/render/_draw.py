@@ -4,9 +4,9 @@ Reads only the per-level arrays (the geometry seam) plus each individual's symbo
 Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are stable.
 Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinical status as NSGC 2022 fills (one
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
-affected condition fills the whole shape, anything else fills one legend-keyed section per condition; every symbol of
-a multi-condition pedigree has dividers, and a filled section's edge inside a symbol is drawn as one), presymptomatic
-vertical line (outline weight, past the outline), deceased
+affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
+every symbol of a multi-condition pedigree has dividers, and a filled section's edge inside a symbol is drawn as one),
+presymptomatic vertical line (outline weight, past the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -33,7 +33,8 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   when one individual is ghosted more than once), so ``[data-position]`` lights both and
   ``.individual:not(.ghost)`` counts drawn symbols.
   Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape — the whole
-  shape for one affected condition, else a legend-keyed section per affected or carried condition, or the X-linked
+  shape for one affected condition (not in sixths), else a legend-keyed section per affected or carried condition —
+  a clipped ``rect``, or in sixths a clipped wedge ``polygon`` — or the X-linked
   ``fill dot`` under ``CarrierStyle.INHERITANCE_GLYPH`` — each with ``data-condition`` and ``data-status`` naming what
   it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (the line(s)
   through the centre between sections: on every symbol of a multi-condition pedigree, else only where a filled
@@ -55,7 +56,9 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   restyling or replacing its pattern.
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
-  ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` and a
+  ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` (in a divided
+  pedigree a small divided square: ``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch``
+  section, ``divider`` lines, ``swatch-outline``) and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
   for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
   hold it.
@@ -106,11 +109,14 @@ _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = _WIDTH / 2  # half the outline: a divider is a section line, lighter than any mark
 _PRESYMPTOMATIC_OVERRUN = _WIDTH  # the presymptomatic line runs this far past the outline, top and bottom
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
+_KEY_SYMBOL = 0.75  # a divided pedigree's key symbol, as a fraction of symbol_size
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status): the tone says the condition, the
 # texture the status. Affected is the flat tone; carrier is the tone with a diagonal hatch in the contrasting colour,
 # "/" for even indices and "\\" for odd, so neighbouring tones also differ in direction where they merge when small.
-_AFFECTED_TONES = ("#000000", "#484848", "#9c9c9c", "#dbdbdb")
-_HATCH_COLOURS = ("#ffffff", "#ffffff", "#000000", "#000000")
+# Conditions 4 and 5 take the two tones left between the first four and their carriers' mean greys; a sixth-divided
+# symbol places every fill in its own fixed section, so position, not tone alone, tells them apart.
+_AFFECTED_TONES = ("#000000", "#484848", "#9c9c9c", "#dbdbdb", "#262626", "#b8b8b8")
+_HATCH_COLOURS = ("#ffffff", "#ffffff", "#000000", "#000000", "#ffffff", "#000000")
 # Fill phase: every fill part is drawn in its symbol's own frame (a key swatch about its centre), so a user-space tile
 # starts at the same place on each. The hatch lies on the lattice x + y, x - y = cell / 2 (mod cell), cell =
 # symbol_size / 4: a square's or diamond's frame is its centre, which puts a diamond's edges (parallel to the hatch)
@@ -120,6 +126,11 @@ _CELLS_PER_SYMBOL = 4
 _HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
 _SOLID = 8.0  # tile (px) of a flat tone; its phase does not show
 _FILLS = len(_AFFECTED_TONES)
+# Sections of a sixth-divided symbol: wedges from the centre, each named by the clock position it points at, in the
+# reading order of halves and quadrants (top row left to right, then the bottom row). Their dividers run through 1-7,
+# 3-9 and 5-11 o'clock, so none is vertical: the presymptomatic line never lies on one.
+_SIXTH_CLOCK = (10, 12, 2, 8, 6, 4)
+_SIXTH_DIVIDERS = (1, 3, 5)
 _DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
@@ -361,7 +372,8 @@ class _FillPlan:
     """How one individual's clinical status is painted (docs/design/renderer.md, Clinical status).
 
     Attributes:
-        whole: the condition index whose affected fill covers the whole shape, when that is the only fill.
+        whole: the condition index whose affected fill covers the whole shape, when that is the only fill (never in
+            sixths, where every fill keeps its section).
         sections: otherwise each ``(index, status)`` painted in the index's section, in index order.
         dot: the condition index of the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH`` only).
     """
@@ -408,8 +420,8 @@ class _Draw:
         # Ordered condition names plus the unnamed slot: the index keys `data-condition-{i}`, fills and sections.
         self._data_legend = _labels.data_legend(p)
         self._divided = _labels.divided(p)  # dividers on every symbol
-        # A condition's section: halves for up to two legend conditions, else quadrants (one per fill).
-        self._slots = 2 if len(self._data_legend) <= 2 else _FILLS
+        n = len(self._data_legend)
+        self._slots = 2 if n <= 2 else 4 if n <= 4 else 6  # sections per symbol: halves, quadrants or sixths
         self._plans = [self._fill_plan(ind) for ind in p.individuals]
         # A real individual may be ghosted more than once; each ghost cell gets an ordinal for a unique id. Both
         # the ordinal and the ghost-link order follow layout cell order, which is shuffle-invariant.
@@ -437,14 +449,16 @@ class _Draw:
             self.gen_height,
             geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub + tracks * geom.elbow_gap,
         )
-        self._swatch = geom.symbol_size / 2  # a key swatch is the size of one symbol quadrant
+        # A key swatch: in a divided pedigree a small divided square, filled in its entry's section only, so the key
+        # shows where a condition sits as well as its fill; otherwise a plain square the size of a quadrant.
+        self._swatch = geom.symbol_size * (_KEY_SYMBOL if self._divided else 0.5)
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
     def _fill_plan(self, ind: pb.Individual) -> _FillPlan:
-        """``ind``'s fills: one affected condition fills the whole shape; anything else is sections.
+        """``ind``'s fills: one affected condition fills the whole shape (outside sixths); anything else is sections.
 
         Raises:
-            DeferredFeatureError: a fill for a condition index with no distinct fill (index ``_FILLS`` or above).
+            DeferredFeatureError: a fill for a condition past the sixth (legend index ``_FILLS`` or above).
         """
         index = self._data_legend.index
         affected = {index(c.name) for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED}
@@ -463,9 +477,11 @@ class _Draw:
             if i >= _FILLS:
                 raise _layout.DeferredFeatureError(
                     f"{_position(ind)} is drawn with condition {self._data_legend[i]!r} at legend index {i}; "
-                    f"only {_FILLS} conditions have distinct fills"
+                    f"at most {_FILLS} conditions can be drawn (halves for 2, quadrants for 3-4, sixths for 5-6)"
                 )
-        if len(sections) == 1 and sections[0][1] == _AFFECTED:
+        # One affected condition fills the whole shape, except in sixths: there six tones cannot carry identity alone,
+        # so every fill keeps its section.
+        if len(sections) == 1 and sections[0][1] == _AFFECTED and self._slots < 6:
             return _FillPlan(whole=sections[0][0], sections=(), dot=dot)
         return _FillPlan(whole=None, sections=tuple(sections), dot=dot)
 
@@ -684,19 +700,42 @@ class _Draw:
             attrs = {"id": f"{self.id_prefix}key-{e.kind}-{e.index}", "data-condition": str(e.index)}
             attrs["data-status"] = e.status
             out.append(_open_g(["key-entry", *(["dot"] if e.dot else [])], attrs))
-            paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
-            # Drawn about its own centre, like a square symbol, so its hatch has a square's phase.
-            out.append(
-                f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" height="{_num(s)}" '
-                f'transform="translate({_num(x + s / 2)} {_num(y + s / 2)})" fill="{paint}" stroke="{_STROKE}" '
-                f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'
-            )
+            if self._divided:
+                out += self._key_symbol(e, x + s / 2, y + s / 2)
+            else:
+                paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
+                # Drawn about its own centre, like a square symbol, so its hatch has a square's phase.
+                out.append(
+                    f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" '
+                    f'height="{_num(s)}" transform="translate({_num(x + s / 2)} {_num(y + s / 2)})" fill="{paint}" '
+                    f'stroke="{_STROKE}" stroke-width="{_num(_SWATCH_WIDTH)}"/>'
+                )
             if e.dot:
                 out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
             label_x = x + s + geom.label_gap
             out.append(_text(label_x, y + s / 2, _escape(e.label), geom.label_size, cls="key-label", anchor="start"))
             out.append("</g>")
         out.append("</g>")
+        return out
+
+    def _key_symbol(self, e: _KeyEntry, cx: float, cy: float) -> list[str]:
+        """A divided pedigree's key swatch: a small square with the pedigree's dividers, filled in ``e``'s section only.
+
+        Drawn about its centre, like a square symbol, so its hatch has a square's phase; the outline is the swatch's.
+        """
+        h = self._swatch / 2
+        at = f'transform="translate({_num(cx)} {_num(cy)})"'
+        square = f'x="{_num(-h)}" y="{_num(-h)}" width="{_num(2 * h)}" height="{_num(2 * h)}"'
+        out = [f'<rect class="swatch-backing" {square} {at} fill="#ffffff"/>']
+        if not e.dot:
+            clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
+            out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
+            out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
+        out += self._divider_lines(pb.GENDER_MAN, cx, cy, h)
+        out.append(
+            f'<rect class="swatch-outline" {square} {at} fill="none" stroke="{_STROKE}" '
+            f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'
+        )
         return out
 
     def root_attrs(self) -> str:
@@ -1044,7 +1083,7 @@ class _Draw:
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         suffix = f"-{ordinal}" if ordinal > 1 else ""
         out += self._status_fill(ind, plan, cx, cy, clip_id=f"{self.id_prefix}clip-ghost-{_position(ind)}{suffix}")
-        out += self._dividers(cx, cy, plan)
+        out += self._dividers(ind.gender, cx, cy, plan)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
         out += self._count_mark(ind, plan, cx, cy)
         lines, ys = _label_lines(ind), self._line_ys(ind)
@@ -1144,7 +1183,7 @@ class _Draw:
         out = [self._open_individual(ind)]
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         out += self._status_fill(ind, plan, cx, cy, clip_id=f"{self.id_prefix}clip-{_position(ind)}")
-        out += self._dividers(cx, cy, plan)
+        out += self._dividers(ind.gender, cx, cy, plan)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
         out += self._count_mark(ind, plan, cx, cy)
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
@@ -1211,9 +1250,9 @@ class _Draw:
     def _status_fill(self, ind: pb.Individual, plan: _FillPlan, cx: float, cy: float, *, clip_id: str) -> list[str]:
         """The ``fill`` and ``divider`` parts, drawn under the outline (docs/design/renderer.md, Clinical status).
 
-        One affected condition paints the whole shape. Otherwise each section is a rectangle for its condition index,
-        clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
-        math). The X-linked dot, when drawn, sits over it.
+        One affected condition paints the whole shape (outside sixths). Otherwise each section is a rectangle, or in
+        sixths a wedge, for its condition index, clipped to the shape by reusing the shape as a clipPath, so there is
+        no per-shape math. The X-linked dot, when drawn, sits over it.
         """
         # Fill parts are drawn about the symbol's own origin and moved into place, so each pattern has one phase per
         # symbol: the centre, or half a cell right of it for a circle (see _CELLS_PER_SYMBOL).
@@ -1239,8 +1278,8 @@ class _Draw:
             out.append(self._dot(cx, cy, plan.dot, cls="fill dot", radius=self.half * 0.26))
         return out
 
-    def _dividers(self, cx: float, cy: float, plan: _FillPlan) -> list[str]:
-        """The section lines through the centre, at half the outline's width: halves, or quadrants for 3-4.
+    def _dividers(self, gender: pb.Gender, cx: float, cy: float, plan: _FillPlan) -> list[str]:
+        """The section lines through the centre, at half the outline's width: halves, quadrants for 3-4, sixths for 5-6.
 
         In a pedigree with two or more conditions every symbol has them, filled or not, so a condition sits in a visibly
         fixed place. In one with a single condition they are the edge of a filled section inside the symbol (a lone
@@ -1248,10 +1287,22 @@ class _Draw:
         """
         if not (self._divided or plan.sections):
             return []
-        h = self.half
-        out = [_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH)]
-        if self._slots == _FILLS:
-            out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=_DIVIDER_WIDTH))
+        return self._divider_lines(gender, cx, cy, self.half)
+
+    def _divider_lines(
+        self, gender: pb.Gender, cx: float, cy: float, h: float, width: float = _DIVIDER_WIDTH
+    ) -> list[str]:
+        """The divider lines of a ``gender`` shape of half-size ``h`` at ``(cx, cy)``, running outline to outline."""
+        if self._slots == 6:
+            out = []
+            for clock in _SIXTH_DIVIDERS:
+                dx, dy = _clock(clock)
+                t = _reach(gender, dx, dy, h)
+                out.append(_line(cx - t * dx, cy - t * dy, cx + t * dx, cy + t * dy, cls="divider", width=width))
+            return out
+        out = [_line(cx, cy - h, cx, cy + h, cls="divider", width=width)]
+        if self._slots == 4:
+            out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=width))
         return out
 
     def _dot(self, cx: float, cy: float, index: int, *, cls: str, radius: float) -> str:
@@ -1261,24 +1312,33 @@ class _Draw:
             f'r="{_num(radius)}" fill="{_STROKE}" stroke="#ffffff" stroke-width="{_num(_DIVIDER_WIDTH)}"/>'
         )
 
-    def _section(self, index: int, status: str, clip_id: str, at: str, cx: float) -> str:
-        """The ``fill`` rectangle of condition ``index``'s section in the symbol's frame, clipped to its shape.
+    def _section(
+        self, index: int, status: str, clip_id: str, at: str, cx: float, *, h: float | None = None, cls: str = "fill"
+    ) -> str:
+        """The ``fill`` region of condition ``index``'s section in the symbol's frame, clipped to its shape.
 
-        Halves (left, right) when the legend has at most two conditions, else quadrants (TL, TR, BL, BR). ``at`` is
-        the transform that places it on the symbol; ``cx`` the symbol's centre in that frame.
+        Halves (left, right) when the legend has at most two conditions, quadrants (TL, TR, BL, BR) for three or four,
+        and for five or six a wedge from the centre toward its clock position (``_SIXTH_CLOCK``). ``at`` is the
+        transform that places it on the symbol; ``cx`` the symbol's centre in that frame; ``h`` its half-size.
         """
-        h = self.half
+        h = self.half if h is None else h
+        paint = f'{at} fill="url(#{self._fill_id(index, status)})" clip-path="url(#{clip_id})"'
+        head = f'class="{cls}" data-condition="{index}" data-status="{status}"'
+        if self._slots == 6:
+            # The centre and three points far outside the shape, on the wedge's edges and middle; the clip trims it.
+            clock, reach = _SIXTH_CLOCK[index], 3 * h
+            pts = [(cx, 0.0)]
+            for off in (-1, 0, 1):
+                dx, dy = _clock(clock + off)
+                pts.append((cx + reach * dx, reach * dy))
+            return f'<polygon {head} points="{" ".join(f"{_num(x)},{_num(y)}" for x, y in pts)}" {paint}/>'
         if self._slots == 2:
             rx, ry, rw, rh = cx + (-h if index == 0 else 0.0), -h, h, 2 * h
         else:
             rx = cx + (-h if index in (0, 2) else 0.0)
             ry = -h if index in (0, 1) else 0.0
             rw = rh = h
-        return (
-            f'<rect class="fill" data-condition="{index}" data-status="{status}" x="{_num(rx)}" y="{_num(ry)}" '
-            f'width="{_num(rw)}" height="{_num(rh)}" {at} fill="url(#{self._fill_id(index, status)})" '
-            f'clip-path="url(#{clip_id})"/>'
-        )
+        return f'<rect {head} x="{_num(rx)}" y="{_num(ry)}" width="{_num(rw)}" height="{_num(rh)}" {paint}/>'
 
     def _shape(
         self, gender: pb.Gender, cx: float, cy: float, fill: str, *, stroke: bool = True, cls: str = "", extra: str = ""
@@ -1308,6 +1368,21 @@ class _Draw:
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
+
+
+def _clock(hour: float) -> tuple[float, float]:
+    """The unit vector toward ``hour`` on a clock face, in SVG's y-down frame (12 is up, 3 is right)."""
+    a = math.radians(hour * 30)
+    return math.sin(a), -math.cos(a)
+
+
+def _reach(gender: pb.Gender, dx: float, dy: float, h: float) -> float:
+    """How far from the centre a ray along the unit ``(dx, dy)`` meets a ``gender`` shape of half-size ``h``."""
+    if gender == pb.GENDER_MAN:
+        return h / max(abs(dx), abs(dy))
+    if gender == pb.GENDER_WOMAN:
+        return h
+    return h / (abs(dx) + abs(dy))
 
 
 def _hatch_path(backslash: bool, c: float) -> str:
