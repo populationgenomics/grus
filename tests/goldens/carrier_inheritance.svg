@@ -10,7 +10,8 @@
 <circle class="backing" cx="106" cy="66" r="18" fill="#ffffff"/>
 <clipPath id="clip-I-1"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
 <rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(110.5 66)" fill="url(#fill-carrier-0)" clip-path="url(#clip-I-1)"/>
-<line class="divider" x1="106" y1="48" x2="106" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="106" y1="66" x2="106" y2="48" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="106" y1="66" x2="106" y2="84" stroke="#000000" stroke-width="1"/>
 <circle class="symbol" cx="106" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="106" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
 <rect class="hit" x="88" y="48" width="36" height="53" fill="none" pointer-events="all"/>
@@ -19,7 +20,8 @@
 <circle class="backing" cx="190" cy="66" r="18" fill="#ffffff"/>
 <clipPath id="clip-I-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
 <rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(194.5 66)" fill="url(#fill-carrier-0)" clip-path="url(#clip-I-2)"/>
-<line class="divider" x1="190" y1="48" x2="190" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="190" y1="66" x2="190" y2="48" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="190" y1="66" x2="190" y2="84" stroke="#000000" stroke-width="1"/>
 <circle class="symbol" cx="190" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="172" y="48" width="36" height="53" fill="none" pointer-events="all"/>

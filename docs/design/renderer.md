@@ -75,21 +75,21 @@ group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its 
 `count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
 centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
 for a circle, 0.5 for a diamond), white when the whole shape is a dark affected tone (index 0 or 1, below) and black
-otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, a divider or a lone carrier
-section's inner edge, the presymptomatic line, the deceased slash — it moves beside the symbol's upper right at
-`0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side, clear of the arrow (lower left) and the
-labels (below); the x-solve spaces the next cell so the count clears both its label and its symbol. Either way it has a
-3 px halo in the contrasting colour, so it reads over any fill. A ghost draws the same fills as its real cell and places
-its count as the real cell does. Connectors: **mating line** (horizontal between partners; doubled for consanguinity —
-the double line is emitted iff `spouse==2`, which is set only from the explicit `Mating.consanguineous` flag, for every
-adjacent couple including founders), **descent/sibship line** (vertical drop from the mating midpoint → horizontal sib
-bar → per-child stubs; a drop the order leaves beside its children, as in a crossing or a cousin standing beside its
-mate, turns at its own elbow track above the bars with rounded corners and lands on its bar's near end, and elbows
-sharing a row gap stagger, a drop standing over another's landing leg turning higher), a **founder sibship**'s implied
-hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point instead
-of a descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a
-couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
-`CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
+otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, a filled section's border,
+the presymptomatic line, the deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the
+slash's tip, above a mating line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve
+spaces the next cell so the count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting
+colour, so it reads over any fill. A ghost draws the same fills as its real cell and places its count as the real cell
+does. Connectors: **mating line** (horizontal between partners; doubled for consanguinity — the double line is emitted
+iff `spouse==2`, which is set only from the explicit `Mating.consanguineous` flag, for every adjacent couple including
+founders), **descent/sibship line** (vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a
+drop the order leaves beside its children, as in a crossing or a cousin standing beside its mate, turns at its own elbow
+track above the bars with rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop
+standing over another's landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no
+parent cell, so the sib bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins**
+(child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a
+stub from the mating midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars
+for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line).
@@ -106,17 +106,20 @@ The drawing follows the NSGC 2022 revision (Bennett et al., §4.5 and Figure 2),
    requires is a unique fill per section, defined in the key.
 1. **Every fill is defined in the key** (Box 1 item 3). The standard never ties a fill to a mode of inheritance.
 
-Figure 2 divides only a symbol that shows more than one condition; it does not forbid more. grus divides **every**
-symbol of a pedigree whose legend has two or more conditions (below), because the sections are then a fixed frame: a
-condition sits in the same place on every symbol, filled or not, and a reader sees which conditions a symbol does *not*
-show. A pedigree with one condition, the common case, stays undivided, as the standard draws it.
+A symbol draws lines only around what it fills (below). Drawing every section's lines on every symbol would make the
+fixed frame explicit, but a four- or six-spoke star on every empty symbol is noise, and a crossed square resembles
+another symbol. An unfilled symbol is its outline alone, as the standard draws it.
 
-**Condition index.** A condition's index is its place in the pedigree's condition legend: distinct names, phenotype
-labels first, then by first appearance in `Position` order, with an unnamed condition (the figure's sole, unlabelled
-one) taking the last index. The index picks both the condition's fills and its section, pedigree-wide, so a condition
-looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index whether or
-not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts towards the
-section count and the six-condition limit — so the drawing of one individual never depends on another's status.
+**Condition index.** A condition's index is its place in the pedigree's condition legend. Index 0, which draws in the
+most distinct fill (black), goes to the **primary** condition: the proband's affected condition when a proband is
+affected with a named one, else the condition with the most affected individuals. The rest follow in the base order —
+phenotype labels first, then by first appearance in `Position` order — which also breaks ties; an unnamed condition (the
+figure's sole, unlabelled one) takes the last index. The primary is the one a reader looks for first, so it gets the
+fill that survives every size and printer. The index picks both the condition's fills and its section, pedigree-wide, so
+a condition looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index
+whether or not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts
+towards the section count and the six-condition limit — so the drawing of one individual never depends on another's
+status.
 
 **Fills: the tone says the condition, the texture the status.**
 
@@ -168,17 +171,17 @@ and 8, 6 and 4 o'clock (3-5, the bottom row) — the reading order of halves and
 wedges divide the square and the diamond, cut off by their outlines, so a condition points the same way on every shape:
 a 2×3 grid on the square would put index 1 in a different place on a square than on a circle, and a grid does not fit a
 diamond at all. On the square the top and bottom wedges are narrower than the corner ones (about 190 against 230 square
-pixels), on the diamond a little wider (120 against 100); neither is small enough to lose its fill. The dividers run
-through 1-7, 3-9 and 5-11 o'clock: none is vertical, so the presymptomatic line, which is vertical, never lies on one.
-In sixths every fill keeps its section, even a single affected condition (which elsewhere fills the whole shape),
-because there the position is what identifies it.
+pixels), on the diamond a little wider (120 against 100); neither is small enough to lose its fill. The wedges' edges
+run along 1, 3, 5, 7, 9 and 11 o'clock: none is vertical, so the presymptomatic line, which is vertical, never lies on
+one. In sixths every fill keeps its section, even a single affected condition (which elsewhere fills the whole shape),
+because position identifies it there; in colour mode (below) the colour does too.
 
-The divider lines through the centre are drawn on every symbol, filled or not, at half the outline's stroke width, so
-they read as the frame and not as a mark. A section is a rectangle clipped to the shape by a per-symbol `clipPath`, so
-one code path covers □ ○ ◇. Every filled section has a visible edge: where it meets the outline that is the outline, and
-where it meets another section, a divider. In a pedigree with one condition, which has no dividers, a lone carrier's
-half gets that one thin line down the centre as its inner edge; nothing is stroked twice. A key swatch has the same thin
-outline.
+A section is a rectangle (in sixths a wedge) clipped to the shape by a per-symbol `clipPath`, so one code path covers □
+○ ◇. Every filled section has a visible edge, and only filled sections do. Where it meets the outline its edge is the
+outline; inside the symbol it gets a **border**, a line from the centre along each boundary it shares with the rest of
+the symbol or with another filled section, at half the outline's stroke width. A boundary between two empty sections has
+no line, a wholly filled symbol none, and no border is stroked twice. A lone carrier's half thus has the thin line down
+the centre; a carrier's single quadrant, its two radii.
 
 **What a symbol shows.**
 
@@ -190,19 +193,28 @@ outline.
   and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
   individual (same-named entries) draws as affected.
 - The **presymptomatic** line is drawn at the outline's full stroke width and runs one stroke width past the outline at
-  top and bottom, everywhere, so in a divided pedigree it never reads as the thinner vertical divider it lies on.
-- Unknown (`?`), deceased and proband marks are unchanged, drawn over the fills; in a divided pedigree the `?` has a
-  white halo so it reads over the dividers.
+  top and bottom, everywhere, so it never reads as the thinner vertical border of a filled half it lies on.
+- Unknown (`?`), deceased and proband marks are unchanged, drawn over the fills; on a symbol with borders the `?` has a
+  white halo so it reads over them.
 
 **Carrier style.** `Geometry.carrier_style` is a render option, not IR meaning; both styles read the same `Condition`
 entries. `CarrierStyle.PARTITION_FILL`, the default, is the standard as above. `CarrierStyle.INHERITANCE_GLYPH` draws
 figures the way the pre-2022 literature does: on a symbol with no affected condition, an X-linked carrier is a central
 dot, edged white so it reads over a tone; every other carrier is a section as above.
 
+**Colour mode.** `Geometry.palette` (the `render --colour` flag) is a render option like the carrier style.
+`Palette.GREYSCALE`, the default, is the table above and survives any printer. `Palette.COLOUR` paints the condition
+tones black (the primary condition) and then orange, blue, bluish green, vermillion and reddish purple from the
+Okabe-Ito palette, chosen to stay distinct under the common colour-vision deficiencies; its yellow is left out as too
+light against white. A carrier is still the tone with a diagonal hatch in white or black, whichever contrasts more with
+it, alternating direction by index. Only the tones change — the same patterns, ids, sections and hatch geometry — so
+colour mode meets the same edge rules, and a consumer can still restyle each tone. In colour, a condition's identity is
+carried by its colour as well as its position, which is what greys cannot do for six conditions or for a light wedge.
+
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
 status) drawn, ordered by index with affected first: a swatch and a label. In a divided pedigree the swatch is a small
-square symbol (three quarters of the symbol size) with the pedigree's dividers, filled in that entry's section only, so
+square symbol (three quarters of the symbol size) filled in that entry's section only, with that section's borders, so
 the key shows where a condition sits as well as its fill; this applies to halves and quadrants as to sixths, so a
 divided pedigree's key always reads the same way. An undivided pedigree has no positions to show, and its swatch is a
 plain square the size of a quadrant filled all over. Then the label — the condition's name when affected,
@@ -257,11 +269,12 @@ Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, 
 
 A figure is a *set* of pedigrees (`ir.md`), so `render_set_svg(PedigreeSet)` composes one SVG from the per-pedigree
 `render_svg`: each pedigree is laid out and drawn unchanged, then the tiles are stacked vertically and titled by their
-`Pedigree.title`, each wrapped in a nested `<svg viewBox>` that carries its own coordinate system — so drawing stays
-byte-identical and single-pedigree goldens are untouched. A pedigree the layout **defers** (an interlocking loop, a
-child of two matings, a routed mating — see Deferred) degrades to a labelled dashed placeholder so the rest of the
-figure still renders rather than the whole figure failing; an empty set is a minimal canvas. v1 stacks vertically; a
-grid for many-family figures is a later refinement (slice 13).
+display title (the family label, else the first panel or other label; a phenotype or gene label names a condition or
+gene, never the pedigree, so a pedigree with only those has no title), each wrapped in a nested `<svg viewBox>` that
+carries its own coordinate system — so drawing stays byte-identical and single-pedigree goldens are untouched. A
+pedigree the layout **defers** (an interlocking loop, a child of two matings, a routed mating — see Deferred) degrades
+to a labelled dashed placeholder so the rest of the figure still renders rather than the whole figure failing; an empty
+set is a minimal canvas. v1 stacks vertically; a grid for many-family figures is a later refinement (slice 13).
 
 ## Deferred
 

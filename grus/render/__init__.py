@@ -15,7 +15,7 @@ the pedigree, the layout's geometry or the layout algorithm changed since (docs/
 from __future__ import annotations
 
 from grus.render._draw import render_set_svg, render_svg, render_svgs
-from grus.render._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry
+from grus.render._geometry import DEFAULT_GEOMETRY, CarrierStyle, Geometry, Palette
 from grus.render._layout import DeferredFeatureError, Layout, TwinGroup
 from grus.render._layout2 import layout
 from grus.render._ordering import Ordering, order
@@ -31,6 +31,7 @@ __all__ = [
     "Geometry",
     "Layout",
     "Ordering",
+    "Palette",
     "StaleLayoutError",
     "TwinGroup",
     "XSolver",

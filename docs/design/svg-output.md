@@ -92,9 +92,9 @@ not depend on styling:
    Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
    named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
    status paint.
-1. **`divider`** — the thin lines through the centre that separate sections (halves, quadrants or sixths): on every
-   symbol of a pedigree with two or more conditions, and otherwise as the inner edge of a lone filled section. Under the
-   outline, so the outline stays whole.
+1. **`divider`** — the borders of filled sections inside the symbol: thin lines from the centre along each section
+   boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline, so the
+   outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
    drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
    consumer colours the stroke.
@@ -116,9 +116,9 @@ The groups, and what each promises:
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
   legend**: the same order the drawer uses to pick each condition's fills and its section of a divided symbol
-  (`renderer.md`, Clinical status), so index *i* in the array is the condition `data-condition-i` names on every
-  individual below it. When any individual has an unnamed condition (the figure's sole, unlabelled one) the array ends
-  with an empty string, so every condition has an index.
+  (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
+  condition `data-condition-i` names on every individual below it. When any individual has an unnamed condition (the
+  figure's sole, unlabelled one) the array ends with an empty string, so every condition has an index.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
@@ -142,8 +142,8 @@ The groups, and what each promises:
   Each entry is its own `key-entry` group with id `key-{status}-{index}` (`key-carrier-dot-{index}`, class
   `key-entry dot`, for the X-linked dot of the inheritance-glyph style) naming its condition index and status as data
   attributes, holding a swatch painted with the same pattern the symbols use and a text label. In a divided pedigree the
-  swatch is a small symbol: a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, the pedigree's
-  `divider` lines and a `swatch-outline`. A consumer relocates the key with a transform on the one group, restyles or
+  swatch is a small symbol: a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, that section's
+  `divider` borders and a `swatch-outline`. A consumer relocates the key with a transform on the one group, restyles or
   hides an entry by id, or drops the key and builds its own from the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
@@ -169,11 +169,12 @@ highlights everyone with the first condition needs one rule and no renderer supp
 .individual:not([data-condition-0]) { opacity: 0.3; }
 ```
 
-Fills restyle through their patterns. A pattern's content is ordinary elements with presentation attributes, so
-`#fill-carrier-0 .tone { fill: #1f77b4; }` recolours that carrier fill's tone on every symbol and in the key at once
-(`#fill-affected-0 .tone` its affected twin, `#fill-carrier-0 .hatch { stroke: … }` the lines); a consumer can also
-replace the pattern element, or point a `fill` part at a paint server of its own. Keeping each fill a named paint rather
-than inline colour is what makes one rule enough.
+Fills restyle through their patterns (colour mode, `renderer.md`, is exactly such a restyle, done by the renderer). A
+pattern's content is ordinary elements with presentation attributes, so `#fill-carrier-0 .tone { fill: #1f77b4; }`
+recolours that carrier fill's tone on every symbol and in the key at once (`#fill-affected-0 .tone` its affected twin,
+`#fill-carrier-0 .hatch { stroke: … }` the lines); a consumer can also replace the pattern element, or point a `fill`
+part at a paint server of its own. Keeping each fill a named paint rather than inline colour is what makes one rule
+enough.
 
 The renderer therefore commits to three things and no more: it keeps setting appearance through presentation attributes,
 never `style`; it keeps the part classes (`backing`, `fill`, `divider`, `symbol`, `mark`, `label`, `hit`) stable; and it

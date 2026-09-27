@@ -118,3 +118,18 @@ def test_title_is_xml_escaped() -> None:
     svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("A & B <x>")]))
     assert "A &amp; B &lt;x&gt;" in svg
     assert "A & B <x>" not in svg  # the raw ampersand / angle brackets never leak into the SVG
+
+
+def test_title_comes_from_family_panel_or_other_labels_only() -> None:
+    # A phenotype or gene label names a condition or a gene, never the pedigree (review-set c03 was titled
+    # "Bone Cancer"): with no family, panel or other label there is no title.
+    p = _trio("")
+    del p.labels[:]
+    p.labels.add(text="Bone Cancer", kind=pb.LABEL_KIND_PHENOTYPE)
+    p.labels.add(text="DRP2", kind=pb.LABEL_KIND_GENE)
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == ""
+    assert "Bone Cancer</text>" not in render.render_set_svg(pb.PedigreeSet(pedigrees=[p]))
+    p.labels.add(text="Figure 2B", kind=pb.LABEL_KIND_PANEL)
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == "Figure 2B"
+    p.labels.add(text="Family 3", kind=pb.LABEL_KIND_FAMILY)
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == "Family 3"

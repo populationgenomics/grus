@@ -562,35 +562,42 @@ def test_carrier_is_the_affected_tone_with_a_contrasting_hatch() -> None:
         assert affected.find(f"{_SVG}path") is None
 
 
+def _vertical(line: ET.Element) -> bool:
+    return line.get("x1") == line.get("x2")
+
+
 def test_one_condition_draws_only_a_filled_sections_inner_edge() -> None:
-    # In a single-condition pedigree nothing is divided, but a lone carrier's half has a visible edge inside the
-    # symbol: the one thin line down the centre. The rest of its boundary is the outline, drawn once.
+    # A lone carrier's half has a visible edge inside the symbol: the thin centre line, as the two rays that bound
+    # its section. The rest of its boundary is the outline, drawn once; a wholly filled or empty symbol has none.
     p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _CAR)), _person(3)])
     affected, carrier, plain = _groups(_parse(render.render_svg(p)), "individual")
     (whole,) = _fills(affected)
     assert whole.tag == f"{_SVG}rect" and whole.get("clip-path") is None and whole.get("width") == "36"
     assert not _dividers(affected) and not _dividers(plain)
-    (edge,) = _dividers(carrier)
-    assert edge.get("x1") == edge.get("x2") and edge.get("stroke-width") == "1"
+    edges = _dividers(carrier)
+    assert len(edges) == 2 and all(_vertical(e) and e.get("stroke-width") == "1" for e in edges)
 
 
-def test_two_conditions_divide_every_symbol_in_halves_filled_or_not() -> None:
-    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3)])
-    groups = _groups(_parse(render.render_svg(p)), "individual")
-    for g in groups:
-        (divider,) = _dividers(g)
-        assert divider.get("x1") == divider.get("x2"), "halves: one vertical divider"
-        assert divider.get("stroke-width") == "1", "half the outline's width"
-    assert [f.get("width") for f in _fills(groups[0])] == ["36"], "one affected condition still fills the shape"
+def test_two_conditions_border_only_filled_halves() -> None:
+    # Only a filled region is bordered: no lines in an empty symbol, none inside a wholly filled one.
+    p = pb.Pedigree(
+        individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3), _person(4, ("A", _AFF), ("B", _CAR))]
+    )
+    whole, carrier, plain, both = _groups(_parse(render.render_svg(p)), "individual")
+    assert [f.get("width") for f in _fills(whole)] == ["36"] and not _dividers(whole)
+    assert not _dividers(plain)
+    for g in (carrier, both):
+        edges = _dividers(g)
+        assert len(edges) == 2 and all(_vertical(e) and e.get("stroke-width") == "1" for e in edges)
 
 
 def test_three_or_four_conditions_divide_into_quadrants() -> None:
     legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
     p = pb.Pedigree(labels=legend, individuals=[_person(1, ("A", _AFF), ("C", _CAR)), _person(2, ("B", _AFF))])
-    groups = _groups(_parse(render.render_svg(p)), "individual")
-    assert all(len(_dividers(g)) == 2 for g in groups), "quadrants on every symbol"
-    g = groups[0]
-    a, c = _fills(g)
+    two, one = _groups(_parse(render.render_svg(p)), "individual")
+    # Top-left and bottom-left filled: the rays at 12, 6 and 9 o'clock bound them; the one at 3 o'clock does not.
+    assert len(_dividers(two)) == 3 and not _dividers(one)
+    a, c = _fills(two)
     assert a.get("width") == c.get("width") == "18" and a.get("height") == "18"
     assert float(c.get("y", "0")) > float(a.get("y", "0")), "index 2 is the bottom-left quadrant"
 
@@ -685,18 +692,20 @@ def test_set_render_keys_each_tile() -> None:
     assert len(ids) == len(set(ids)) and all(ref in ids for ref in re.findall(r"url\(#([^)]+)\)", svg))
 
 
-def test_a_count_moves_beside_every_symbol_of_a_divided_pedigree() -> None:
-    # The dividers cross every symbol's centre, where the count would sit, so the count moves outside.
-    def counted(*conditions: tuple[str, int]) -> list[list[str]]:
+def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
+    # A border crosses the centre, where the count would sit, so the count moves outside; a symbol without one keeps
+    # its count inside, in any pedigree.
+    def count_classes(*conditions: tuple[str, int]) -> list[str]:
         ind = _person(1, *conditions)
         ind.count = 3
-        (g,) = _groups(
-            _parse(render.render_svg(pb.Pedigree(individuals=[ind, _person(2, ("A", _AFF), ("B", _CAR))]))),
-            "individual",
-        )[:1]
-        return [_classes(c) for c in g if "count" in _classes(c)]
+        other = _person(2, ("A", _AFF), ("B", _CAR))
+        (g, _) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind, other]))), "individual")
+        (count,) = [c for c in g if "count" in _classes(c)]
+        return _classes(count)
 
-    assert counted() == [["mark", "count", "outside"]]
+    assert count_classes() == ["mark", "count"]
+    assert count_classes(("A", _AFF)) == ["mark", "count"], "wholly filled: no border"
+    assert count_classes(("B", _CAR)) == ["mark", "count", "outside"]
     one = _person(1, ("A", _AFF))
     one.count = 3
     (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[one]))), "individual")
@@ -705,14 +714,15 @@ def test_a_count_moves_beside_every_symbol_of_a_divided_pedigree() -> None:
 
 
 def test_presymptomatic_line_is_outline_weight_and_overruns_the_symbol() -> None:
-    # In a divided pedigree the vertical divider and the presymptomatic line share a place; weight and overrun tell
-    # them apart.
-    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC))
-    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind, _person(2, ("B", _AFF))]))), "individual")[:1]
+    # A filled half's inner border and the presymptomatic line share a place; weight and overrun tell them apart.
+    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
+    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind]))), "individual")
     (line,) = [c for c in g if "presymptomatic" in _classes(c)]
-    (divider,) = _dividers(g)
+    borders = _dividers(g)
     symbol = next(c for c in g if "symbol" in _classes(c))
-    assert float(line.get("stroke-width", "0")) == 2 * float(divider.get("stroke-width", "0"))
+    assert borders and all(
+        float(line.get("stroke-width", "0")) == 2 * float(b.get("stroke-width", "0")) for b in borders
+    )
     top, bottom = float(symbol.get("y", "0")), float(symbol.get("y", "0")) + float(symbol.get("height", "0"))
     assert float(line.get("y1", "0")) == top - 2 and float(line.get("y2", "0")) == bottom + 2
 
@@ -884,16 +894,17 @@ def _sixths(*people: pb.Individual, names: str = "ABCDEF") -> pb.Pedigree:
 
 
 @pytest.mark.parametrize("names", ["ABCDE", "ABCDEF"])
-def test_five_or_six_conditions_divide_every_symbol_into_six_wedges(names: str) -> None:
+def test_five_or_six_conditions_border_filled_wedges_only(names: str) -> None:
     genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
-    root = _parse(render.render_svg(_sixths(*(_person(i + 1, gender=g) for i, g in enumerate(genders)), names=names)))
-    for g in _groups(root, "individual"):
-        dividers = _dividers(g)
-        assert len(dividers) == 3, "three lines through the centre: six wedges"
-        assert all(d.get("x1") != d.get("x2") for d in dividers), (
-            "none vertical, so none lies on the presymptomatic line"
-        )
-        assert all(d.get("stroke-width") == "1" for d in dividers), "half the outline's width"
+    every = [(n, _CAR) for n in names]
+    people = [_person(i + 1, *every, gender=g) for i, g in enumerate(genders)] + [_person(9)]
+    *filled, plain = _groups(_parse(render.render_svg(_sixths(*people, names=names))), "individual")
+    assert not _dividers(plain), "an empty symbol is its outline alone"
+    for g in filled:
+        rays = _dividers(g)
+        assert len(rays) == 6, "every boundary bounds a filled wedge"
+        assert not any(_vertical(r) for r in rays), "none vertical, so none lies on the presymptomatic line"
+        assert all(r.get("stroke-width") == "1" for r in rays), "half the outline's width"
 
 
 @pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
@@ -912,23 +923,24 @@ def test_a_sixth_is_a_wedge_toward_its_clock_position(gender: pb.Gender) -> None
         assert abs(angle - clock * 30 % 360) < 1e-2, "3-decimal coordinates"
 
 
-def test_a_presymptomatic_line_reads_over_sixth_dividers() -> None:
-    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC))
+def test_a_presymptomatic_line_reads_over_sixth_borders() -> None:
+    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
     (g, *_) = _groups(_parse(render.render_svg(_sixths(ind, _person(2, ("E", _AFF))))), "individual")
     (line,) = [c for c in g if "presymptomatic" in _classes(c)]
-    assert line.get("x1") == line.get("x2") and line.get("stroke-width") == "2"
-    assert all(d.get("x1") != d.get("x2") for d in _dividers(g))
+    assert _vertical(line) and line.get("stroke-width") == "2"
+    assert _dividers(g) and not any(_vertical(d) for d in _dividers(g))
 
 
 def test_a_divided_pedigrees_key_shows_each_entrys_section() -> None:
-    # The key draws a small divided square per entry, filled in that entry's section only, so it shows where a
-    # condition sits as well as its fill; an undivided pedigree keeps plain swatches.
+    # The key draws a small square per entry, filled in that entry's section only and bordered by that section's
+    # two boundaries, so it shows where a condition sits as well as its fill; an undivided pedigree keeps plain
+    # swatches.
     root = _parse(render.render_svg(_sixths(_person(1, ("C", _CAR)), _person(2, ("E", _AFF)))))
     (key,) = _groups(root, "key")
     for e in _groups(key, "key-entry"):
         (swatch,) = [c for c in e if "swatch" in _classes(c)]
         assert swatch.tag == f"{_SVG}polygon" and swatch.get("clip-path")
-        assert len(_dividers(e)) == 3 and [c for c in e if "swatch-outline" in _classes(c)]
+        assert len(_dividers(e)) == 2 and [c for c in e if "swatch-outline" in _classes(c)]
     undivided = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _CAR))])))
     (key,) = _groups(undivided, "key")
     assert not any(_dividers(e) for e in _groups(key, "key-entry"))
@@ -944,3 +956,71 @@ def test_conditions_4_and_5_have_their_own_tones_and_hatches() -> None:
         assert carrier.find(f"{_SVG}rect").get("fill") == tones[i]  # type: ignore[union-attr]
         (x1, y1), (x2, y2) = _segments_of(carrier.find(f"{_SVG}path").get("d", ""))[0]  # type: ignore[union-attr]
         assert ((x2 - x1) * (y2 - y1) < 0) == (i % 2 == 0), "/ for even indices, \\ for odd"
+
+
+# --- the primary condition takes index 0 ----------------------------------------------------------------------------
+
+
+def _legend(p: pb.Pedigree) -> list[str]:
+    return json.loads(_parse(render.render_svg(p)).get("data-conditions", "null"))
+
+
+def test_the_probands_affected_condition_takes_index_0() -> None:
+    proband = _person(3, ("C", _AFF))
+    proband.proband = True
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
+    p = pb.Pedigree(labels=labels, individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _AFF)), proband])
+    assert _legend(p) == ["C", "A", "B"], "the proband's condition first, even when another has more affected"
+
+
+def test_else_the_most_affected_condition_takes_index_0() -> None:
+    # Review-set c03: the proband is unaffected, and Polyneuropathy has the most affected individuals.
+    proband = _person(4)
+    proband.proband = True
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in ("Bone Cancer", "Polyneuropathy", "Polio")]
+    people = [
+        _person(1, ("Bone Cancer", _AFF)),
+        _person(2, ("Polyneuropathy", _AFF)),
+        _person(3, ("Polyneuropathy", _AFF)),
+    ]
+    p = pb.Pedigree(labels=labels, individuals=[*people, proband, _person(5, ("Polio", _CAR))])
+    assert _legend(p) == ["Polyneuropathy", "Bone Cancer", "Polio"]
+
+
+def test_a_tie_or_no_affected_keeps_the_base_order() -> None:
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
+    tied = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _AFF)), _person(2, ("B", _AFF))])
+    assert _legend(tied) == ["B", "A", "C"], "B and C tie; B comes first in the base order"
+    carriers = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _CAR))])
+    assert _legend(carriers) == ["A", "B", "C"]
+
+
+# --- colour mode ----------------------------------------------------------------------------------------------------
+
+_COLOUR = dataclasses.replace(render.DEFAULT_GEOMETRY, palette=render.Palette.COLOUR)
+
+
+def test_colour_mode_changes_only_the_tones() -> None:
+    # The same patterns, ids, sections and hatches; only each pattern's tone (and so its contrasting hatch) changes.
+    people = [_person(i + 1, (n, s)) for i, (n, s) in enumerate((n, s) for n in "ABCDEF" for s in (_AFF, _CAR))]
+    grey, colour = (_parse(render.render_svg(_sixths(*people), g)) for g in (render.DEFAULT_GEOMETRY, _COLOUR))
+    assert sorted(_patterns(grey)) == sorted(_patterns(colour))
+    tones = [_patterns(colour)[f"fill-affected-{i}"].find(f"{_SVG}rect").get("fill") for i in range(6)]  # type: ignore[union-attr]
+    assert tones[0] == "#000000" and len(set(tones)) == 6, "black for the primary condition, then six colours"
+    assert all(t.lower() != "#f0e442" for t in tones if t), "no Okabe-Ito yellow: too light on white"
+    for i in range(6):
+        carrier = _patterns(colour)[f"fill-carrier-{i}"]
+        assert carrier.find(f"{_SVG}rect").get("fill") == tones[i]  # type: ignore[union-attr]
+        hatch = carrier.find(f"{_SVG}path")
+        assert hatch is not None and hatch.get("stroke") in ("#ffffff", "#000000")
+    strip = re.compile(r'fill="#[0-9a-f]{6}"|stroke="#[0-9a-f]{6}"')
+    assert strip.sub("", render.render_svg(_sixths(*people))) == strip.sub(
+        "", render.render_svg(_sixths(*people), _COLOUR)
+    ), "nothing but paint differs"
+
+
+@pytest.mark.parametrize("name", ["six_conditions", "condition_fills", "compound_carrier"])
+def test_colour_mode_keeps_the_hatch_clear_of_edges(name: str) -> None:
+    p = ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
+    gaps = _hatch_gaps(render.render_svg(p, _COLOUR))
+    assert gaps and all(gap >= 2.0 - 1e-6 for _, gap in gaps)

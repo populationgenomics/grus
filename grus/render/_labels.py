@@ -103,10 +103,12 @@ class CountMark:
 def condition_legend(p: pb.Pedigree) -> list[str]:
     """Ordered distinct condition names in the pedigree — the index that keys each condition's fills and section.
 
-    Phenotype legend labels come first (their drawn order), then any remaining condition names by first
-    appearance, walking individuals in ``Position`` order (never input order, so the legend and every fill are
-    independent of how the IR lists its individuals). A condition's index selects its fills and its section,
-    consistently pedigree-wide, so two conditions never share a section or a fill.
+    The **primary** condition comes first, so it draws in the most distinct fill: the proband's affected condition
+    when a proband is affected with a named one, else the condition with the most affected individuals. After it,
+    and breaking ties, the base order: phenotype legend labels (their drawn order), then any remaining condition
+    names by first appearance, walking individuals in ``Position`` order (never input order, so the legend and every
+    fill are independent of how the IR lists its individuals). A condition's index selects its fills and its
+    section, consistently pedigree-wide, so two conditions never share a section or a fill.
     """
     order: list[str] = []
     seen: set[str] = set()
@@ -114,12 +116,28 @@ def condition_legend(p: pb.Pedigree) -> list[str]:
         if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text and label.text not in seen:
             seen.add(label.text)
             order.append(label.text)
-    for ind in sorted(p.individuals, key=lambda ind: (ind.generation, ind.index)):
+    people = sorted(p.individuals, key=lambda ind: (ind.generation, ind.index))
+    for ind in people:
         for c in ind.conditions:
             if c.name and c.name not in seen:
                 seen.add(c.name)
                 order.append(c.name)
-    return order
+    primary = _primary_condition(people, order)
+    return order if primary is None else [primary, *(name for name in order if name != primary)]
+
+
+def _primary_condition(people: list[pb.Individual], order: list[str]) -> str | None:
+    """The condition drawn first: a proband's affected one, else the most affected; ties go to ``order``."""
+
+    def affected(ind: pb.Individual) -> set[str]:
+        return {c.name for c in ind.conditions if c.name and c.status == pb.CONDITION_STATUS_AFFECTED}
+
+    for ind in people:
+        if ind.proband and (named := affected(ind)):
+            return min(named, key=order.index)
+    counts = {name: sum(name in affected(ind) for ind in people) for name in order}
+    best = max(counts.values(), default=0)
+    return next(name for name in order if counts[name] == best) if best else None
 
 
 def data_legend(p: pb.Pedigree) -> list[str]:
@@ -128,36 +146,35 @@ def data_legend(p: pb.Pedigree) -> list[str]:
     return [*condition_legend(p), *([""] if unnamed else [])]
 
 
-def divided(p: pb.Pedigree) -> bool:
-    """Whether every symbol of ``p`` is divided: its legend has two or more entries (docs/design/renderer.md).
+def sixths(p: pb.Pedigree) -> bool:
+    """Whether ``p`` is drawn in sixths (five or six conditions), where a lone affected condition keeps its wedge."""
+    return len(data_legend(p)) > 4
 
-    Dividers cross each symbol's centre, so a count inside would overprint them; the count moves beside the symbol.
+
+def has_borders(ind: pb.Individual, geom: _geometry.Geometry, *, sixths: bool) -> bool:
+    """Whether ``ind``'s symbol draws a filled section's border through its centre.
+
+    A symbol with any section fill does: a carrier, several conditions, or in ``sixths`` any affected condition. A
+    symbol wholly in one affected fill, or with none, is its outline alone; the X-linked dot is no section.
     """
-    return len(data_legend(p)) >= 2
+    affected = {c.name for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED}
+    carriers = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_CARRIER and c.name not in affected]
+    carried = len({c.name for c in carriers})
+    if (
+        geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
+        and not affected
+        and any(c.inheritance in _X_LINKED for c in carriers)
+    ):
+        carried -= 1  # one carried condition is the dot, not a section
+    filled = len(affected) + carried
+    return filled > 1 or (filled == 1 and (carried == 1 or sixths))
 
 
-def draws_centre_line(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
-    """Whether ``ind``'s symbol has a section line through its centre.
-
-    Always in a ``divided`` pedigree; otherwise the edge of a lone carrier's section (a single-condition pedigree's
-    carrier, unless its condition is the X-linked dot).
-    """
-    if divided:
-        return True
-    statuses = {c.status for c in ind.conditions}
-    if pb.CONDITION_STATUS_CARRIER not in statuses or pb.CONDITION_STATUS_AFFECTED in statuses:
-        return False
-    x_linked_dot = geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and any(
-        c.status == pb.CONDITION_STATUS_CARRIER and c.inheritance in _X_LINKED for c in ind.conditions
-    )
-    return not x_linked_dot
-
-
-def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
+def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, sixths: bool) -> bool:
     """Whether drawing puts a mark through the symbol's centre, where the count would go.
 
-    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), a section line
-    (``draws_centre_line``), the presymptomatic line and the deceased slash — the same conditions under which
+    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), a filled section's
+    border (``has_borders``), the presymptomatic line and the deceased slash — the same conditions under which
     ``_draw`` emits them.
     """
     statuses = {c.status for c in ind.conditions}
@@ -172,11 +189,11 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bo
         or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
         or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
         or x_linked_dot
-        or draws_centre_line(ind, geom, divided=divided)
+        or has_borders(ind, geom, sixths=sixths)
     )
 
 
-def count_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> CountMark | None:
+def count_mark(ind: pb.Individual, geom: _geometry.Geometry, *, sixths: bool) -> CountMark | None:
     """The count's placement: inside the symbol, shrunk to fit, unless a centre mark is there; None for one person.
 
     The count never overprints another mark: with one through the centre (``has_centre_mark``) it moves beside the
@@ -186,28 +203,28 @@ def count_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -
     text = count_text(ind)
     if text is None:
         return None
-    if has_centre_mark(ind, geom, divided=divided):
+    if has_centre_mark(ind, geom, sixths=sixths):
         return CountMark(text, COUNT_OUTSIDE_SCALE * geom.symbol_size, inside=False)
     fit = _COUNT_FIT.get(ind.gender, _COUNT_FIT_DIAMOND) * geom.symbol_size
     return CountMark(text, min(COUNT_SCALE * geom.symbol_size, fit / (0.6 * len(text))), inside=True)
 
 
-def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int, divided: bool) -> tuple[float, float]:
+def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int, sixths: bool) -> tuple[float, float]:
     """How far ``ind``'s drawing reaches left and right of its symbol's centre, in pixels: labels and count.
 
     ``side`` is ``Layout.label_side``: 0 for a stack centred under its symbol; for a symbol whose descent drops from
     its own centre (a count-collapsed or sideless lone parent), which would run through a centred stack, 1 for a
     stack aligned ``label_gap`` right of the line and -1 for one ``label_gap`` left of it. A count placed outside
-    the symbol reaches right (``outside_count_reach``); ``divided`` is ``divided(pedigree)``.
+    the symbol reaches right (``outside_count_reach``); ``sixths`` is ``sixths(pedigree)``.
     """
     w = label_width(ind, geom)
     left, right = {0: (w / 2, w / 2), 1: (0.0, geom.label_gap + w), -1: (geom.label_gap + w, 0.0)}[side]
-    return left, max(right, outside_count_reach(ind, geom, divided=divided))
+    return left, max(right, outside_count_reach(ind, geom, sixths=sixths))
 
 
-def outside_count_reach(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> float:
+def outside_count_reach(ind: pb.Individual, geom: _geometry.Geometry, *, sixths: bool) -> float:
     """How far right of the symbol's centre a count placed beside the symbol reaches, in pixels; 0.0 if none."""
-    mark = count_mark(ind, geom, divided=divided)
+    mark = count_mark(ind, geom, sixths=sixths)
     if mark is None or mark.inside:
         return 0.0
     return geom.symbol_size / 2 + COUNT_OUTSIDE_DX + 0.6 * mark.size * len(mark.text)
