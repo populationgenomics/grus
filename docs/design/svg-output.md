@@ -8,14 +8,16 @@ drawing is organised in the document), [`ir.md`](ir.md) (the identities and fact
 The renderer's SVG gains structure without changing what it draws. Every individual, mating, sibship and generation
 marker becomes a group that names the IR fact it draws — the drawn position such as `II-3`, gender, clinical status per
 condition, deceased, proband — as an id, classes and data attributes. The pedigree itself carries its ordered condition
-legend. Nothing else changes: same geometry, same glyphs, no stylesheet and no script in the file.
+legend. Every status fill is a named pattern in the document's `defs`, and the drawn key defines each one. No stylesheet
+and no script in the file.
 
 That is enough for the interactive figures the output feeds. A legend built outside the SVG can find every individual
 who carries a condition and restyle them with one CSS rule, because the renderer sets appearance through presentation
-attributes, which any stylesheet rule overrides. Two things are deliberately not offered: the renderer does not draw the
-legend, and labels do not reflow. Label extents are an input to the layout, so a bigger font must move nodes; the
-substitute is a minimum label box — "every label fits in 20em by 3em" — that the spacing reserves whether or not the
-drawn labels need it, so a consumer can replace or enlarge label text within that box without collisions.
+attributes, which any stylesheet rule overrides, and it can recolour a fill everywhere, key included, by restyling one
+pattern. One thing is deliberately not offered: labels do not reflow. Label extents are an input to the layout, so a
+bigger font must move nodes; the substitute is a minimum label box — "every label fits in 20em by 3em" — that the
+spacing reserves whether or not the drawn labels need it, so a consumer can replace or enlarge label text within that
+box without collisions.
 
 ## Background
 
@@ -36,8 +38,6 @@ once and is reviewed as a rendering change (`CLAUDE.md`, Committing).
 
 - **No stylesheet or script in the output.** The renderer describes the drawing; the consumer owns its behaviour and
   theme. An embedded `<style>` would fight the consumer's stylesheet and would change the goldens with every theme.
-- **No drawn legend.** Where a legend sits, and whether it is a list, a key or a control, is the consumer's layout
-  decision; the round-trip judge does not need one; and a drawn legend would resize every canvas.
 - **No label reflow.** A label's estimated width and the tallest label stack set the column and row pitch
   (`renderer.md`, Spacing scales with the labels). Redrawing for a new font size without moving nodes would mean
   re-running the drawing step in the browser — a port of the drawer — for a result SVG text cannot deliver anyway, since
@@ -61,7 +61,9 @@ emitted markup has this shape (coordinates elided):
    data-index="3" data-gender="woman" data-condition-0="carrier">
   <circle class="backing" … fill="#ffffff"/>
   <clipPath id="clip-II-3"><circle …/></clipPath>
-  <rect class="fill" data-condition="0" … clip-path="url(#clip-II-3)"/>
+  <rect class="fill" data-condition="0" data-status="carrier" … fill="url(#fill-carrier-0)"
+        clip-path="url(#clip-II-3)"/>
+  <line class="divider" …/>
   <circle class="symbol" … fill="none" stroke="#000000"/>
   <line class="mark deceased" …/>
   <g class="mark proband"><line …/><line …/><line …/><text …>P</text></g>
@@ -84,10 +86,13 @@ not depend on styling:
 
 1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
    link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
-1. **`fill`** — status paint inside the shape: the full shape when affected, a legend-indexed region when a carrier, or
-   the central dot an X-linked carrier gets under the inheritance-glyph style. Status is always a `fill` part naming its
-   condition and never the backing's colour, so one selector reaches all status paint and the multi-condition quadrants
-   (`renderer.md`, not yet drawn) join the same scheme.
+1. **`fill`** — status paint inside the shape: the whole shape for an individual affected with one condition, else one
+   legend-indexed section per affected or carried condition, or the central dot an X-linked carrier gets under the
+   inheritance-glyph style (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status
+   (`data-status`) and paints with that pair's named pattern; status is never the backing's colour, so one selector
+   reaches all status paint.
+1. **`divider`** — on a divided symbol, the lines through the centre that separate its sections: under the outline, so
+   the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: today the
    region rectangle is drawn last and covers the inner half of the stroke on the filled side, which is invisible while
    both are black and visibly uneven the moment a consumer colours the stroke. Visually the two orders are identical at
@@ -109,10 +114,10 @@ The groups, and what each promises:
 
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
-  legend**: the same order the drawer uses to pick which region of a divided symbol a carrier fills (`renderer.md`,
-  Drawing), so index *i* in the array is the condition `data-condition-i` names on every individual below it. When any
-  individual has an unnamed condition (the figure's sole, unlabelled one) the array ends with an empty string, so every
-  condition has an index.
+  legend**: the same order the drawer uses to pick each condition's fills and its section of a divided symbol
+  (`renderer.md`, Clinical status), so index *i* in the array is the condition `data-condition-i` names on every
+  individual below it. When any individual has an unnamed condition (the figure's sole, unlabelled one) the array ends
+  with an empty string, so every condition has an index.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
@@ -132,6 +137,15 @@ The groups, and what each promises:
   line through every row between, so its parents and children can be several rows apart.
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
 - **`generation`** — each Roman-numeral marker, naming its row by IR generation.
+- **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
+  Each entry is its own `key-entry` group with id `key-{status}-{index}` naming its condition index and status as data
+  attributes, holding a swatch painted with the same pattern the symbols use and a text label. A consumer relocates the
+  key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its own from the
+  pedigree's condition array.
+
+The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
+with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
+attributes. Every fill part and every key swatch references its pattern by `fill="url(#…)"`; none repeats the paint.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's
@@ -148,9 +162,14 @@ highlights everyone with the first condition needs one rule and no renderer supp
 .individual:not([data-condition-0]) { opacity: 0.3; }
 ```
 
-The renderer therefore commits to two things and no more: it keeps setting appearance through presentation attributes,
-never `style`, and it keeps the part classes (`backing`, `fill`, `symbol`, `mark`, `label`, `hit`) stable. Hover,
-selection, dimming and theming all live in the consumer.
+Fills restyle through their patterns. A pattern's content is ordinary elements with presentation attributes, so
+`#fill-carrier-0 rect { fill: #1f77b4; }` recolours that hatch on every symbol and in the key at once; a consumer can
+also replace the pattern element, or point a `fill` part at a paint server of its own. Keeping each fill a named paint
+rather than inline colour is what makes one rule enough.
+
+The renderer therefore commits to three things and no more: it keeps setting appearance through presentation attributes,
+never `style`; it keeps the part classes (`backing`, `fill`, `divider`, `symbol`, `mark`, `label`, `hit`) stable; and it
+keeps the pattern and key ids stable. Hover, selection, dimming and theming all live in the consumer.
 
 ### Positions are unique per pedigree; ids are unique per page, so the caller names the namespace
 
@@ -164,12 +183,12 @@ against the first figure's clip geometry.
 
 Only the caller knows what else its page holds, so the namespace is a **render argument**: every function that produces
 a document (`render_svg`, `render_set_svg`, `render_svgs`) and the `render` command take an id prefix that goes in front
-of every id and every id reference in the output — individuals, ghosts, clip paths, and the tile prefix composed under
-it, so `#fig2-p1-ind-II-3` is figure 2, family 2, II-3. A prefix must be an id-safe token (it starts an XML id and sits
-inside a `url(#…)` reference), and the renderer refuses anything else rather than emit a document that is not
-well-formed. The default is empty, which leaves single-figure output and the goldens as they are. Data attributes and
-classes need no namespace: a consumer scopes them under the root or a `pedigree` group, and that is the selector to
-prefer inside one figure; the id is for reaching across figures and for the document's own references.
+of every id and every id reference in the output — individuals, ghosts, clip paths, fill patterns, the key, and the tile
+prefix composed under it, so `#fig2-p1-ind-II-3` is figure 2, family 2, II-3. A prefix must be an id-safe token (it
+starts an XML id and sits inside a `url(#…)` reference), and the renderer refuses anything else rather than emit a
+document that is not well-formed. The default is empty, which leaves single-figure output and the goldens as they are.
+Data attributes and classes need no namespace: a consumer scopes them under the root or a `pedigree` group, and that is
+the selector to prefer inside one figure; the id is for reaching across figures and for the document's own references.
 
 ### A semantic change is a re-render, and nodes stay put
 
@@ -177,16 +196,16 @@ The hooks carry meaning out of the drawing; they are not a way to put new meanin
 not have — a new condition on some of its individuals — the consumer adds the condition to the IR and renders again.
 That is cheap and exact for a reason worth stating: layout and ordering read only the pedigree's structure and each
 individual's stable position, never clinical status, so a re-render with changed conditions draws every node in the same
-place and regenerates everything that does depend on them — the solid fill, the carrier regions, and the change from a
+place and regenerates everything that does depend on them — the fills, the sections, the key, and the change from a
 two-way split to quadrants once a pedigree has more than two conditions. No stylesheet could do that last step, since it
 is new geometry keyed to the legend index.
 
 The boundary between what a consumer's CSS can derive from the hooks and what needs the drawer is the boundary between
-paint and geometry. Fills are paint: a stylesheet can point `fill` at a paint server in the document's `defs`, and
-hard-stop gradients and object-bounding-box patterns paint a solid, a half, a quadrant or a central dot clipped to the
-symbol for free. Marks that leave the shape — the deceased slash, the proband arrow, the question mark, the
-presymptomatic line — are elements, and CSS cannot create SVG geometry (generated content is undefined on SVG shapes). A
-consumer that wants to change those without a round trip needs a drawer where it runs; see Alternatives.
+paint and geometry. Fills are paint: they are already paint servers in the document's `defs`, and a stylesheet can
+restyle them or point `fill` elsewhere. Sections are geometry, and so are marks that leave the shape — the deceased
+slash, the proband arrow, the question mark, the presymptomatic line — are elements, and CSS cannot create SVG geometry
+(generated content is undefined on SVG shapes). A consumer that wants to change those without a round trip needs a
+drawer where it runs; see Alternatives.
 
 ### A minimum label box stands in for reflow
 
@@ -222,8 +241,10 @@ may change. The cost is a wider, taller figure than the content needs, paid only
 - **A `<style>` block with a class vocabulary for theming.** Tempting for a consistent look across consumers. Rejected:
   it makes the renderer own presentation it has no opinion on, fights the consumer's cascade, and turns every theme
   change into a golden change.
-- **Draw the legend into the SVG.** Rejected as a non-goal above; a consumer that wants one can build it from the
-  pedigree group's condition array in a few lines.
+- **Leave the legend to the consumer.** Where a legend sits is the consumer's layout decision, and a drawn one resizes
+  the canvas. Rejected because the standard requires every fill to be defined in the key and a hatch is meaningless
+  without one, so a figure without its key is incomplete wherever it ends up. The ids keep the consumer's control: it
+  can move, restyle or remove the key, and the canvas grows only for a pedigree that draws a fill.
 - **A drawer in the browser.** Re-running the drawing step client-side would give label reflow and let a consumer change
   marks without a round trip. Deferred, not rejected: the likely shape is a TypeScript port of the renderer, glyphs and
   layout both, kept in agreement with the Python by the same goldens. Not now — two drawers to hold to glyph-level

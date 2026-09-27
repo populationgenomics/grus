@@ -31,7 +31,7 @@ so we control glyph-level convention fidelity — the thing the eval judge score
 ### Own the emission
 
 We do **not** adopt an existing renderer as a black box: the judge compares *convention fidelity* (proband arrow,
-consanguinity double line, MZ-twin bar, deceased slash, carrier dot), so we need glyph-level control that
+consanguinity double line, MZ-twin bar, deceased slash, carrier fill), so we need glyph-level control that
 pedigreejs/Madeline do not cheaply give. We own the SVG emission (below) and drive it from an internal layout — v1
 ported kinship2's `align.pedigree` recursion; layout is now the constraint model in [`layout-v2.md`](layout-v2.md),
 reimplemented from published graph-drawing descriptions, not vendored source (kinship2 is GPL/LGPL, Madeline GPL; grus
@@ -69,28 +69,21 @@ individual it duplicates). Drawing reads only these arrays.
 ### Drawing (Bennett symbols)
 
 Map grid to pixels (`px = X0 + GEN_MARKER_GUTTER + x·X_UNIT`, `py = Y0 + (level-1)·GEN_HEIGHT`). Symbol by gender (□ ○
-◇); affected = solid fill; a **carrier** by the `Geometry.carrier_style` render option (*not* IR meaning — both styles
-read the same `Condition.inheritance` + condition legend). `CarrierStyle.INHERITANCE_GLYPH` (default, matching the
-existing literature): X-linked → central dot, else a region fill. `CarrierStyle.PARTITION_FILL` (NSGC 2022 §4.5, dot
-retired): every carrier is a region fill regardless of inheritance. A region fill is a rectangle clipped to the shape
-via a per-symbol `clipPath`, so one code path covers □ ○ ◇; the region is keyed to the carried condition's index in the
-pedigree's condition legend (distinct names, phenotype labels first, then by first appearance in `Position` order) — so
-two carriers of *different* named variants fill *opposite* halves (a compound het reads as opposite sides), while a
-single or unnamed carrier is the plain left half (2-split; quadrants for 3–4 conditions). Plus deceased slash and
-proband arrow. A **count-collapsed** symbol (a group drawn as one: `Individual.count` > 1, or `count_unspecified`)
-carries its number, or `n` for an unknown number; `count` absent or 1 is one person and draws none (`ir.validate`
-rejects `count` < 1 and `count` with `count_unspecified`). The count never overprints another mark. When nothing runs
-through the symbol's centre it is centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape
-(0.8 of the size for a square, 0.7 for a circle, 0.5 for a diamond), white on an affected symbol's solid fill and black
-otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the
-deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating
-line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the
-count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over a
-carrier's region fill. A ghost places its count as the real cell does. Connectors: **mating line** (horizontal between
-partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit
-`Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop
-from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a
-crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with rounded corners and
+◇), clinical status as fills inside it (below), plus deceased slash and proband arrow. A **count-collapsed** symbol (a
+group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its number, or `n` for an unknown number;
+`count` absent or 1 is one person and draws none (`ir.validate` rejects `count` < 1 and `count` with
+`count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
+centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
+for a circle, 0.5 for a diamond), white when the whole shape is an affected fill and black otherwise. When a mark runs
+through the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the deceased slash — it moves
+beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side,
+clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the count clears both its
+label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over any fill. A ghost draws
+the same fills as its real cell and places its count as the real cell does. Connectors: **mating line** (horizontal
+between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only from the
+explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line** (vertical
+drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in
+a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with rounded corners and
 lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's landing leg turning
 higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short
 vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a
@@ -99,8 +92,67 @@ horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for 
 instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
-line) and multi-`Condition` partition fills (an individual affected by several *named* conditions → quadrant shading;
-the single-condition affected/carrier fills above are drawn, the multi-region case is not).
+line).
+
+#### Clinical status: fills, sections and the key
+
+The drawing follows the NSGC 2022 revision (Bennett et al., §4.5 and Figure 2), which says three things about status:
+
+1. A symbol showing **one** condition is undivided. Only a symbol showing more than one is divided into sections, one
+   per condition, each with its own fill.
+1. **Carrier status is a fill**, not the central dot of the 2008 standard: a dot cannot say *which* of several
+   conditions a person carries, and a condition's fill can hide it. The standard's example is a HEXA and CFTR carrier
+   drawn in halves, horizontal lines on the left, vertical on the right.
+1. **Every fill is defined in the key** (Box 1 item 3). The standard never ties a fill to a mode of inheritance.
+
+Dividing *every* symbol, as kinship2 does, is not the standard, and a divided empty symbol is exactly the standard's
+presymptomatic glyph (a vertical line through the symbol).
+
+**Condition index.** A condition's index is its place in the pedigree's condition legend: distinct names, phenotype
+labels first, then by first appearance in `Position` order, with an unnamed condition (the figure's sole, unlabelled
+one) taking the last index. The index picks both the condition's fills and its section, pedigree-wide, so a condition
+looks the same and sits in the same place on every symbol that shows it.
+
+**Fills.** One per (index, status):
+
+| index | affected         | carrier             |
+| ----- | ---------------- | ------------------- |
+| 0     | solid black      | horizontal lines    |
+| 1     | solid dark grey  | vertical lines      |
+| 2     | solid light grey | diagonal lines, `/` |
+| 3     | black stipple    | diagonal lines, `\` |
+
+Affected fills are tones and carrier fills are line hatches, so a carrier never reads as affected with the same
+condition, and a carrier of two conditions never reads as a solid, affected symbol, as two black carrier halves would.
+There is no fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a placeholder, never
+a reused fill).
+
+**Sections.** A pedigree with at most two conditions in its legend divides a symbol into halves (index 0 left, 1 right);
+with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). A section is a rectangle clipped to
+the shape by a per-symbol `clipPath`, so one code path covers □ ○ ◇. A divided symbol draws divider lines through its
+centre — the vertical, and for quadrants the horizontal — so the sections read even where a fill is light.
+
+**What a symbol shows.**
+
+- Affected with exactly one condition and carrying none: the whole shape in that condition's affected fill. An affected
+  symbol of a single-condition pedigree is solid black, as before.
+- Otherwise every affected and every carried condition fills its own section, and the symbol is divided. A carrier of
+  one condition is one hatched section; affected with one condition and a carrier of another is two sections, one tone
+  and one hatch. A condition that is both affected and carried on one individual (same-named entries) draws as affected.
+- Presymptomatic, unknown (`?`), deceased and proband marks are unchanged, drawn over the fills.
+
+**Carrier style.** `Geometry.carrier_style` is a render option, not IR meaning; both styles read the same `Condition`
+entries. `CarrierStyle.PARTITION_FILL`, the default, is the standard as above. `CarrierStyle.INHERITANCE_GLYPH` draws
+figures the way the pre-2022 literature does: on a symbol with no affected condition, an X-linked carrier is a central
+dot, edged white so it reads over a hatch; every other carrier is a section as above.
+
+**The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
+it, and without it a hatch means nothing to a reader who does not hold the IR. It has one entry per (index, status)
+drawn, ordered by index with affected first: a square swatch in that fill and a label — the condition's name when
+affected, `Carrier: <name>` when carried, and `Affected` / `Carrier` for an unnamed condition. Entries run left to right
+and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP` below the lowest label or
+arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no fills has no key and an
+unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree
@@ -140,7 +192,8 @@ sized from the actual pedigree, not a fixed band:
   pedigree, keeping golden bytes stable.
 
 Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, `SIB_GAP`, `SIB_STUB`,
-`DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`.
+`DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`, and the key's `KEY_SWATCH`,
+`KEY_GAP`, `KEY_ENTRY_GAP` (drawing-only: the key never moves a symbol).
 
 ### Figure render (PedigreeSet → tiled SVG)
 
@@ -173,6 +226,8 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **A routed mating** — partners that cannot stand side by side: a third partner, or a twin whose sides are both taken
   (a twin pair holds three partners). Its drawn form, a track over the row, read as a sibship
   ([`layout-v2.md`](layout-v2.md), Alternatives considered), so it defers (`_layout2.layout`).
+- **A fifth filled condition** — an individual affected with, or carrying, a condition at legend index 4 or above. The
+  fills table has four distinct fills per status, and reusing one would draw two conditions alike (`_draw`).
 - **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).
@@ -182,14 +237,29 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **pedigreejs as a black-box SVG renderer** — proven and medical, but GPL, JS (would pull the stack out of Python),
   d3-hierarchy layout weaker on consanguinity, and its editor-oriented model + styling resist the glyph-level control
   the judge needs.
+
 - **Madeline as a subprocess** — best-in-class complex-pedigree layout, but GPL C++ and its own SVG styling; kept as the
   aesthetic benchmark/oracle, not the renderer.
+
 - **Graphviz `dot` (via ped_draw)** — generic hierarchical layout, not pedigree-aware (no couple nodes, sib bars, or
   loop handling) — poor convention fidelity.
+
 - **From-scratch layout heuristics** — rejected; the layout is the constraint-optimization model of
   [`layout-v2.md`](layout-v2.md) (Sugiyama's coordinate phase + pedigree constraints), which is graph-drawing prior art
   specialised, not an invented heuristic. Its own alternatives (keep v1's passes, duplicate-to-a-tree, Madeline's
   hybrid, `dot` as-is) are weighed there.
+
+- **Divide every symbol** (kinship2) — rejected: the standard divides only a symbol showing more than one condition, and
+  a divided empty symbol is the presymptomatic glyph.
+
+- **Pie sectors, as Figure 2 draws three conditions on a circle** — rejected for fixed halves / quadrants keyed by
+  index: sectors sized to each individual's own conditions would move a condition from symbol to symbol.
+
+- **Colour fills** — not the default: tones and hatches survive greyscale print and photocopy, and a consumer that wants
+  colour recolours the named fills (`svg-output.md`).
+
+- **A key only on request** — rejected: the standard requires every fill to be defined, and a figure without its key is
+  unreadable once it leaves the IR.
 
 ## References
 
