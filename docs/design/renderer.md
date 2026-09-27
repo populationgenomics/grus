@@ -192,8 +192,10 @@ the centre; a carrier's single quadrant, its two radii.
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
   and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
   individual (same-named entries) draws as affected.
-- The **presymptomatic** line is drawn at the outline's full stroke width and runs one stroke width past the outline at
-  top and bottom, everywhere, so it never reads as the thinner vertical border of a filled half it lies on.
+- The **presymptomatic** line runs from outline to outline at the outline's full stroke width, twice a border's, so it
+  never reads as the thinner vertical border of a filled half it may lie on. It stops at the outline: running past it
+  would meet the child's stub above and read as a descent line through the symbol. The line does not say which condition
+  is presymptomatic, so the key does (below).
 - Unknown (`?`), deceased and proband marks are unchanged, drawn over the fills; on a symbol with borders the `?` has a
   white halo so it reads over them.
 
@@ -213,16 +215,18 @@ carried by its colour as well as its position, which is what greys cannot do for
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
-status) drawn, ordered by index with affected first: a swatch and a label. In a divided pedigree the swatch is a small
-square symbol (three quarters of the symbol size) filled in that entry's section only, with that section's borders, so
-the key shows where a condition sits as well as its fill; this applies to halves and quadrants as to sixths, so a
-divided pedigree's key always reads the same way. An undivided pedigree has no positions to show, and its swatch is a
-plain square the size of a quadrant filled all over. Then the label — the condition's name when affected,
-`Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed
-condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits
-`KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree
-with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices
-are per pedigree.
+status) drawn, ordered by index with affected first, then carrier, then presymptomatic: a swatch and a label. In a
+divided pedigree the swatch is a small square symbol (three quarters of the symbol size) filled in that entry's section
+only, with that section's borders, so the key shows where a condition sits as well as its fill; this applies to halves
+and quadrants as to sixths, so a divided pedigree's key always reads the same way. An undivided pedigree has no
+positions to show, and its swatch is a plain square the size of a quadrant filled all over. Then the label — the
+condition's name when affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot),
+`Presymptomatic: <name>` (a swatch with the vertical line) for each condition someone is presymptomatic for — the
+standard asks for the condition in the legend — and `Affected` / `Carrier` / `Presymptomatic` for an unnamed condition.
+Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP`
+below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no
+fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per
+pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree

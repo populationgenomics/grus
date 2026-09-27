@@ -6,7 +6,7 @@ Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinica
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
 affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
 a filled section's edges inside a symbol are drawn as thin borders, and nothing else divides it),
-presymptomatic vertical line (outline weight, past the outline), deceased
+presymptomatic vertical line (outline weight, outline to outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -56,9 +56,10 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   restyling or replacing its pattern.
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
-  ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` (in a divided
-  pedigree a small divided square: ``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch``
-  section, its ``divider`` borders, ``swatch-outline``) and a
+  ``key-carrier-dot-{i}`` for the X-linked dot, ``key-presymptomatic-{i}`` with ``data-status="presymptomatic"`` and a
+  ``swatch presymptomatic`` line per condition someone is presymptomatic for), in index order, affected first,
+  holding a ``swatch`` (in a divided pedigree a small divided square: ``swatch-backing``, clip path
+  ``{prefix}key-clip-{kind}-{i}``, the ``swatch`` section, its ``divider`` borders, ``swatch-outline``) and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
   for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
   hold it.
@@ -107,7 +108,6 @@ _ARROW_LABEL_DX = 8.0
 _ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = _WIDTH / 2  # half the outline: a divider is a section line, lighter than any mark
-_PRESYMPTOMATIC_OVERRUN = _WIDTH  # the presymptomatic line runs this far past the outline, top and bottom
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
 _KEY_SYMBOL = 0.75  # a divided pedigree's key symbol, as a fraction of symbol_size
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status): the tone says the condition, the
@@ -139,7 +139,7 @@ _BOUNDARIES = {
     4: {12: (0, 1), 3: (1, 3), 6: (3, 2), 9: (2, 0)},
     6: {11: (0, 1), 1: (1, 2), 3: (2, 5), 5: (5, 4), 7: (4, 3), 9: (3, 0)},
 }
-_AFFECTED, _CARRIER = "affected", "carrier"
+_AFFECTED, _CARRIER, _PRESYMPTOMATIC = "affected", "carrier", "presymptomatic"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
 
 # One stacked pedigree in a figure render: (title, width, height, body-elements, root-attributes).
@@ -512,10 +512,23 @@ class _Draw:
                 used.add((plan.dot, _CARRIER, True))
         return sorted(used, key=lambda u: (u[0], u[1] != _AFFECTED, u[2]))
 
+    def _presymptomatic(self) -> list[int]:
+        """Every condition index some individual is presymptomatic for: the glyph does not say which, the key does."""
+        return sorted(
+            {
+                self._data_legend.index(c.name)
+                for ind in self.p.individuals
+                for c in ind.conditions
+                if c.status == pb.CONDITION_STATUS_PRESYMPTOMATIC
+            }
+        )
+
     def _key_label(self, index: int, status: str, dot: bool) -> str:
         name = self._data_legend[index]
         if status == _AFFECTED:
             return name or "Affected"
+        if status == _PRESYMPTOMATIC:
+            return f"Presymptomatic: {name}" if name else "Presymptomatic"
         word = "X-linked carrier" if dot else "Carrier"  # one condition can be both a dot and a hatched section
         return f"{word}: {name}" if name else word
 
@@ -525,9 +538,11 @@ class _Draw:
         Entry offsets are relative to the key's top-left corner.
         """
         geom = self.geom
+        keyed = [*self._used_fills(), *((i, _PRESYMPTOMATIC, False) for i in self._presymptomatic())]
+        keyed.sort(key=lambda u: (u[0], (_AFFECTED, _CARRIER, _PRESYMPTOMATIC).index(u[1]), u[2]))
         entries = [
             _KeyEntry(index=i, status=status, dot=dot, label=self._key_label(i, status, dot))
-            for i, status, dot in self._used_fills()
+            for i, status, dot in keyed
         ]
         if not entries:
             return [], 0.0, 0.0
@@ -719,7 +734,8 @@ class _Draw:
             if self._divided:
                 out += self._key_symbol(e, x + s / 2, y + s / 2)
             else:
-                paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
+                plain = e.dot or e.status == _PRESYMPTOMATIC
+                paint = "#ffffff" if plain else f"url(#{self._fill_id(e.index, e.status)})"
                 # Drawn about its own centre, like a square symbol, so its hatch has a square's phase.
                 out.append(
                     f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" '
@@ -728,6 +744,8 @@ class _Draw:
                 )
             if e.dot:
                 out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
+            if e.status == _PRESYMPTOMATIC:
+                out.append(_line(x + s / 2, y, x + s / 2, y + s, cls="swatch presymptomatic"))
             label_x = x + s + geom.label_gap
             out.append(_text(label_x, y + s / 2, _escape(e.label), geom.label_size, cls="key-label", anchor="start"))
             out.append("</g>")
@@ -743,7 +761,7 @@ class _Draw:
         at = f'transform="translate({_num(cx)} {_num(cy)})"'
         square = f'x="{_num(-h)}" y="{_num(-h)}" width="{_num(2 * h)}" height="{_num(2 * h)}"'
         out = [f'<rect class="swatch-backing" {square} {at} fill="#ffffff"/>']
-        if not e.dot:
+        if not e.dot and e.status != _PRESYMPTOMATIC:
             clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
             out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
             out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
@@ -1212,9 +1230,8 @@ class _Draw:
                 )
             out.append(mark)
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
-            # Outline weight and past the outline top and bottom, so it never reads as the lighter vertical divider.
-            reach = self.half + _PRESYMPTOMATIC_OVERRUN
-            out.append(_line(cx, cy - reach, cx, cy + reach, cls="mark presymptomatic"))
+            # Outline weight, outline to outline: twice a filled half's border, which may lie under it.
+            out.append(_line(cx, cy - self.half, cx, cy + self.half, cls="mark presymptomatic"))
         if ind.deceased:
             d = self.half * 1.4
             out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))

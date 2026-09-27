@@ -92,7 +92,7 @@ not depend on styling:
    Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
    named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
    status paint.
-1. **`divider`** — the borders of filled sections inside the symbol: thin lines from the centre along each section
+1. **`divider`** — the borders of filled sections inside the symbol: thin rays from the centre along each section
    boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline, so the
    outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
@@ -139,12 +139,13 @@ The groups, and what each promises:
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
 - **`generation`** — each Roman-numeral marker, naming its row by IR generation.
 - **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
-  Each entry is its own `key-entry` group with id `key-{status}-{index}` (`key-carrier-dot-{index}`, class
-  `key-entry dot`, for the X-linked dot of the inheritance-glyph style) naming its condition index and status as data
-  attributes, holding a swatch painted with the same pattern the symbols use and a text label. In a divided pedigree the
-  swatch is a small symbol: a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, that section's
-  `divider` borders and a `swatch-outline`. A consumer relocates the key with a transform on the one group, restyles or
-  hides an entry by id, or drops the key and builds its own from the pedigree's condition array.
+  Each entry is its own `key-entry` group with id `key-{status}-{index}` (status `affected`, `carrier` or
+  `presymptomatic`; `key-carrier-dot-{index}`, class `key-entry dot`, for the X-linked dot of the inheritance-glyph
+  style) naming its condition index and status as data attributes, holding a swatch painted with the same pattern the
+  symbols use and a text label. In a divided pedigree the swatch is a small symbol: a `swatch-backing`, its clip path,
+  the `swatch` section in the entry's fill, that section's `divider` borders and a `swatch-outline`. A consumer
+  relocates the key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its
+  own from the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data

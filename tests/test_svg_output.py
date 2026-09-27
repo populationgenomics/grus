@@ -713,8 +713,9 @@ def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
     assert _classes(count) == ["mark", "count"] and count.get("fill") == "#ffffff", "white on the black tone"
 
 
-def test_presymptomatic_line_is_outline_weight_and_overruns_the_symbol() -> None:
-    # A filled half's inner border and the presymptomatic line share a place; weight and overrun tell them apart.
+def test_presymptomatic_line_is_outline_weight_from_outline_to_outline() -> None:
+    # A filled half's inner border and the presymptomatic line share a place; the weight tells them apart. The line
+    # ends on the outline, so it does not run on into a descent line above.
     ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
     (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind]))), "individual")
     (line,) = [c for c in g if "presymptomatic" in _classes(c)]
@@ -724,7 +725,22 @@ def test_presymptomatic_line_is_outline_weight_and_overruns_the_symbol() -> None
         float(line.get("stroke-width", "0")) == 2 * float(b.get("stroke-width", "0")) for b in borders
     )
     top, bottom = float(symbol.get("y", "0")), float(symbol.get("y", "0")) + float(symbol.get("height", "0"))
-    assert float(line.get("y1", "0")) == top - 2 and float(line.get("y2", "0")) == bottom + 2
+    assert float(line.get("y1", "0")) == top and float(line.get("y2", "0")) == bottom
+
+
+def test_the_key_names_each_presymptomatic_condition() -> None:
+    # The vertical line does not say which condition; the key does, one entry per condition, named or not.
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "AB"]
+    people = [_person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC)), _person(2, ("B", _CAR))]
+    (key,) = _groups(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))), "key")
+    entry = next(e for e in _groups(key, "key-entry") if e.get("data-status") == "presymptomatic")
+    assert entry.get("id") == "key-presymptomatic-0" and entry.get("data-condition") == "0"
+    assert [t.text for t in entry if "key-label" in _classes(t)] == ["Presymptomatic: A"]
+    assert [c for c in entry if "presymptomatic" in _classes(c)], "a swatch with the vertical line"
+    unnamed = pb.Pedigree(individuals=[_person(1, ("", pb.CONDITION_STATUS_PRESYMPTOMATIC))])
+    (key,) = _groups(_parse(render.render_svg(unnamed)), "key")
+    (entry,) = _groups(key, "key-entry")
+    assert [t.text for t in entry if "key-label" in _classes(t)] == ["Presymptomatic"]
 
 
 def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
