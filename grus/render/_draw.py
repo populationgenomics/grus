@@ -126,7 +126,9 @@ _COLOUR_TONES = ("#000000", "#e69f00", "#0072b2", "#009e73", "#d55e00", "#cc79a7
 # centre and none is a near-tangent chord (tests/test_svg_output.py pins both).
 _CELLS_PER_SYMBOL = 4
 _HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
-_SOLID = 8.0  # tile (px) of a flat tone; its phase does not show
+# One pattern tile, TILE_CELLS hatch cells across and centred on the frame origin, covers any symbol or swatch whole, so
+# no fill is ever drawn from two tiles: tile seams show as a faint grid when an SVG goes through a PDF renderer.
+_TILE_CELLS = 40
 _FILLS = len(_AFFECTED_TONES)
 # Sections of a sixth-divided symbol: wedges from the centre, each named by the clock position it points at, in the
 # reading order of halves and quadrants (top row left to right, then the bottom row). Their boundaries run along 1, 3,
@@ -703,20 +705,20 @@ class _Draw:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
         tone = self._tones[index]
-        if status == _CARRIER:
-            c = self.geom.symbol_size / _CELLS_PER_SYMBOL
-            return (
-                f'{head}width="{_num(c)}" height="{_num(c)}" patternUnits="userSpaceOnUse">'
-                f'<rect class="tone" width="{_num(c)}" height="{_num(c)}" fill="{tone}"/>'
-                f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c)}" fill="none" '
-                f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
-            )
-        # A user-space tile, like the carrier fills: cairosvg (grus.render.rasterize) fails on an objectBoundingBox
-        # pattern painted more than twice.
-        return (
-            f'{head}width="{_num(_SOLID)}" height="{_num(_SOLID)}" patternUnits="userSpaceOnUse">'
-            f'<rect class="tone" width="{_num(_SOLID)}" height="{_num(_SOLID)}" fill="{tone}"/></pattern>'
+        # A user-space tile (cairosvg fails on an objectBoundingBox pattern painted more than twice), one tile large
+        # enough to hold any fill part whole about its frame origin, so no tile seam falls inside a symbol.
+        c = self.geom.symbol_size / _CELLS_PER_SYMBOL
+        t = c * _TILE_CELLS
+        tile = (
+            f'x="{_num(-t / 2)}" y="{_num(-t / 2)}" width="{_num(t)}" height="{_num(t)}" patternUnits="userSpaceOnUse"'
         )
+        body = f'<rect class="tone" width="{_num(t)}" height="{_num(t)}" fill="{tone}"/>'
+        if status == _CARRIER:
+            body += (
+                f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c, t)}" fill="none" '
+                f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/>'
+            )
+        return f"{head}{tile}>{body}</pattern>"
 
     def _key_group(self) -> list[str]:
         """The key: one entry per fill drawn, a swatch in that fill and its label, below the drawing."""
@@ -1435,16 +1437,20 @@ def _reach(gender: pb.Gender, dx: float, dy: float, h: float) -> float:
     return h / (abs(dx) + abs(dy))
 
 
-def _hatch_path(backslash: bool, c: float) -> str:
-    r"""One ``c``-square tile of a diagonal hatch on the lattice x +- y = c/2 (mod c), each line run past the tile.
+def _hatch_path(backslash: bool, c: float, t: float) -> str:
+    r"""A ``t``-square tile of diagonal hatch on the lattice x +- y = c/2 (mod c): each line one segment across it.
 
-    ``/`` lies on x + y = c/2 and 3c/2, ``\`` on x - y = +-c/2; the tile clips the overrun.
+    ``/`` lies on x + y = c/2 + k*c, ``\`` on x - y = c/2 + k*c; ``t`` is a whole number of cells, so the lattice
+    keeps its phase about the frame origin at the tile's centre.
     """
-    h, e = c / 2, c / 8  # half a cell; the overrun past the tile
-    if backslash:
-        runs = [((h - e, -e), (c + e, h + e)), ((-e, h - e), (h + e, c + e))]
-    else:
-        runs = [((-e, h + e), (h + e, -e)), ((h - e, c + e), (c + e, h - e))]
+    runs = []
+    for k in range(round(2 * t / c)):
+        if backslash:
+            d = -t + c / 2 + k * c  # x - y = d
+            runs.append(((max(0.0, d), max(0.0, d) - d), (min(t, t + d), min(t, t + d) - d)))
+        else:
+            sm = c / 2 + k * c  # x + y = sm
+            runs.append(((max(0.0, sm - t), min(sm, t)), (min(sm, t), max(0.0, sm - t))))
     return "".join(f"M{_num(x1)},{_num(y1)}L{_num(x2)},{_num(y2)}" for (x1, y1), (x2, y2) in runs)
 
 

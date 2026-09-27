@@ -1079,3 +1079,60 @@ def test_colour_mode_keeps_the_hatch_clear_of_edges(name: str) -> None:
     p = ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
     gaps = _hatch_gaps(render.render_svg(p, _COLOUR))
     assert gaps and all(gap >= 2.0 - 1e-6 for _, gap in gaps)
+
+
+# --- no tile seams ----------------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", _NAMES)
+def test_every_fill_lies_inside_one_pattern_tile(name: str) -> None:
+    # A PDF renderer draws the seams between pattern tiles as a faint grid, so each fill part must lie wholly inside
+    # one tile: the tile is centred on the part's frame origin and wider than anything drawn about it.
+    root = _parse((_GOLDENS / f"{name}.svg").read_text())
+    tiles = {
+        pat.get("id"): (float(pat.get("x", "0")), float(pat.get("width", "0"))) for pat in root.iter(f"{_SVG}pattern")
+    }
+    for el in root.iter():
+        ref = re.fullmatch(r"url\(#(.+)\)", el.get("fill", ""))
+        if not ref or ref.group(1) not in tiles:
+            continue
+        x0, width = tiles[ref.group(1)]
+        assert x0 == -width / 2, "the tile is centred on the frame origin"
+        if el.tag == f"{_SVG}polygon":
+            coords = [abs(float(v)) for xy in el.get("points", "").split() for v in xy.split(",")]
+        elif el.tag == f"{_SVG}circle":
+            coords = [abs(float(el.get("cx", "0"))) + float(el.get("r", "0")), abs(float(el.get("cy", "0")))]
+        else:
+            x, y = float(el.get("x", "0")), float(el.get("y", "0"))
+            coords = [abs(x), abs(y), abs(x + float(el.get("width", "0"))), abs(y + float(el.get("height", "0")))]
+        reach = max(coords)
+        if el.tag == f"{_SVG}polygon" and "fill" in _classes(el) and len(coords) == 8:
+            reach = min(reach, render.DEFAULT_GEOMETRY.symbol_size)  # a wedge's far points lie outside its clip
+        assert reach < width / 2, f"{el.get('class')} reaches {reach} in a {width} tile"
+
+
+def test_a_flat_fill_has_no_seams_through_pdf() -> None:
+    # The path that showed the seams: SVG -> rsvg-convert PDF -> a PDF rasteriser (MuPDF), placed at a fractional
+    # scale. Skipped where either tool is missing.
+    import shutil
+    import subprocess
+
+    pymupdf = pytest.importorskip("pymupdf")
+    if shutil.which("rsvg-convert") is None:
+        pytest.skip("rsvg-convert not installed")
+    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _AFF))])
+    svg = render.render_svg(p)
+    pdf = subprocess.run(["rsvg-convert", "-f", "pdf"], input=svg.encode(), capture_output=True, check=True).stdout
+    src = pymupdf.open("pdf", pdf)
+    page = pymupdf.open().new_page(width=612, height=792)
+    page.show_pdf_page(
+        pymupdf.Rect(37.3, 91.7, 37.3 + src[0].rect.width * 0.731, 91.7 + src[0].rect.height * 0.731), src, 0
+    )
+    pix = page.get_pixmap(dpi=233)
+    k = 0.731 * 0.75 * 233 / 72  # px -> PDF points -> placed -> device pixels
+    root = _parse(svg)
+    for g in _groups(root, "individual"):
+        cx, cy = _centre(next(c for c in g if "symbol" in _classes(c)))
+        x, y = 37.3 * 233 / 72 + cx * k, 91.7 * 233 / 72 + cy * k
+        grey = {pix.pixel(int(x + dx), int(y + dy))[0] for dx in range(-12, 12) for dy in range(-12, 12)}
+        assert len(grey) == 1, f"{g.get('data-position')}: a seam in the flat fill ({sorted(grey)})"

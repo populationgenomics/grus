@@ -157,9 +157,12 @@ fill is therefore drawn in its symbol's own frame and moved into place, so each 
 lines lie on a diagonal lattice whose cell is a quarter of the symbol size. The diagonals run parallel to a diamond's
 edges, so a square or diamond is placed with its centre on the lattice's midpoint, putting a diamond's edges midway
 between two lines; a circle is placed with a lattice line through its centre, so that no line is a near-tangent chord
-hugging its outline. A key swatch is placed like a square. No line runs along a section edge, a divider or an outline;
-lines cross them. There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a
-placeholder, never a reused fill), with a message naming the supported range.
+hugging its outline. A key swatch is placed like a square. Each pattern is one tile, forty cells across and centred on
+the frame origin, so every fill part lies inside a single tile: a PDF renderer draws the seams between tiles as a faint
+grid (seen through rsvg-convert's PDF in MuPDF), and a fill that never crosses a seam cannot show one. The hatch lines
+therefore run unbroken across the tile. No line runs along a section edge, a divider or an outline; lines cross them.
+There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a placeholder, never a
+reused fill), with a message naming the supported range.
 
 **Sections, dividers and sector edges.** A pedigree with two conditions in its legend divides every symbol into halves
 (index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right); with five
