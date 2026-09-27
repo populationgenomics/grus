@@ -438,7 +438,7 @@
   "3": {
     "highs": {
       "carrier_inheritance": {
-        "pedigree": "3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216",
+        "pedigree": "c0a129a526f1e9deed02f230d0ffe0cbcd70e1a97039c342c2e8f5c108417867",
         "placement": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b"
       },
       "childless": {
@@ -450,7 +450,7 @@
         "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
       },
       "condition_fills": {
-        "pedigree": "744ab7f3e1e8071a80c3ac65c15295138b1afbb27daaf8db61fc9625979684d6",
+        "pedigree": "eaf02157974225056db1400e8e7c09f7d4356e5aa4c035702f8be14a6fe992da",
         "placement": "ed4455825f3ef2e77c2a2d6024952271249cee18ab44e3b493d37fde8945f5da"
       },
       "consanguineous": {
@@ -556,7 +556,7 @@
     },
     "z3": {
       "carrier_inheritance": {
-        "pedigree": "3b799fd813152d7a49b7adf59b8e0cb3d763155aacf26978c8215dc138bb9216",
+        "pedigree": "c0a129a526f1e9deed02f230d0ffe0cbcd70e1a97039c342c2e8f5c108417867",
         "placement": "5a196b3c41b147ec5023997b51c2e9ec85ae734806d1d08eb0cdbbefded9145b"
       },
       "childless": {
@@ -568,7 +568,7 @@
         "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
       },
       "condition_fills": {
-        "pedigree": "744ab7f3e1e8071a80c3ac65c15295138b1afbb27daaf8db61fc9625979684d6",
+        "pedigree": "eaf02157974225056db1400e8e7c09f7d4356e5aa4c035702f8be14a6fe992da",
         "placement": "ed4455825f3ef2e77c2a2d6024952271249cee18ab44e3b493d37fde8945f5da"
       },
       "consanguineous": {

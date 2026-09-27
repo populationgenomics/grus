@@ -1,5 +1,5 @@
 id: "condition-fills"
-labels { text: "Fills by condition index and status (NSGC 2022): tones affected, hatches carrier, divided only for several" kind: LABEL_KIND_OTHER }
+labels { text: "Fills by condition index and status" kind: LABEL_KIND_OTHER }
 labels { text: "A" kind: LABEL_KIND_PHENOTYPE }
 labels { text: "B" kind: LABEL_KIND_PHENOTYPE }
 labels { text: "C" kind: LABEL_KIND_PHENOTYPE }
