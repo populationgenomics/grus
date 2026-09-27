@@ -37,8 +37,8 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   a clipped ``rect``, or in sixths a clipped wedge ``polygon`` — or the X-linked
   ``fill dot`` under ``CarrierStyle.INHERITANCE_GLYPH`` — each with ``data-condition`` and ``data-status`` naming what
   it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (a filled
-  section's borders inside the symbol: rays from the centre along each boundary with a filled section on either
-  side), ``symbol`` (the shape as outline only), ``mark …``
+  section's borders inside the symbol: one round-joined path of rays from the centre along each boundary with a filled
+  section on either side), ``symbol`` (the shape as outline only), ``mark …``
   (``count``, a count-collapsed symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``,
   ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line),
   then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow
@@ -1321,14 +1321,27 @@ class _Draw:
         return self._borders(gender, cx, cy, self.half, {i for i, _ in plan.sections})
 
     def _borders(self, gender: pb.Gender, cx: float, cy: float, h: float, filled: set[int]) -> list[str]:
-        """The rays from the centre to the outline of a ``gender`` shape of half-size ``h`` that bound ``filled``."""
-        out = []
-        for clock, pair in _BOUNDARIES[self._slots].items():
+        """The rays from the centre to the outline of a ``gender`` shape of half-size ``h`` that bound ``filled``.
+
+        One ``path`` through the centre, out along each ray and back, with round joins, so every ray meets the
+        others cleanly at the centre; each ray's far end lies under the outline's stroke.
+        """
+        ends = []
+        for clock, pair in sorted(_BOUNDARIES[self._slots].items()):
             if filled & set(pair):
                 dx, dy = _clock(clock)
                 t = _reach(gender, dx, dy, h)
-                out.append(_line(cx, cy, cx + t * dx, cy + t * dy, cls="divider", width=_DIVIDER_WIDTH))
-        return out
+                ends.append((cx + t * dx, cy + t * dy))
+        if not ends:
+            return []
+        centre = f"{_num(cx)},{_num(cy)}"
+        d = f"M{_num(ends[0][0])},{_num(ends[0][1])}L{centre}" + "".join(
+            f"L{_num(x)},{_num(y)}L{centre}" for x, y in ends[1:]
+        )
+        return [
+            f'<path class="divider" d="{d}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_DIVIDER_WIDTH)}" '
+            f'stroke-linejoin="round"/>'
+        ]
 
     def _dot(self, cx: float, cy: float, index: int, *, cls: str, radius: float) -> str:
         """The X-linked carrier dot, edged white so it reads over a tone."""

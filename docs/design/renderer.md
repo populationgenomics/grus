@@ -181,7 +181,9 @@ A section is a rectangle (in sixths a wedge) clipped to the shape by a per-symbo
 outline; inside the symbol it gets a **border**, a line from the centre along each boundary it shares with the rest of
 the symbol or with another filled section, at half the outline's stroke width. A boundary between two empty sections has
 no line, a wholly filled symbol none, and no border is stroked twice. A lone carrier's half thus has the thin line down
-the centre; a carrier's single quadrant, its two radii.
+the centre; a carrier's single quadrant, its two radii. A symbol's borders are one path, out from the centre along each
+ray and back, with round joins: separate butt-capped lines left notches where rays meet at the centre, and a mitre join
+spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke, so it needs no join there.
 
 **What a symbol shows.**
 

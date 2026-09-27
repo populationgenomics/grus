@@ -92,9 +92,9 @@ not depend on styling:
    Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
    named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
    status paint.
-1. **`divider`** — the borders of filled sections inside the symbol: thin rays from the centre along each section
-   boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline, so the
-   outline stays whole.
+1. **`divider`** — the borders of filled sections inside the symbol: one path of thin rays from the centre along each
+   section boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline,
+   so the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
    drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
    consumer colours the stroke.

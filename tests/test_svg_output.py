@@ -527,8 +527,29 @@ def test_patterns_are_emitted_only_for_the_fills_drawn() -> None:
             assert f.get("fill") == f"url(#f-fill-{f.get('data-status')}-{f.get('data-condition')})"
 
 
-def _dividers(g: ET.Element) -> list[ET.Element]:
-    return [c for c in g if "divider" in _classes(c)]
+class _Ray:
+    """One ray of a ``divider`` border path (centre to outline), read like a line element."""
+
+    def __init__(self, path: ET.Element, start: tuple[float, float], end: tuple[float, float]) -> None:
+        self._attrs = {"x1": start[0], "y1": start[1], "x2": end[0], "y2": end[1]}
+        self._path = path
+
+    def get(self, key: str, default: str = "") -> str:
+        if key in self._attrs:
+            return f"{self._attrs[key]:g}"
+        return self._path.get(key, default)
+
+
+def _dividers(g: ET.Element) -> list[_Ray]:
+    """The rays of a group's ``divider`` border paths: each distinct centre-to-outline segment once."""
+    rays: list[_Ray] = []
+    for path in (c for c in g if "divider" in _classes(c)):
+        assert path.tag == f"{_SVG}path" and path.get("stroke-linejoin") == "round", "one path, clean joins"
+        pts = [(float(a), float(b)) for a, b in re.findall(r"([-0-9.]+),([-0-9.]+)", path.get("d", ""))]
+        centre = pts[1]
+        assert all(pt == centre for pt in pts[1::2]), "out along each ray and back through the centre"
+        rays += [_Ray(path, centre, end) for end in pts[0::2]]
+    return rays
 
 
 def test_a_carrier_of_two_conditions_is_two_hatched_sections_of_different_tones() -> None:
@@ -562,7 +583,7 @@ def test_carrier_is_the_affected_tone_with_a_contrasting_hatch() -> None:
         assert affected.find(f"{_SVG}path") is None
 
 
-def _vertical(line: ET.Element) -> bool:
+def _vertical(line: ET.Element | _Ray) -> bool:
     return line.get("x1") == line.get("x2")
 
 
