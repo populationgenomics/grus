@@ -10,8 +10,8 @@ Shared terms across grus docs and code. Pedigree conventions follow Bennett/NSGC
   The symbol denotes gender identity (Bennett 2022); sex assigned at birth is a separate optional annotation.
 - **Affection status** — whether an individual has the condition: unaffected (empty symbol), affected (filled), unknown
   ("?").
-- **Carrier** — heterozygous for a recessive allele; drawn with a central dot. **Obligate carrier** — a carrier inferred
-  from the inheritance pattern rather than tested.
+- **Carrier** — heterozygous for a recessive allele; drawn as a line-hatched fill the key defines (NSGC 2022; older
+  figures use a central dot). **Obligate carrier** — a carrier inferred from the inheritance pattern rather than tested.
 - **Proband** — the first affected individual who sought evaluation, marked with an arrow + "P". **Consultand** — the
   individual who consulted (may be unaffected); also an arrow.
 - **Deceased** — drawn with a diagonal slash through the symbol.

@@ -207,6 +207,14 @@
         "pedigree": "1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332",
         "placement": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be"
       },
+      "compound_carrier": {
+        "pedigree": "c6f77cec4041b8a89c6969ff668b4e88a28e759f0860dd89bd3c3e4d47878450",
+        "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
+      },
+      "condition_fills": {
+        "pedigree": "744ab7f3e1e8071a80c3ac65c15295138b1afbb27daaf8db61fc9625979684d6",
+        "placement": "ed4455825f3ef2e77c2a2d6024952271249cee18ab44e3b493d37fde8945f5da"
+      },
       "consanguineous": {
         "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",
         "placement": "0f30a45070c21d8d782970ee5cca87f8252ecc30e41b151a0bee990dfa6d5bee"
@@ -316,6 +324,14 @@
       "childless": {
         "pedigree": "1fe817d5ef885beb0412ff50000ad1fcb23ffa16697bfa1f49e8277d6cf39332",
         "placement": "2df63610481a7e9898861e5b736eb955615f6bdc4279399ba35d1d0b2c4536be"
+      },
+      "compound_carrier": {
+        "pedigree": "c6f77cec4041b8a89c6969ff668b4e88a28e759f0860dd89bd3c3e4d47878450",
+        "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
+      },
+      "condition_fills": {
+        "pedigree": "744ab7f3e1e8071a80c3ac65c15295138b1afbb27daaf8db61fc9625979684d6",
+        "placement": "ed4455825f3ef2e77c2a2d6024952271249cee18ab44e3b493d37fde8945f5da"
       },
       "consanguineous": {
         "pedigree": "e0d3058a33084ceb2ee25ae3a93cb2e3ca88e6a8d3243c6989af670f49980968",

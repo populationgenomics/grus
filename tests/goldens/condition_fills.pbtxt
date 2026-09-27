@@ -1,0 +1,19 @@
+id: "condition-fills"
+labels { text: "Fills by condition index and status (NSGC 2022): tones affected, hatches carrier, divided only for several" kind: LABEL_KIND_OTHER }
+labels { text: "A" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "B" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "C" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "D" kind: LABEL_KIND_PHENOTYPE }
+individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { name: "B" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 3 gender: GENDER_NONBINARY conditions { name: "C" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 4 gender: GENDER_MAN conditions { name: "D" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 2 index: 3 gender: GENDER_NONBINARY conditions { name: "C" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 2 index: 4 gender: GENDER_MAN conditions { name: "D" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 1 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 2 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_CARRIER } conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 3 gender: GENDER_NONBINARY conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 4 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_AFFECTED } conditions { name: "D" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 5 gender: GENDER_MAN conditions { name: "C" status: CONDITION_STATUS_CARRIER } conditions { name: "D" status: CONDITION_STATUS_CARRIER } }

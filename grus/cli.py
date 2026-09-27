@@ -243,7 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument(
         "--carrier-style",
         choices=[s.value for s in render.CarrierStyle],
-        help="carrier glyph convention (default: inheritance_glyph)",
+        help="carrier glyph convention (default: partition_fill, NSGC 2022)",
     )
     render_cmd.add_argument(
         "--layout",

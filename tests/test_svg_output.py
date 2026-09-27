@@ -79,7 +79,7 @@ def test_golden_ids_are_unique_and_references_resolve(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_golden_individual_parts_are_layered(name: str) -> None:
-    order = ["backing", "fill", "symbol", "mark", "label", "hit"]
+    order = ["backing", "fill", "divider", "symbol", "mark", "label", "hit"]
     for g in _groups(_parse((_GOLDENS / f"{name}.svg").read_text()), "individual"):
         parts = _parts(g)
         assert parts.count("backing") == 1 and parts.count("symbol") == 1 and parts.count("hit") == 1
@@ -298,6 +298,8 @@ def test_label_box_smaller_than_content_changes_nothing() -> None:
 
 def test_label_box_widens_reserved_space() -> None:
     p = _load("trio")
+    for ind in p.individuals:
+        del ind.conditions[:]  # no key: a wider canvas wraps the key's entries less, which can shorten it
     geom = render.DEFAULT_GEOMETRY
     wide = dataclasses.replace(geom, label_box_width=20.0, label_box_height=3.0)
     # The box is a floor under each label's width, and label widths separate neighbours in the solve: every pair
@@ -485,3 +487,149 @@ def test_every_sibship_is_one_connected_drawing(name: str) -> None:
             continue
         segs = _segments(g)
         assert _pieces(segs) == 1, f"{name}: {g.get('data-parents')} descent is in pieces"
+
+
+# --- clinical status: named fills, sections and the key (docs/design/renderer.md, Clinical status) ----------------
+
+
+def _person(i: int, *conditions: tuple[str, int], gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
+    ind = pb.Individual(generation=1, index=i, gender=gender)
+    for name, status in conditions:
+        ind.conditions.add(name=name, status=status)
+    return ind
+
+
+_AFF, _CAR = pb.CONDITION_STATUS_AFFECTED, pb.CONDITION_STATUS_CARRIER
+
+
+def _fills(g: ET.Element) -> list[ET.Element]:
+    return [c for c in g if "fill" in _classes(c)]
+
+
+def _patterns(root: ET.Element) -> dict[str, ET.Element]:
+    return {pat.get("id", ""): pat for pat in root.iter(f"{_SVG}pattern")}
+
+
+def test_patterns_are_emitted_only_for_the_fills_drawn() -> None:
+    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3, ("C", 0))])
+    p.individuals[2].conditions[0].status = pb.CONDITION_STATUS_PRESYMPTOMATIC  # C is in the legend, never filled
+    root = _parse(render.render_svg(p, id_prefix="f-"))
+    pats = _patterns(root)
+    assert sorted(pats) == ["f-fill-affected-0", "f-fill-carrier-1"]
+    for pid, pat in pats.items():
+        assert "fill-pattern" in _classes(pat)
+        assert pid == f"f-fill-{pat.get('data-status')}-{pat.get('data-condition')}"
+        assert "style" not in pat.attrib and all("style" not in el.attrib for el in pat.iter())
+    for g in _groups(root, "individual"):
+        for f in _fills(g):
+            assert f.get("fill") == f"url(#f-fill-{f.get('data-status')}-{f.get('data-condition')})"
+
+
+def test_a_carrier_of_two_conditions_is_two_hatched_sections_and_a_divider() -> None:
+    root = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("HEXA", _CAR), ("CFTR", _CAR))])))
+    (g,) = _groups(root, "individual")
+    fills = _fills(g)
+    assert [(f.get("data-condition"), f.get("data-status")) for f in fills] == [("0", "carrier"), ("1", "carrier")]
+    assert fills[0].get("fill") != fills[1].get("fill"), "each condition has its own hatch"
+    assert all(f.get("clip-path") for f in fills), "sections are clipped to the shape, never the solid shape"
+    assert float(fills[0].get("x", "0")) < float(fills[1].get("x", "0")), "index 0 left, index 1 right"
+    assert len([c for c in g if "divider" in _classes(c)]) == 1
+    pats = _patterns(root)
+    assert all(pat.find(f"{_SVG}rect[@width='1']") is None for pat in pats.values()), "a hatch, not a solid tone"
+
+
+def test_one_affected_condition_is_undivided_and_several_are_divided() -> None:
+    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _AFF), ("B", _AFF))])
+    one, two = _groups(_parse(render.render_svg(p)), "individual")
+    (whole,) = _fills(one)
+    assert whole.tag == f"{_SVG}rect" and whole.get("clip-path") is None and whole.get("width") == "36"
+    assert not [c for c in one if "divider" in _classes(c)]
+    assert [f.get("data-condition") for f in _fills(two)] == ["0", "1"]
+    assert [c for c in two if "divider" in _classes(c)]
+
+
+def test_three_or_four_conditions_divide_into_quadrants() -> None:
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
+    p = pb.Pedigree(labels=legend, individuals=[_person(1, ("A", _AFF), ("C", _CAR)), _person(2, ("B", _AFF))])
+    g = _groups(_parse(render.render_svg(p)), "individual")[0]
+    assert len([c for c in g if "divider" in _classes(c)]) == 2
+    a, c = _fills(g)
+    assert a.get("width") == c.get("width") == "18" and a.get("height") == "18"
+    assert float(c.get("y", "0")) > float(a.get("y", "0")), "index 2 is the bottom-left quadrant"
+
+
+def test_a_fifth_filled_condition_defers() -> None:
+    p = pb.Pedigree(individuals=[_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCDE")])
+    with pytest.raises(render.DeferredFeatureError, match="legend index 4"):
+        render.render_svg(p)
+    p.individuals[4].conditions[0].status = pb.CONDITION_STATUS_UNKNOWN  # in the legend, but drawn with no fill
+    render.render_svg(p)
+
+
+def test_key_has_one_entry_per_fill_drawn_with_its_label() -> None:
+    p = pb.Pedigree(
+        individuals=[
+            _person(1, ("A", _AFF)),
+            _person(2, ("A", _CAR), ("B", _CAR)),
+            _person(3, ("", _AFF)),
+            _person(4, ("", _CAR), gender=pb.GENDER_WOMAN),
+        ]
+    )
+    root = _parse(render.render_svg(p, id_prefix="k-"))
+    (key,) = _groups(root, "key")
+    assert key.get("id") == "k-key"
+    entries = [(e.get("id"), e.get("data-condition"), e.get("data-status")) for e in _groups(key, "key-entry")]
+    assert entries == [
+        ("k-key-affected-0", "0", "affected"),
+        ("k-key-carrier-0", "0", "carrier"),
+        ("k-key-carrier-1", "1", "carrier"),
+        ("k-key-affected-2", "2", "affected"),
+        ("k-key-carrier-2", "2", "carrier"),
+    ]
+    labels = [next(t.text for t in e if "key-label" in _classes(t)) for e in _groups(key, "key-entry")]
+    assert labels == ["A", "Carrier: A", "Carrier: B", "Affected", "Carrier"]
+    for e in _groups(key, "key-entry"):
+        swatch = next(c for c in e if "swatch" in _classes(c))
+        assert swatch.get("fill") == f"url(#k-fill-{e.get('data-status')}-{e.get('data-condition')})"
+
+
+def test_no_fill_draws_no_key_and_no_defs() -> None:
+    p = _load("trio")
+    for ind in p.individuals:
+        del ind.conditions[:]
+    svg = render.render_svg(p)
+    assert 'class="key"' not in svg and "<defs>" not in svg and "<pattern" not in svg
+
+
+def _bottom(el: ET.Element) -> float:
+    return float(el.get("y", "0")) + float(el.get("height", "0"))
+
+
+@pytest.mark.parametrize("name", _NAMES)
+def test_key_sits_below_every_individual(name: str) -> None:
+    root = _parse((_GOLDENS / f"{name}.svg").read_text())
+    keys = _groups(root, "key")
+    if not keys:
+        assert not _patterns(root)
+        return
+    (key,) = keys
+    top = min(float(sw.get("y", "0")) for sw in key.iter(f"{_SVG}rect"))
+    # Each hit rect covers its symbol, the reserved label box and any arrow.
+    lowest = max(_bottom(next(c for c in g if "hit" in _classes(c))) for g in _groups(root, "individual"))
+    assert top >= lowest + render.DEFAULT_GEOMETRY.key_gap - 1e-6
+    bottom = max(_bottom(sw) for sw in key.iter(f"{_SVG}rect"))
+    assert bottom <= float(root.get("height", "0")) - render.DEFAULT_GEOMETRY.margin + 1e-6
+    for e in _groups(key, "key-entry"):
+        label = next(t for t in e if "key-label" in _classes(t))
+        right = float(label.get("x", "0")) + 0.6 * render.DEFAULT_GEOMETRY.label_size * len(label.text or "")
+        assert right <= float(root.get("width", "0")) - render.DEFAULT_GEOMETRY.margin + 1e-6
+
+
+def test_set_render_keys_each_tile() -> None:
+    ps = pb.PedigreeSet(pedigrees=[_load("trio"), _load("compound_carrier")])
+    svg = render.render_set_svg(ps)
+    root = _parse(svg)
+    tiles = [t for t in root.iter(f"{_SVG}svg") if t is not root]
+    assert [[k.get("id") for k in _groups(t, "key")] for t in tiles] == [["p0-key"], ["p1-key"]]
+    ids = re.findall(r'\bid="([^"]+)"', svg)
+    assert len(ids) == len(set(ids)) and all(ref in ids for ref in re.findall(r"url\(#([^)]+)\)", svg))
