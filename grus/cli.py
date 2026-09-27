@@ -236,7 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument("input", type=pathlib.Path)
     render_cmd.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
     render_cmd.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
-    render_cmd.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra + libcairo)")
+    render_cmd.add_argument("--png", action="store_true", help="rasterize to PNG (needs the `raster` extra)")
     render_cmd.add_argument("--scale", type=float, default=2.0, help="PNG scale factor (default 2.0)")
     render_cmd.add_argument(
         "--id-prefix",
