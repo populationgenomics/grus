@@ -997,6 +997,10 @@
         "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
         "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
       },
+      "six_conditions": {
+        "pedigree": "7e5309774d590a3809fd9b6ec7829b5294a09d1a908b7f96b31157a599c0d83f",
+        "placement": "061ff0f9e545cac0fa08940c2ad0e8042408cf7eba69c6937bbae6e17addc255"
+      },
       "three_generation": {
         "pedigree": "e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f",
         "placement": "9d27b04e9315fdbf43e0144f6e351cfd324d0637c81ea0d4db0023c82f38413e"
@@ -1114,6 +1118,10 @@
       "sibship": {
         "pedigree": "cf54c97cde996aeb7600ae4801a2c3af0745d4e57969e9092ad989dbf76e3b58",
         "placement": "5b6f131eadf2b1ffdc20d534435d4e0c599e3bb817efe914356d1fa8be20703e"
+      },
+      "six_conditions": {
+        "pedigree": "7e5309774d590a3809fd9b6ec7829b5294a09d1a908b7f96b31157a599c0d83f",
+        "placement": "061ff0f9e545cac0fa08940c2ad0e8042408cf7eba69c6937bbae6e17addc255"
       },
       "three_generation": {
         "pedigree": "e96236dd019f6699bea0a8bf9719fb57d3354b6bd0f15a3b857c26168c4d452f",

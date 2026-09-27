@@ -1,0 +1,21 @@
+id: "six-conditions"
+labels { text: "Six conditions: sixth sections, one fixed wedge per condition" kind: LABEL_KIND_OTHER }
+labels { text: "A" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "B" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "C" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "D" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "E" kind: LABEL_KIND_PHENOTYPE }
+labels { text: "F" kind: LABEL_KIND_PHENOTYPE }
+individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { name: "E" status: CONDITION_STATUS_CARRIER } conditions { name: "F" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { name: "B" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 2 gender: GENDER_WOMAN conditions { name: "C" status: CONDITION_STATUS_AFFECTED } conditions { name: "E" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 2 index: 3 gender: GENDER_NONBINARY conditions { name: "D" status: CONDITION_STATUS_AFFECTED } conditions { name: "F" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 4 gender: GENDER_MAN conditions { name: "E" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 2 index: 5 gender: GENDER_WOMAN conditions { name: "F" status: CONDITION_STATUS_CARRIER } conditions { name: "A" status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 2 index: 6 gender: GENDER_NONBINARY }
+individuals { generation: 3 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_CARRIER } conditions { name: "B" status: CONDITION_STATUS_CARRIER } conditions { name: "C" status: CONDITION_STATUS_CARRIER } conditions { name: "D" status: CONDITION_STATUS_CARRIER } conditions { name: "E" status: CONDITION_STATUS_CARRIER } conditions { name: "F" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 2 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_AFFECTED } conditions { name: "D" status: CONDITION_STATUS_AFFECTED } conditions { name: "E" status: CONDITION_STATUS_AFFECTED } conditions { name: "F" status: CONDITION_STATUS_AFFECTED } }
+individuals { generation: 3 index: 3 gender: GENDER_NONBINARY conditions { name: "A" status: CONDITION_STATUS_CARRIER } conditions { name: "B" status: CONDITION_STATUS_CARRIER } conditions { name: "C" status: CONDITION_STATUS_CARRIER } conditions { name: "D" status: CONDITION_STATUS_CARRIER } conditions { name: "E" status: CONDITION_STATUS_CARRIER } conditions { name: "F" status: CONDITION_STATUS_CARRIER } }
+matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } offspring { child { generation: 2 index: 1 } } offspring { child { generation: 2 index: 3 } } offspring { child { generation: 2 index: 5 } } }
+matings { partner_a { generation: 2 index: 1 } partner_b { generation: 2 index: 2 } offspring { child { generation: 3 index: 1 } } offspring { child { generation: 3 index: 2 } } }
