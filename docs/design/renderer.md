@@ -111,15 +111,15 @@ fixed frame explicit, but a four- or six-spoke star on every empty symbol is noi
 another symbol. An unfilled symbol is its outline alone, as the standard draws it.
 
 **Condition index.** A condition's index is its place in the pedigree's condition legend. Index 0, which draws in the
-most distinct fill (black), goes to the **primary** condition: the proband's affected condition when a proband is
-affected with a named one, else the condition with the most affected individuals. The rest follow in the base order —
-phenotype labels first, then by first appearance in `Position` order — which also breaks ties; an unnamed condition (the
-figure's sole, unlabelled one) takes the last index. The primary is the one a reader looks for first, so it gets the
-fill that survives every size and printer. The index picks both the condition's fills and its section, pedigree-wide, so
-a condition looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index
-whether or not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts
-towards the section count and the six-condition limit — so the drawing of one individual never depends on another's
-status.
+most distinct fill (black), goes to the **primary** condition: the proband's affected condition when the proband is
+affected, else the condition with the most affected individuals. An unnamed condition (the figure's plain "affected",
+often beside named carrier-only conditions) is eligible like any other. The rest follow in the base order — phenotype
+labels first, then by first appearance in `Position` order, then the unnamed condition — which also breaks ties. The
+primary is the one a reader looks for first, so it gets the fill that survives every size and printer. The index picks
+both the condition's fills and its section, pedigree-wide, so a condition looks the same and sits in the same place on
+every symbol that shows it. Every legend entry holds its index whether or not any symbol is filled for it — a phenotype
+label nobody is shaded for still takes a section and counts towards the section count and the six-condition limit — so
+the drawing of one individual never depends on another's status.
 
 **Fills: the tone says the condition, the texture the status.**
 

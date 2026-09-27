@@ -1024,6 +1024,24 @@ def test_else_the_most_affected_condition_takes_index_0() -> None:
     assert _legend(p) == ["Polyneuropathy", "Bone Cancer", "Polio"]
 
 
+def test_an_unnamed_affected_condition_can_be_primary() -> None:
+    # The usual figure: a plain "affected" status (unnamed) beside two named carrier-only conditions. The affected
+    # condition is the one to draw black, whole-shape.
+    people = [
+        _person(1, ("", _AFF)),
+        _person(2, ("", _AFF)),
+        _person(3, ("HEXA", _CAR)),
+        _person(4, ("CFTR", _CAR)),
+    ]
+    root = _parse(render.render_svg(pb.Pedigree(individuals=people)))
+    assert json.loads(root.get("data-conditions", "null")) == ["", "HEXA", "CFTR"]
+    affected = _groups(root, "individual")[0]
+    (whole,) = _fills(affected)
+    assert whole.get("data-condition") == "0" and whole.get("width") == "36", "whole shape, in index 0's fill"
+    tone = _patterns(root)["fill-affected-0"].find(f"{_SVG}rect")
+    assert tone is not None and tone.get("fill") == "#000000"
+
+
 def test_a_tie_or_no_affected_keeps_the_base_order() -> None:
     labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
     tied = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _AFF)), _person(2, ("B", _AFF))])

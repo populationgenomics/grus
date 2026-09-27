@@ -100,15 +100,16 @@ class CountMark:
     inside: bool
 
 
-def condition_legend(p: pb.Pedigree) -> list[str]:
-    """Ordered distinct condition names in the pedigree — the index that keys each condition's fills and section.
+def data_legend(p: pb.Pedigree) -> list[str]:
+    """The pedigree's condition legend (``data-conditions``), whose index keys each condition's fills and section.
 
     The **primary** condition comes first, so it draws in the most distinct fill: the proband's affected condition
-    when a proband is affected with a named one, else the condition with the most affected individuals. After it,
-    and breaking ties, the base order: phenotype legend labels (their drawn order), then any remaining condition
+    when the proband is affected, else the condition with the most affected individuals — named or unnamed alike. After
+    it, and breaking ties, the base order: phenotype legend labels (their drawn order), then any remaining condition
     names by first appearance, walking individuals in ``Position`` order (never input order, so the legend and every
-    fill are independent of how the IR lists its individuals). A condition's index selects its fills and its
-    section, consistently pedigree-wide, so two conditions never share a section or a fill.
+    fill are independent of how the IR lists its individuals), then ``""`` for the unnamed condition when any
+    individual has one. So ``""`` is last unless the unnamed condition is the primary, when it is first. A
+    condition's index selects its fills and its section, consistently pedigree-wide.
     """
     order: list[str] = []
     seen: set[str] = set()
@@ -122,6 +123,8 @@ def condition_legend(p: pb.Pedigree) -> list[str]:
             if c.name and c.name not in seen:
                 seen.add(c.name)
                 order.append(c.name)
+    if any(not c.name for ind in p.individuals for c in ind.conditions):
+        order.append("")
     primary = _primary_condition(people, order)
     return order if primary is None else [primary, *(name for name in order if name != primary)]
 
@@ -130,20 +133,14 @@ def _primary_condition(people: list[pb.Individual], order: list[str]) -> str | N
     """The condition drawn first: a proband's affected one, else the most affected; ties go to ``order``."""
 
     def affected(ind: pb.Individual) -> set[str]:
-        return {c.name for c in ind.conditions if c.name and c.status == pb.CONDITION_STATUS_AFFECTED}
+        return {c.name for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED}
 
     for ind in people:
-        if ind.proband and (named := affected(ind)):
-            return min(named, key=order.index)
+        if ind.proband and (conditions := affected(ind)):
+            return min(conditions, key=order.index)
     counts = {name: sum(name in affected(ind) for ind in people) for name in order}
     best = max(counts.values(), default=0)
     return next(name for name in order if counts[name] == best) if best else None
-
-
-def data_legend(p: pb.Pedigree) -> list[str]:
-    """The ``data-conditions`` array: the named legend plus a trailing ``""`` slot when any condition is unnamed."""
-    unnamed = any(not c.name for ind in p.individuals for c in ind.conditions)
-    return [*condition_legend(p), *([""] if unnamed else [])]
 
 
 def sixths(p: pb.Pedigree) -> bool:
