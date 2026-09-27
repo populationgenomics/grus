@@ -129,10 +129,11 @@ section count and the six-condition limit — so the drawing of one individual n
 | 4     | near-black `#262626` | near-black with white `/` hatch |
 | 5     | pale grey `#b8b8b8`  | pale grey with black `\` hatch  |
 
-Conditions 4 and 5 take the two tones left in the gaps between the first four fills' mean greys, about 15 levels from
-their nearest neighbour where the first eight are about 26 apart. Six tones cannot all be told apart by grey alone, and
-they do not have to: a pedigree with five or six conditions is drawn in sixths, where every fill sits in its own fixed
-wedge, so a condition's position carries its identity and the tone only confirms it.
+Conditions 4 and 5 take a near-black and a pale grey, tones the first four do not use. Their fills are distinct at full
+size, but small, where the hatch blurs into its tone, they come close to others' (carrier 4, near-black with a white
+hatch, blurs to about the grey of carriers 0 and 2). Six conditions cannot be told apart by grey alone, and they do not
+have to: a pedigree with five or six conditions is drawn in sixths, where every fill sits in its own fixed wedge, so a
+condition's position carries its identity and the tone only confirms it.
 
 A carrier is the condition's own tone with a diagonal hatch in the contrasting colour, so "carrier of A" and "affected
 with A" share A's tone and differ only in texture, and a carrier of two conditions is two hatched sections, never a

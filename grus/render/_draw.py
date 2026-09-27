@@ -4,9 +4,9 @@ Reads only the per-level arrays (the geometry seam) plus each individual's symbo
 Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are stable.
 Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinical status as NSGC 2022 fills (one
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
-affected condition fills the whole shape, anything else fills one legend-keyed section per condition; every symbol of
-a multi-condition pedigree has dividers, and a filled section's edge inside a symbol is drawn as one), presymptomatic
-vertical line (outline weight, past the outline), deceased
+affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
+every symbol of a multi-condition pedigree has dividers, and a filled section's edge inside a symbol is drawn as one),
+presymptomatic vertical line (outline weight, past the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -372,7 +372,8 @@ class _FillPlan:
     """How one individual's clinical status is painted (docs/design/renderer.md, Clinical status).
 
     Attributes:
-        whole: the condition index whose affected fill covers the whole shape, when that is the only fill.
+        whole: the condition index whose affected fill covers the whole shape, when that is the only fill (never in
+            sixths, where every fill keeps its section).
         sections: otherwise each ``(index, status)`` painted in the index's section, in index order.
         dot: the condition index of the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH`` only).
     """
@@ -454,7 +455,7 @@ class _Draw:
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
     def _fill_plan(self, ind: pb.Individual) -> _FillPlan:
-        """``ind``'s fills: one affected condition fills the whole shape; anything else is sections.
+        """``ind``'s fills: one affected condition fills the whole shape (outside sixths); anything else is sections.
 
         Raises:
             DeferredFeatureError: a fill for a condition past the sixth (legend index ``_FILLS`` or above).
@@ -1249,9 +1250,9 @@ class _Draw:
     def _status_fill(self, ind: pb.Individual, plan: _FillPlan, cx: float, cy: float, *, clip_id: str) -> list[str]:
         """The ``fill`` and ``divider`` parts, drawn under the outline (docs/design/renderer.md, Clinical status).
 
-        One affected condition paints the whole shape. Otherwise each section is a rectangle for its condition index,
-        clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
-        math). The X-linked dot, when drawn, sits over it.
+        One affected condition paints the whole shape (outside sixths). Otherwise each section is a rectangle, or in
+        sixths a wedge, for its condition index, clipped to the shape by reusing the shape as a clipPath, so there is
+        no per-shape math. The X-linked dot, when drawn, sits over it.
         """
         # Fill parts are drawn about the symbol's own origin and moved into place, so each pattern has one phase per
         # symbol: the centre, or half a cell right of it for a circle (see _CELLS_PER_SYMBOL).
@@ -1324,7 +1325,7 @@ class _Draw:
         paint = f'{at} fill="url(#{self._fill_id(index, status)})" clip-path="url(#{clip_id})"'
         head = f'class="{cls}" data-condition="{index}" data-status="{status}"'
         if self._slots == 6:
-            # A triangle from the centre whose far edge lies well outside the shape; the clip trims it to the wedge.
+            # The centre and three points far outside the shape, on the wedge's edges and middle; the clip trims it.
             clock, reach = _SIXTH_CLOCK[index], 3 * h
             pts = [(cx, 0.0)]
             for off in (-1, 0, 1):

@@ -205,8 +205,8 @@ not have — a new condition on some of its individuals — the consumer adds th
 That is cheap and exact for a reason worth stating: layout and ordering read only the pedigree's structure and each
 individual's stable position, never clinical status, so a re-render with changed conditions draws every node in the same
 place and regenerates everything that does depend on them — the fills, the sections, the key, and the change from a
-two-way split to quadrants once a pedigree has more than two conditions. No stylesheet could do that last step, since it
-is new geometry keyed to the legend index.
+two-way split to quadrants once a pedigree has more than two conditions, and to sixths past four. No stylesheet could do
+that last step, since it is new geometry keyed to the legend index.
 
 The boundary between what a consumer's CSS can derive from the hooks and what needs the drawer is the boundary between
 paint and geometry. Fills are paint: they are already paint servers in the document's `defs`, and a stylesheet can
