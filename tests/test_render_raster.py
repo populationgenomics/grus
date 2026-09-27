@@ -7,6 +7,8 @@ tests never require ``anthropic``.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from grus import render
@@ -33,3 +35,11 @@ def test_rasterize_scale_increases_output() -> None:
     large = _rasterize_or_skip(_SVG, scale=3.0)
     assert small[:8] == _PNG_MAGIC and large[:8] == _PNG_MAGIC
     assert len(large) > len(small)  # more pixels at higher scale
+
+
+@pytest.mark.parametrize("name", ["compound_carrier", "condition_fills", "count_marks", "trio"])
+def test_goldens_with_fills_rasterize(name: str) -> None:
+    # Every named fill must survive the rasterizer the eval judge sees: cairosvg once failed (NO_MEMORY, or blank
+    # fills) on objectBoundingBox patterns painted more than twice.
+    svg = (pathlib.Path(__file__).parent / "goldens" / f"{name}.svg").read_text()
+    assert _rasterize_or_skip(svg)[:8] == _PNG_MAGIC

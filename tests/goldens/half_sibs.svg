@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="340" height="239" viewBox="0 0 340 239" class="pedigree" data-title="Half-sibs: one shared parent across two matings" data-conditions="[&quot;&quot;]">
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="289.456" viewBox="0 0 340 289.456" class="pedigree" data-title="Half-sibs: one shared parent across two matings" data-conditions="[&quot;&quot;]">
+<defs>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
+</defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
 </g>
@@ -39,7 +42,7 @@
 </g>
 <g id="ind-II-1" class="individual affected" data-position="II-1" data-generation="2" data-index="1" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="130" y="138" width="36" height="36" fill="#ffffff"/>
-<rect class="fill" data-condition="0" x="130" y="138" width="36" height="36" fill="#000000"/>
+<rect class="fill" data-condition="0" data-status="affected" transform="translate(148 156)" x="-18" y="-18" width="36" height="36" fill="url(#fill-affected-0)"/>
 <rect class="symbol" x="130" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="148" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
 <rect class="hit" x="130" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -54,5 +57,11 @@
 </g>
 <text class="label" x="232" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
 <rect class="hit" x="188.544" y="138" width="61.456" height="61.456" fill="none" pointer-events="all"/>
+</g>
+<g id="key" class="key">
+<g id="key-affected-0" class="key-entry" data-condition="0" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(97 232.456)" fill="url(#fill-affected-0)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="112" y="232.456" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Affected</text>
+</g>
 </g>
 </svg>

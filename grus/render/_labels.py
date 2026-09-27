@@ -100,11 +100,65 @@ class CountMark:
     inside: bool
 
 
-def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
+def condition_legend(p: pb.Pedigree) -> list[str]:
+    """Ordered distinct condition names in the pedigree — the index that keys each condition's fills and section.
+
+    Phenotype legend labels come first (their drawn order), then any remaining condition names by first
+    appearance, walking individuals in ``Position`` order (never input order, so the legend and every fill are
+    independent of how the IR lists its individuals). A condition's index selects its fills and its section,
+    consistently pedigree-wide, so two conditions never share a section or a fill.
+    """
+    order: list[str] = []
+    seen: set[str] = set()
+    for label in p.labels:
+        if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text and label.text not in seen:
+            seen.add(label.text)
+            order.append(label.text)
+    for ind in sorted(p.individuals, key=lambda ind: (ind.generation, ind.index)):
+        for c in ind.conditions:
+            if c.name and c.name not in seen:
+                seen.add(c.name)
+                order.append(c.name)
+    return order
+
+
+def data_legend(p: pb.Pedigree) -> list[str]:
+    """The ``data-conditions`` array: the named legend plus a trailing ``""`` slot when any condition is unnamed."""
+    unnamed = any(not c.name for ind in p.individuals for c in ind.conditions)
+    return [*condition_legend(p), *([""] if unnamed else [])]
+
+
+def divided(p: pb.Pedigree) -> bool:
+    """Whether every symbol of ``p`` is divided: its legend has two or more entries (docs/design/renderer.md).
+
+    Dividers cross each symbol's centre, so a count inside would overprint them; the count moves beside the symbol.
+    """
+    return len(data_legend(p)) >= 2
+
+
+def draws_centre_line(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
+    """Whether ``ind``'s symbol has a section line through its centre.
+
+    Always in a ``divided`` pedigree; otherwise the edge of a lone carrier's section (a single-condition pedigree's
+    carrier, unless its condition is the X-linked dot).
+    """
+    if divided:
+        return True
+    statuses = {c.status for c in ind.conditions}
+    if pb.CONDITION_STATUS_CARRIER not in statuses or pb.CONDITION_STATUS_AFFECTED in statuses:
+        return False
+    x_linked_dot = geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and any(
+        c.status == pb.CONDITION_STATUS_CARRIER and c.inheritance in _X_LINKED for c in ind.conditions
+    )
+    return not x_linked_dot
+
+
+def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
     """Whether drawing puts a mark through the symbol's centre, where the count would go.
 
-    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), the presymptomatic
-    line and the deceased slash — the same conditions under which ``_draw`` emits them.
+    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), a section line
+    (``draws_centre_line``), the presymptomatic line and the deceased slash — the same conditions under which
+    ``_draw`` emits them.
     """
     statuses = {c.status for c in ind.conditions}
     affected = pb.CONDITION_STATUS_AFFECTED in statuses
@@ -118,10 +172,11 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
         or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
         or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
         or x_linked_dot
+        or draws_centre_line(ind, geom, divided=divided)
     )
 
 
-def count_mark(ind: pb.Individual, geom: _geometry.Geometry) -> CountMark | None:
+def count_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> CountMark | None:
     """The count's placement: inside the symbol, shrunk to fit, unless a centre mark is there; None for one person.
 
     The count never overprints another mark: with one through the centre (``has_centre_mark``) it moves beside the
@@ -131,28 +186,28 @@ def count_mark(ind: pb.Individual, geom: _geometry.Geometry) -> CountMark | None
     text = count_text(ind)
     if text is None:
         return None
-    if has_centre_mark(ind, geom):
+    if has_centre_mark(ind, geom, divided=divided):
         return CountMark(text, COUNT_OUTSIDE_SCALE * geom.symbol_size, inside=False)
     fit = _COUNT_FIT.get(ind.gender, _COUNT_FIT_DIAMOND) * geom.symbol_size
     return CountMark(text, min(COUNT_SCALE * geom.symbol_size, fit / (0.6 * len(text))), inside=True)
 
 
-def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int) -> tuple[float, float]:
+def label_reach(ind: pb.Individual, geom: _geometry.Geometry, *, side: int, divided: bool) -> tuple[float, float]:
     """How far ``ind``'s drawing reaches left and right of its symbol's centre, in pixels: labels and count.
 
     ``side`` is ``Layout.label_side``: 0 for a stack centred under its symbol; for a symbol whose descent drops from
     its own centre (a count-collapsed or sideless lone parent), which would run through a centred stack, 1 for a
     stack aligned ``label_gap`` right of the line and -1 for one ``label_gap`` left of it. A count placed outside
-    the symbol reaches right (``outside_count_reach``).
+    the symbol reaches right (``outside_count_reach``); ``divided`` is ``divided(pedigree)``.
     """
     w = label_width(ind, geom)
     left, right = {0: (w / 2, w / 2), 1: (0.0, geom.label_gap + w), -1: (geom.label_gap + w, 0.0)}[side]
-    return left, max(right, outside_count_reach(ind, geom))
+    return left, max(right, outside_count_reach(ind, geom, divided=divided))
 
 
-def outside_count_reach(ind: pb.Individual, geom: _geometry.Geometry) -> float:
+def outside_count_reach(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> float:
     """How far right of the symbol's centre a count placed beside the symbol reaches, in pixels; 0.0 if none."""
-    mark = count_mark(ind, geom)
+    mark = count_mark(ind, geom, divided=divided)
     if mark is None or mark.inside:
         return 0.0
     return geom.symbol_size / 2 + COUNT_OUTSIDE_DX + 0.6 * mark.size * len(mark.text)

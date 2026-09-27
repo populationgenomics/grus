@@ -1,0 +1,216 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="371" viewBox="0 0 760 371" class="pedigree" data-title="Fills by condition index and status" data-conditions="[&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;]">
+<defs>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
+<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#000000"/><path class="hatch" d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#484848"/></pattern>
+<pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#484848"/><path class="hatch" d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#9c9c9c"/></pattern>
+<pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#9c9c9c"/><path class="hatch" d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-3" class="fill-pattern" data-condition="3" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#dbdbdb"/></pattern>
+<pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#dbdbdb"/><path class="hatch" d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+</defs>
+<g class="generation" data-generation="1">
+<text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
+</g>
+<g class="generation" data-generation="2">
+<text x="20" y="156" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">II</text>
+</g>
+<g class="generation" data-generation="3">
+<text x="20" y="246" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">III</text>
+</g>
+<g id="ind-I-1" class="individual affected" data-position="I-1" data-generation="1" data-index="1" data-gender="man" data-condition-0="affected">
+<rect class="backing" x="88" y="48" width="36" height="36" fill="#ffffff"/>
+<rect class="fill" data-condition="0" data-status="affected" transform="translate(106 66)" x="-18" y="-18" width="36" height="36" fill="url(#fill-affected-0)"/>
+<line class="divider" x1="106" y1="48" x2="106" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="88" y1="66" x2="124" y2="66" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="88" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="106" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
+<rect class="hit" x="88" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-I-2" class="individual affected" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-1="affected">
+<circle class="backing" cx="190" cy="66" r="18" fill="#ffffff"/>
+<circle class="fill" data-condition="1" data-status="affected" transform="translate(194.5 66)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-1)"/>
+<line class="divider" x1="190" y1="48" x2="190" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="172" y1="66" x2="208" y2="66" stroke="#000000" stroke-width="1"/>
+<circle class="symbol" cx="190" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="190" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
+<rect class="hit" x="172" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-I-3" class="individual affected" data-position="I-3" data-generation="1" data-index="3" data-gender="nonbinary" data-condition-2="affected">
+<polygon class="backing" points="274,48 292,66 274,84 256,66" fill="#ffffff"/>
+<polygon class="fill" data-condition="2" data-status="affected" transform="translate(274 66)" points="0,-18 18,0 0,18 -18,0" fill="url(#fill-affected-2)"/>
+<line class="divider" x1="274" y1="48" x2="274" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="256" y1="66" x2="292" y2="66" stroke="#000000" stroke-width="1"/>
+<polygon class="symbol" points="274,48 292,66 274,84 256,66" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="274" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-3</text>
+<rect class="hit" x="256" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-I-4" class="individual affected" data-position="I-4" data-generation="1" data-index="4" data-gender="man" data-condition-3="affected">
+<rect class="backing" x="340" y="48" width="36" height="36" fill="#ffffff"/>
+<rect class="fill" data-condition="3" data-status="affected" transform="translate(358 66)" x="-18" y="-18" width="36" height="36" fill="url(#fill-affected-3)"/>
+<line class="divider" x1="358" y1="48" x2="358" y2="84" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="340" y1="66" x2="376" y2="66" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="340" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="358" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-4</text>
+<rect class="hit" x="340" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-1" class="individual carrier" data-position="II-1" data-generation="2" data-index="1" data-gender="man" data-condition-0="carrier">
+<rect class="backing" x="88" y="138" width="36" height="36" fill="#ffffff"/>
+<clipPath id="clip-II-1"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="18" transform="translate(106 156)" fill="url(#fill-carrier-0)" clip-path="url(#clip-II-1)"/>
+<line class="divider" x1="106" y1="138" x2="106" y2="174" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="88" y1="156" x2="124" y2="156" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="88" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="106" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
+<rect class="hit" x="88" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-2" class="individual carrier" data-position="II-2" data-generation="2" data-index="2" data-gender="woman" data-condition-1="carrier">
+<circle class="backing" cx="190" cy="156" r="18" fill="#ffffff"/>
+<clipPath id="clip-II-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="1" data-status="carrier" x="-4.5" y="-18" width="18" height="18" transform="translate(194.5 156)" fill="url(#fill-carrier-1)" clip-path="url(#clip-II-2)"/>
+<line class="divider" x1="190" y1="138" x2="190" y2="174" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="172" y1="156" x2="208" y2="156" stroke="#000000" stroke-width="1"/>
+<circle class="symbol" cx="190" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="190" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
+<rect class="hit" x="172" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-3" class="individual carrier" data-position="II-3" data-generation="2" data-index="3" data-gender="nonbinary" data-condition-2="carrier">
+<polygon class="backing" points="274,138 292,156 274,174 256,156" fill="#ffffff"/>
+<clipPath id="clip-II-3"><polygon points="0,-18 18,0 0,18 -18,0" fill="none"/></clipPath>
+<rect class="fill" data-condition="2" data-status="carrier" x="-18" y="0" width="18" height="18" transform="translate(274 156)" fill="url(#fill-carrier-2)" clip-path="url(#clip-II-3)"/>
+<line class="divider" x1="274" y1="138" x2="274" y2="174" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="256" y1="156" x2="292" y2="156" stroke="#000000" stroke-width="1"/>
+<polygon class="symbol" points="274,138 292,156 274,174 256,156" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="274" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-3</text>
+<rect class="hit" x="256" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-4" class="individual carrier" data-position="II-4" data-generation="2" data-index="4" data-gender="man" data-condition-3="carrier">
+<rect class="backing" x="340" y="138" width="36" height="36" fill="#ffffff"/>
+<clipPath id="clip-II-4"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
+<rect class="fill" data-condition="3" data-status="carrier" x="0" y="0" width="18" height="18" transform="translate(358 156)" fill="url(#fill-carrier-3)" clip-path="url(#clip-II-4)"/>
+<line class="divider" x1="358" y1="138" x2="358" y2="174" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="340" y1="156" x2="376" y2="156" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="340" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="358" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-4</text>
+<rect class="hit" x="340" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-1" class="individual affected" data-position="III-1" data-generation="3" data-index="1" data-gender="woman" data-condition-0="affected" data-condition-1="affected">
+<circle class="backing" cx="106" cy="246" r="18" fill="#ffffff"/>
+<clipPath id="clip-III-1"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-22.5" y="-18" width="18" height="18" transform="translate(110.5 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-1)"/>
+<rect class="fill" data-condition="1" data-status="affected" x="-4.5" y="-18" width="18" height="18" transform="translate(110.5 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-1)"/>
+<line class="divider" x1="106" y1="228" x2="106" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="88" y1="246" x2="124" y2="246" stroke="#000000" stroke-width="1"/>
+<circle class="symbol" cx="106" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="106" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-1</text>
+<rect class="hit" x="88" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-2" class="individual carrier" data-position="III-2" data-generation="3" data-index="2" data-gender="man" data-condition-0="carrier" data-condition-1="carrier">
+<rect class="backing" x="172" y="228" width="36" height="36" fill="#ffffff"/>
+<clipPath id="clip-III-2"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="18" transform="translate(190 246)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-2)"/>
+<rect class="fill" data-condition="1" data-status="carrier" x="0" y="-18" width="18" height="18" transform="translate(190 246)" fill="url(#fill-carrier-1)" clip-path="url(#clip-III-2)"/>
+<line class="divider" x1="190" y1="228" x2="190" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="172" y1="246" x2="208" y2="246" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="172" y="228" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="190" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-2</text>
+<rect class="hit" x="172" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-3" class="individual affected carrier" data-position="III-3" data-generation="3" data-index="3" data-gender="nonbinary" data-condition-0="affected" data-condition-2="carrier">
+<polygon class="backing" points="274,228 292,246 274,264 256,246" fill="#ffffff"/>
+<clipPath id="clip-III-3"><polygon points="0,-18 18,0 0,18 -18,0" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-18" y="-18" width="18" height="18" transform="translate(274 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-3)"/>
+<rect class="fill" data-condition="2" data-status="carrier" x="-18" y="0" width="18" height="18" transform="translate(274 246)" fill="url(#fill-carrier-2)" clip-path="url(#clip-III-3)"/>
+<line class="divider" x1="274" y1="228" x2="274" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="256" y1="246" x2="292" y2="246" stroke="#000000" stroke-width="1"/>
+<polygon class="symbol" points="274,228 292,246 274,264 256,246" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="274" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-3</text>
+<rect class="hit" x="256" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-4" class="individual affected" data-position="III-4" data-generation="3" data-index="4" data-gender="woman" data-condition-0="affected" data-condition-1="affected" data-condition-2="affected" data-condition-3="affected">
+<circle class="backing" cx="358" cy="246" r="18" fill="#ffffff"/>
+<clipPath id="clip-III-4"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-22.5" y="-18" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="1" data-status="affected" x="-4.5" y="-18" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="2" data-status="affected" x="-22.5" y="0" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-2)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="3" data-status="affected" x="-4.5" y="0" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-4)"/>
+<line class="divider" x1="358" y1="228" x2="358" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="340" y1="246" x2="376" y2="246" stroke="#000000" stroke-width="1"/>
+<circle class="symbol" cx="358" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="358" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-4</text>
+<rect class="hit" x="340" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-5" class="individual carrier" data-position="III-5" data-generation="3" data-index="5" data-gender="man" data-condition-2="carrier" data-condition-3="carrier">
+<rect class="backing" x="424" y="228" width="36" height="36" fill="#ffffff"/>
+<clipPath id="clip-III-5"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
+<rect class="fill" data-condition="2" data-status="carrier" x="-18" y="0" width="18" height="18" transform="translate(442 246)" fill="url(#fill-carrier-2)" clip-path="url(#clip-III-5)"/>
+<rect class="fill" data-condition="3" data-status="carrier" x="0" y="0" width="18" height="18" transform="translate(442 246)" fill="url(#fill-carrier-3)" clip-path="url(#clip-III-5)"/>
+<line class="divider" x1="442" y1="228" x2="442" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="424" y1="246" x2="460" y2="246" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="424" y="228" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="442" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-5</text>
+<rect class="hit" x="424" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-6" class="individual presymptomatic" data-position="III-6" data-generation="3" data-index="6" data-gender="man" data-condition-0="presymptomatic">
+<rect class="backing" x="508" y="228" width="36" height="36" fill="#ffffff"/>
+<line class="divider" x1="526" y1="228" x2="526" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="508" y1="246" x2="544" y2="246" stroke="#000000" stroke-width="1"/>
+<rect class="symbol" x="508" y="228" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="526" y1="226" x2="526" y2="266" stroke="#000000" stroke-width="2"/>
+<text class="label" x="526" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-6</text>
+<rect class="hit" x="508" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-7" class="individual carrier presymptomatic" data-position="III-7" data-generation="3" data-index="7" data-gender="woman" data-condition-0="presymptomatic" data-condition-1="carrier">
+<circle class="backing" cx="610" cy="246" r="18" fill="#ffffff"/>
+<clipPath id="clip-III-7"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="1" data-status="carrier" x="-4.5" y="-18" width="18" height="18" transform="translate(614.5 246)" fill="url(#fill-carrier-1)" clip-path="url(#clip-III-7)"/>
+<line class="divider" x1="610" y1="228" x2="610" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="592" y1="246" x2="628" y2="246" stroke="#000000" stroke-width="1"/>
+<circle class="symbol" cx="610" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="610" y1="226" x2="610" y2="266" stroke="#000000" stroke-width="2"/>
+<text class="label" x="610" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-7</text>
+<rect class="hit" x="592" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-III-8" class="individual" data-position="III-8" data-generation="3" data-index="8" data-gender="nonbinary">
+<polygon class="backing" points="694,228 712,246 694,264 676,246" fill="#ffffff"/>
+<line class="divider" x1="694" y1="228" x2="694" y2="264" stroke="#000000" stroke-width="1"/>
+<line class="divider" x1="676" y1="246" x2="712" y2="246" stroke="#000000" stroke-width="1"/>
+<polygon class="symbol" points="694,228 712,246 694,264 676,246" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="694" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-8</text>
+<rect class="hit" x="676" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="key" class="key">
+<g id="key-affected-0" class="key-entry" data-condition="0" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(97 314)" fill="url(#fill-affected-0)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="112" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">A</text>
+</g>
+<g id="key-carrier-0" class="key-entry" data-condition="0" data-status="carrier">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(145.6 314)" fill="url(#fill-carrier-0)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="160.6" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: A</text>
+</g>
+<g id="key-affected-1" class="key-entry" data-condition="1" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(253.6 314)" fill="url(#fill-affected-1)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="268.6" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">B</text>
+</g>
+<g id="key-carrier-1" class="key-entry" data-condition="1" data-status="carrier">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(302.2 314)" fill="url(#fill-carrier-1)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="317.2" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: B</text>
+</g>
+<g id="key-affected-2" class="key-entry" data-condition="2" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(410.2 314)" fill="url(#fill-affected-2)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="425.2" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">C</text>
+</g>
+<g id="key-carrier-2" class="key-entry" data-condition="2" data-status="carrier">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(458.8 314)" fill="url(#fill-carrier-2)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="473.8" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: C</text>
+</g>
+<g id="key-affected-3" class="key-entry" data-condition="3" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(566.8 314)" fill="url(#fill-affected-3)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="581.8" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">D</text>
+</g>
+<g id="key-carrier-3" class="key-entry" data-condition="3" data-status="carrier">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(615.4 314)" fill="url(#fill-carrier-3)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="630.4" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: D</text>
+</g>
+</g>
+</svg>

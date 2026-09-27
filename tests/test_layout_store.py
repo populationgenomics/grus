@@ -229,7 +229,7 @@ _KEY_FIELDS = (
 def test_a_layout_under_other_layout_geometry_is_stale(field: str) -> None:
     p = _FIXTURES["three_generation"]
     stored = render.store_layout(p)
-    enums = {"x_solver": render.XSolver.HIGHS, "carrier_style": render.CarrierStyle.PARTITION_FILL}
+    enums = {"x_solver": render.XSolver.HIGHS, "carrier_style": render.CarrierStyle.INHERITANCE_GLYPH}
     changed = enums[field] if field in enums else getattr(_GEOM, field) + 1.0
     geom = dataclasses.replace(_GEOM, **{field: changed})
     with pytest.raises(render.StaleLayoutError, match=field):

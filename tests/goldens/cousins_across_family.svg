@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="564" height="329" viewBox="0 0 564 329" class="pedigree" data-title="First cousins marry across a middle sibling's family: the middle family moves aside" data-conditions="[&quot;&quot;]">
+<svg xmlns="http://www.w3.org/2000/svg" width="564" height="371" viewBox="0 0 564 371" class="pedigree" data-title="First cousins marry across a middle sibling's family: the middle family moves aside" data-conditions="[&quot;&quot;]">
+<defs>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
+</defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
 </g>
@@ -57,7 +60,7 @@
 </g>
 <g id="ind-I-2" class="individual affected" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="274" cy="66" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" cx="274" cy="66" r="18" fill="#000000"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(278.5 66)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="274" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="274" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="256" y="48" width="36" height="53" fill="none" pointer-events="all"/>
@@ -76,7 +79,7 @@
 </g>
 <g id="ind-II-1" class="individual affected" data-position="II-1" data-generation="2" data-index="1" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="228" y="138" width="36" height="36" fill="#ffffff"/>
-<rect class="fill" data-condition="0" x="228" y="138" width="36" height="36" fill="#000000"/>
+<rect class="fill" data-condition="0" data-status="affected" transform="translate(246 156)" x="-18" y="-18" width="36" height="36" fill="url(#fill-affected-0)"/>
 <rect class="symbol" x="228" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="246" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
 <rect class="hit" x="228" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -95,7 +98,7 @@
 </g>
 <g id="ind-II-6" class="individual affected deceased" data-position="II-6" data-generation="2" data-index="6" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="442" cy="156" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" cx="442" cy="156" r="18" fill="#000000"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(446.5 156)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="442" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <line class="mark deceased" x1="416.8" y1="181.2" x2="467.2" y2="130.8" stroke="#000000" stroke-width="2"/>
 <text class="label" x="442" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-6</text>
@@ -121,9 +124,15 @@
 </g>
 <g id="ind-III-4" class="individual affected" data-position="III-4" data-generation="3" data-index="4" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="480" y="228" width="36" height="36" fill="#ffffff"/>
-<rect class="fill" data-condition="0" x="480" y="228" width="36" height="36" fill="#000000"/>
+<rect class="fill" data-condition="0" data-status="affected" transform="translate(498 246)" x="-18" y="-18" width="36" height="36" fill="url(#fill-affected-0)"/>
 <rect class="symbol" x="480" y="228" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="498" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-4</text>
 <rect class="hit" x="480" y="228" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="key" class="key">
+<g id="key-affected-0" class="key-entry" data-condition="0" data-status="affected">
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(97 314)" fill="url(#fill-affected-0)" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="112" y="314" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Affected</text>
+</g>
 </g>
 </svg>

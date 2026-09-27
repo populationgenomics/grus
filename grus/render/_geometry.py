@@ -22,8 +22,8 @@ class CarrierStyle(enum.Enum):
     the glyph, so a re-render can match either the existing literature or the current standard.
     """
 
-    INHERITANCE_GLYPH = "inheritance_glyph"  # pre-2022 / practitioner: X-linked -> central dot, else half/region fill
-    PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5: legend-keyed divided fill, dot retired, any inheritance
+    INHERITANCE_GLYPH = "inheritance_glyph"  # pre-2022 literature: an unaffected X-linked carrier is a central dot
+    PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5 (default): every carrier a hatched section, dot glyph retired
 
 
 @dataclasses.dataclass(frozen=True)
@@ -58,6 +58,11 @@ class Geometry:
         label_box_height: minimum reserved label band below each symbol, in em of ``label_size`` (0 =
             none). A floor under the tallest label stack, so a consumer may add lines up to this tall and
             stay clear of the row below.
+        carrier_style: how a carrier is drawn (``CarrierStyle``); drawing-only except that the X-linked dot sends a
+            count beside its symbol.
+        key_gap: pixels between the drawing's lowest label or arrow and the key below it.
+        key_entry_gap: pixels between adjacent key entries on one row; rows are a quarter of ``symbol_size``
+            apart. A key swatch is one quadrant of a symbol (``symbol_size / 2``), so its fill has the symbol's phase.
 
     ``gen_height`` and ``x_unit`` are floors: drawing opens the row pitch and column pitch further
     when a pedigree's label stacks need it (see ``_draw``). The label stack under each symbol lists the
@@ -83,9 +88,9 @@ class Geometry:
     label_box_height: float = 0.0
     margin: float = 48.0
     gen_marker_gutter: float = 40.0
-    # default matches the existing literature (dot for X-linked carriers), so re-renders line up with the
-    # corpus figures reviewers compare against; PARTITION_FILL gives the NSGC-2022-normalized output.
-    carrier_style: CarrierStyle = CarrierStyle.INHERITANCE_GLYPH
+    carrier_style: CarrierStyle = CarrierStyle.PARTITION_FILL
+    key_gap: float = 24.0
+    key_entry_gap: float = 18.0
     # The x-solve backend. Z3 is exact (bit-identical positions everywhere, what the goldens are pinned to);
     # HIGHS is the optional floating-point alternative (the ``highs`` extra).
     x_solver: XSolver = XSolver.Z3

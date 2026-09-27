@@ -74,7 +74,10 @@ _SYMBOL_CIRCLE_RE = re.compile(r'<circle class="symbol" cx="([-0-9.]+)" cy="([-0
 _SYMBOL_RECT_RE = re.compile(r'<rect class="symbol" x="([-0-9.]+)" y="([-0-9.]+)"')
 # Drawn (non-hit) elements: the invisible pointer targets carry class="hit" and are not glyphs.
 _GLYPH_LINE_RE = re.compile(r'<line (?!class="hit")(?:class="[^"]*" )?x1="([-0-9.]+)" y1="[-0-9.]+" x2="([-0-9.]+)"')
-_GLYPH_RECT_RE = re.compile(r'<rect (?!class="hit")(?:class="[^"]*" )?(?:data-condition="\d+" )?x="([-0-9.]+)"')
+# A fill part or key swatch is drawn in local coordinates and placed by a transform; these read absolute ones only.
+_GLYPH_RECT_RE = re.compile(
+    r'<rect (?!class="hit")(?![^>]*transform=)(?:class="[^"]*" )?(?:data-condition="\d+" )?x="([-0-9.]+)"'
+)
 _GLYPH_CIRCLE_RE = re.compile(r'<circle (?:class="[^"]*" )?cx="([-0-9.]+)" cy="[-0-9.]+" r="([-0-9.]+)"')
 _GLYPH_POLYGON_RE = re.compile(r'<polygon (?:class="[^"]*" )?points="([^"]+)"')
 _WIDTH_RE = re.compile(r'<svg [^>]*\bwidth="([-0-9.]+)"')
@@ -85,10 +88,13 @@ def _texts(svg: str) -> list[tuple[float, float, float, str]]:
     return [(float(x), float(y), float(sz), s) for x, y, sz, s in _TEXT_RE.findall(svg)]
 
 
+_KEY_LABEL_RE = re.compile(r'<text class="key-label"[^>]*>[^<]*</text>')
+
+
 def _label_lines(svg: str) -> list[tuple[float, float, str]]:
-    """Just the label-stack lines (font size == label_size): ``(x, y, content)``."""
+    """Just the label-stack lines (font size == label_size, the key's labels excluded): ``(x, y, content)``."""
     size = render.DEFAULT_GEOMETRY.label_size
-    return [(x, y, s) for x, y, sz, s in _texts(svg) if sz == size]
+    return [(x, y, s) for x, y, sz, s in _texts(_KEY_LABEL_RE.sub("", svg)) if sz == size]
 
 
 _LABEL_RE = re.compile(
@@ -327,37 +333,35 @@ def test_childless_couple_draws_the_bennett_glyph() -> None:
     assert not any(v for row in fertile for v in row), "a couple with children draws no childless glyph"
 
 
-def test_carrier_glyph_depends_on_inheritance() -> None:
-    # The carrier glyph is chosen by the condition's inheritance: a half-filled symbol (clipped to the shape)
-    # for autosomal recessive, a central dot for X-linked; an unspecified carrier defaults to the AR half-fill.
-    ar = render.render_svg(
-        _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE))
-    )
-    assert "<clipPath" in ar and 'clip-path="url(#' in ar, "an AR carrier is a shape-clipped half-fill"
-    xl = render.render_svg(
-        _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE))
-    )
-    assert "<clipPath" not in xl and 'r="' in xl, "an X-linked carrier is a central dot, not a half-fill"
-    default = render.render_svg(_one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER)))
-    assert "<clipPath" in default, "an unspecified-inheritance carrier defaults to the AR half-fill"
-
-
 def _one(cond: pb.Condition) -> pb.Pedigree:
     return pb.Pedigree(individuals=[pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN, conditions=[cond])])
 
 
-def test_carrier_style_toggle_controls_the_x_linked_glyph() -> None:
-    # The carrier convention is a render option, not IR meaning. An X-linked carrier is a central dot under
-    # the default INHERITANCE_GLYPH style, but a shape-clipped region fill (dot retired) under PARTITION_FILL.
-    import dataclasses
+_GLYPH = dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.CarrierStyle.INHERITANCE_GLYPH)
 
+
+def test_carrier_style_controls_the_x_linked_glyph() -> None:
+    # The carrier convention is a render option, not IR meaning. Under the default PARTITION_FILL (NSGC 2022, dot
+    # retired) every carrier is a hatched section whatever its inheritance; under INHERITANCE_GLYPH an unaffected
+    # X-linked carrier is a central dot, and any other carrier is still a section.
+    assert render.DEFAULT_GEOMETRY.carrier_style is render.CarrierStyle.PARTITION_FILL
     xl = _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE))
-    default = render.render_svg(xl)  # DEFAULT_GEOMETRY -> INHERITANCE_GLYPH
-    assert "<clipPath" not in default, "default (existing-literature) X-linked carrier is a central dot"
-    partition = render.render_svg(
-        xl, dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.CarrierStyle.PARTITION_FILL)
-    )
-    assert "<clipPath" in partition, "under 2022 PARTITION_FILL the X-linked carrier is a region fill, not a dot"
+    ar = _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE))
+    for svg in (render.render_svg(xl), render.render_svg(ar), render.render_svg(ar, _GLYPH)):
+        assert 'fill="url(#fill-carrier-0)" clip-path="url(#' in svg and 'class="fill dot"' not in svg
+    dotted = render.render_svg(xl, _GLYPH)
+    assert 'class="fill dot"' in dotted and "<clipPath" not in dotted and "<pattern" not in dotted
+    assert 'id="key-carrier-dot-0"' in dotted, "the dot is a fill, so the key defines it"
+
+
+def test_inheritance_glyph_draws_the_other_carriers_beside_the_dot() -> None:
+    # Under INHERITANCE_GLYPH the dot stands for the X-linked carrier only; a second, autosomal carrier is a section.
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN)
+    ind.conditions.add(name="DMD", status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)
+    ind.conditions.add(name="CF", status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
+    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
+    assert 'class="fill dot" data-condition="0"' in svg
+    assert 'data-condition="1" data-status="carrier"' in svg and 'fill="url(#fill-carrier-1)"' in svg
 
 
 def test_carrier_fill_keyed_to_named_variant() -> None:
@@ -376,7 +380,9 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
         return pb.Pedigree(individuals=[c(1, name_a), c(2, name_b)])
 
     def rect_xs(svg: str) -> list[float]:
-        return sorted(float(x) for x in re.findall(r'<rect class="fill" data-condition="\d+" x="([-0-9.]+)"', svg))
+        return sorted(
+            float(x) for x in re.findall(r'<rect class="fill" data-condition="\d+" [^>]*?x="([-0-9.]+)"', svg)
+        )
 
     different = rect_xs(render.render_svg(two("varA", "varB")))
     same = rect_xs(render.render_svg(two("varA", "varA")))
@@ -1647,3 +1653,28 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     ) or any(abs(x - mid_px) < 0.5 and y <= parent_y + 0.5 for x, y in starts), (
         "the offset single-child descent must originate from the parents' mating midpoint"
     )
+
+
+def test_inheritance_glyph_draws_a_second_x_linked_carrier_as_a_section() -> None:
+    # The dot says one condition; a second X-linked carrier condition is a section and a key entry, never dropped.
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN)
+    for name in ("DMD", "HEMA"):
+        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)
+    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
+    assert 'class="fill dot" data-condition="0"' in svg and 'id="key-carrier-dot-0"' in svg
+    assert 'fill="url(#fill-carrier-1)"' in svg and 'id="key-carrier-1"' in svg
+
+
+def test_the_dot_goes_to_the_lowest_index_whatever_the_ir_order() -> None:
+    def woman(i: int, names: tuple[str, str]) -> pb.Individual:
+        ind = pb.Individual(generation=1, index=i, gender=pb.GENDER_WOMAN)
+        for name in names:
+            ind.conditions.add(
+                name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE
+            )
+        return ind
+
+    svg = render.render_svg(pb.Pedigree(individuals=[woman(1, ("A", "B")), woman(2, ("B", "A"))]), _GLYPH)
+    assert svg.count('class="fill dot" data-condition="0"') == 2
+    assert re.findall(r'id="(key-[^"]+)"', svg) == ["key-carrier-dot-0", "key-carrier-1"]
+    assert ">X-linked carrier: A<" in svg
