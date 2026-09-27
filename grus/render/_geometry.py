@@ -23,7 +23,7 @@ class CarrierStyle(enum.Enum):
     """
 
     INHERITANCE_GLYPH = "inheritance_glyph"  # pre-2022 literature: an unaffected X-linked carrier is a central dot
-    PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5 (default): every carrier a dotted section, dot glyph retired
+    PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5 (default): every carrier a hatched section, dot glyph retired
 
 
 @dataclasses.dataclass(frozen=True)

@@ -136,12 +136,29 @@ def divided(p: pb.Pedigree) -> bool:
     return len(data_legend(p)) >= 2
 
 
+def draws_centre_line(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
+    """Whether ``ind``'s symbol has a section line through its centre.
+
+    Always in a ``divided`` pedigree; otherwise the edge of a lone carrier's section (a single-condition pedigree's
+    carrier, unless its condition is the X-linked dot).
+    """
+    if divided:
+        return True
+    statuses = {c.status for c in ind.conditions}
+    if pb.CONDITION_STATUS_CARRIER not in statuses or pb.CONDITION_STATUS_AFFECTED in statuses:
+        return False
+    x_linked_dot = geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and any(
+        c.status == pb.CONDITION_STATUS_CARRIER and c.inheritance in _X_LINKED for c in ind.conditions
+    )
+    return not x_linked_dot
+
+
 def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bool) -> bool:
     """Whether drawing puts a mark through the symbol's centre, where the count would go.
 
-    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), the dividers every
-    symbol of a ``divided`` pedigree draws, the presymptomatic line and the deceased slash — the same conditions
-    under which ``_draw`` emits them.
+    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), a section line
+    (``draws_centre_line``), the presymptomatic line and the deceased slash — the same conditions under which
+    ``_draw`` emits them.
     """
     statuses = {c.status for c in ind.conditions}
     affected = pb.CONDITION_STATUS_AFFECTED in statuses
@@ -155,7 +172,7 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, *, divided: bo
         or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
         or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
         or x_linked_dot
-        or divided
+        or draws_centre_line(ind, geom, divided=divided)
     )
 
 

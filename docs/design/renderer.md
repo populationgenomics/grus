@@ -75,20 +75,20 @@ group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its 
 `count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
 centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
 for a circle, 0.5 for a diamond), white when the whole shape is a dark affected tone (index 0 or 1, below) and black
-otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, the dividers every symbol of
-a multi-condition pedigree draws, the presymptomatic line, the deceased slash — it moves beside the symbol's upper right
-at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side, clear of the arrow (lower left) and
-the labels (below); the x-solve spaces the next cell so the count clears both its label and its symbol. Either way it
-has a 3 px halo in the contrasting colour, so it reads over any fill. A ghost draws the same fills as its real cell and
-places its count as the real cell does. Connectors: **mating line** (horizontal between partners; doubled for
-consanguinity — the double line is emitted iff `spouse==2`, which is set only from the explicit `Mating.consanguineous`
-flag, for every adjacent couple including founders), **descent/sibship line** (vertical drop from the mating midpoint →
-horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in a crossing or a cousin standing
-beside its mate, turns at its own elbow track above the bars with rounded corners and lands on its bar's near end, and
-elbows sharing a row gap stagger, a drop standing over another's landing leg turning higher), a **founder sibship**'s
-implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point
-instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless
-glyph** (a couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
+otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, a divider or a lone carrier
+section's inner edge, the presymptomatic line, the deceased slash — it moves beside the symbol's upper right at
+`0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side, clear of the arrow (lower left) and the
+labels (below); the x-solve spaces the next cell so the count clears both its label and its symbol. Either way it has a
+3 px halo in the contrasting colour, so it reads over any fill. A ghost draws the same fills as its real cell and places
+its count as the real cell does. Connectors: **mating line** (horizontal between partners; doubled for consanguinity —
+the double line is emitted iff `spouse==2`, which is set only from the explicit `Mating.consanguineous` flag, for every
+adjacent couple including founders), **descent/sibship line** (vertical drop from the mating midpoint → horizontal sib
+bar → per-child stubs; a drop the order leaves beside its children, as in a crossing or a cousin standing beside its
+mate, turns at its own elbow track above the bars with rounded corners and lands on its bar's near end, and elbows
+sharing a row gap stagger, a drop standing over another's landing leg turning higher), a **founder sibship**'s implied
+hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short vertical stub rising to a point instead
+of a descent drop), **twins** (child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a
+couple with no offspring: a stub from the mating midpoint down to a short horizontal bar — one bar for
 `CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
@@ -120,48 +120,52 @@ quadrants and the four-fill limit — so the drawing of one individual never dep
 
 **Fills: the tone says the condition, the texture the status.**
 
-| index | affected             | carrier                    |
-| ----- | -------------------- | -------------------------- |
-| 0     | black `#000000`      | black with white dots      |
-| 1     | dark grey `#484848`  | dark grey with white dots  |
-| 2     | mid grey `#9c9c9c`   | mid grey with black dots   |
-| 3     | light grey `#dbdbdb` | light grey with black dots |
+| index | affected             | carrier                         |
+| ----- | -------------------- | ------------------------------- |
+| 0     | black `#000000`      | black with white `/` hatch      |
+| 1     | dark grey `#484848`  | dark grey with white `\` hatch  |
+| 2     | mid grey `#9c9c9c`   | mid grey with black `/` hatch   |
+| 3     | light grey `#dbdbdb` | light grey with black `\` hatch |
 
-A carrier is the condition's own tone with a square grid of dots in the contrasting colour, so "carrier of A" and
-"affected with A" share A's tone and differ only in texture, and a carrier of two conditions is two dotted sections,
-never a solid, affected-looking symbol. The standard's example fills (horizontal and vertical lines, which it says
-*could* be used) are avoided: a vertical line through a symbol is its presymptomatic glyph and the dividers are
-vertical, and horizontal lines echo the mating lines, sib bars and the childless bar. Dots are the one texture nothing
-else in a pedigree draws.
+A carrier is the condition's own tone with a diagonal hatch in the contrasting colour, so "carrier of A" and "affected
+with A" share A's tone and differ only in texture, and a carrier of two conditions is two hatched sections, never a
+solid, affected-looking symbol. The hatch alternates direction by index, so neighbouring tones — the pairs that merge
+first when a figure is rastered small — also differ in direction.
 
-The fills must stay apart when a figure is rastered small, where the dots blur into their tone. The dots cover about 17%
-of a carrier's area, and the tones are chosen so that the eight fills' mean greys, with white, fall about 26 levels
-apart: in order, affected 0, carrier 0, affected 1, carrier 1, carrier 2, affected 2, carrier 3, affected 3. At that
-size a fill is told from its neighbours by grey level alone, which reads side by side (the key sits beside every
-drawing) and is marginal in isolation between neighbours in that order.
+The standard's example fills (horizontal and vertical lines, which it says *could* be used) are avoided: a vertical line
+through a symbol is its presymptomatic glyph and the dividers are vertical, and horizontal lines echo the mating lines,
+sib bars and the childless bar. Diagonal lines are also what survives a small raster: a dot pattern (tried at a 17%
+cover, 3.5 px dots) blurs into its tone below about half size, leaving only a grey level to tell fills apart, while a
+line keeps its streaks down to about a third. Below that the hatch blurs too, and a fill is told from its neighbours by
+grey level and faint direction, which reads side by side (the key sits beside every drawing) and is marginal in
+isolation for carrier 0 against affected 1 and for carrier 1 against carrier 2.
 
-A pattern tiles from a fixed origin, so where its dots fall on a symbol depends on where the symbol is; at an arbitrary
-phase a dot is sliced by a section edge or half-buried in the outline. Every fill is therefore drawn about its symbol's
-centre (a key swatch about its own) and moved into place, so each pattern has one phase per symbol. The dot pitch (5/24
-of the symbol size) and radius put every dot wholly within its section and clear of the dividers, and a dot at an
-outline either wholly under its stroke or grazing its inner edge by under a pixel; no pitch keeps every dot clear of a
-circle's and a diamond's outline at this density. There is no fifth distinct fill: a pedigree that would fill a
-condition at index 4 or above defers (a placeholder, never a reused fill).
+A pattern tiles from a fixed origin, so where its lines fall on a symbol depends on where the symbol is — at an
+arbitrary phase a line lies flush against a section edge or the outline and reads as a thicker edge, or a mark. Every
+fill is therefore drawn in its symbol's own frame and moved into place, so each pattern has one phase per shape. The
+lines lie on a diagonal lattice whose cell is a quarter of the symbol size. The diagonals run parallel to a diamond's
+edges, so a square or diamond is placed with its centre on the lattice's midpoint, putting a diamond's edges midway
+between two lines; a circle is placed with a lattice line through its centre, so that no line is a near-tangent chord
+hugging its outline. A key swatch is placed like a square. No line runs along a section edge, a divider or an outline;
+lines cross them. There is no fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a
+placeholder, never a reused fill).
 
-**Sections and dividers.** A pedigree with two conditions in its legend divides every symbol into halves (index 0 left,
-1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). The divider lines through
-the centre are drawn on every symbol, filled or not, at half the outline's stroke width, so they read as the frame and
-not as a mark. A section is a rectangle clipped to the shape by a per-symbol `clipPath`, so one code path covers □ ○ ◇.
-A pedigree with one condition has no dividers; a lone carrier's section there is its own tone's half, its edge the
-boundary of the dots.
+**Sections, dividers and sector edges.** A pedigree with two conditions in its legend divides every symbol into halves
+(index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). The
+divider lines through the centre are drawn on every symbol, filled or not, at half the outline's stroke width, so they
+read as the frame and not as a mark. A section is a rectangle clipped to the shape by a per-symbol `clipPath`, so one
+code path covers □ ○ ◇. Every filled section has a visible edge: where it meets the outline that is the outline, and
+where it meets another section, a divider. In a pedigree with one condition, which has no dividers, a lone carrier's
+half gets that one thin line down the centre as its inner edge; nothing is stroked twice. A key swatch has the same thin
+outline.
 
 **What a symbol shows.**
 
 - Affected with exactly one condition and carrying none: the whole shape in that condition's affected tone. An affected
   symbol of a single-condition pedigree is solid black, as before.
-- Otherwise every affected and every carried condition fills its own section. A carrier of one condition is one dotted
+- Otherwise every affected and every carried condition fills its own section. A carrier of one condition is one hatched
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
-  and a carrier of another is a flat section and a dotted one. A condition that is both affected and carried on one
+  and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
   individual (same-named entries) draws as affected.
 - The **presymptomatic** line is drawn at the outline's full stroke width and runs one stroke width past the outline at
   top and bottom, everywhere, so in a divided pedigree it never reads as the thinner vertical divider it lies on.
@@ -174,7 +178,7 @@ figures the way the pre-2022 literature does: on a symbol with no affected condi
 dot, edged white so it reads over a tone; every other carrier is a section as above.
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
-it, and without it a tone or a texture means nothing to a reader who does not hold the IR. It has one entry per (index,
+it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
 status) drawn, ordered by index with affected first: a square swatch in that fill, the size of one symbol quadrant and
 drawn about its own centre, and a label — the condition's name when affected, `Carrier: <name>` when carried
 (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed condition. Entries run left to right
@@ -283,7 +287,14 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **Pie sectors, as Figure 2 draws three conditions on a circle** — rejected for fixed halves / quadrants keyed by
   index: sectors sized to each individual's own conditions would move a condition from symbol to symbol.
 
-- **Colour fills** — not the default: grey tones and dots survive greyscale print and photocopy, and a consumer that
+- **Carrier as a dot stipple on its tone** — rejected: at a density that reads, the dots blur into their tone below
+  about half size, and then only the grey level tells carrier from affected; diagonal lines keep their streaks longer.
+
+- **Carrier as hatch alone, on white** (`/`, `\`, cross-hatch, chevrons) — rejected: without the condition's tone a
+  carrier and an affected individual of the same condition share nothing visible, and the four hatches are harder to
+  tell apart small than four tones.
+
+- **Colour fills** — not the default: grey tones and hatches survive greyscale print and photocopy, and a consumer that
   wants colour recolours the named fills (`svg-output.md`).
 
 - **A key only on request** — rejected: the standard requires every fill to be defined, and a figure without its key is

@@ -63,6 +63,7 @@ emitted markup has this shape (coordinates elided):
   <clipPath id="clip-II-3"><circle …/></clipPath>
   <rect class="fill" data-condition="0" data-status="carrier" … fill="url(#fill-carrier-0)"
         clip-path="url(#clip-II-3)"/>
+  <line class="divider" …/>
   <circle class="symbol" … fill="none" stroke="#000000"/>
   <line class="mark deceased" …/>
   <g class="mark proband"><line …/><line …/><line …/><text …>P</text></g>
@@ -90,8 +91,9 @@ not depend on styling:
    inheritance-glyph style (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status
    (`data-status`) and paints with that pair's named pattern (the dot, a plain glyph, has none); status is never the
    backing's colour, so one selector reaches all status paint.
-1. **`divider`** — in a pedigree with two or more conditions, on every symbol, the thin lines through the centre that
-   separate its sections (halves or quadrants): under the outline, so the outline stays whole.
+1. **`divider`** — the thin lines through the centre that separate sections (halves or quadrants): on every symbol of a
+   pedigree with two or more conditions, and otherwise as the inner edge of a lone filled section. Under the outline, so
+   the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
    drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
    consumer colours the stroke.
@@ -144,11 +146,11 @@ The groups, and what each promises:
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
-attributes. An affected pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a `stipple` dot. Every
+attributes. An affected pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a `hatch` path. Every
 fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none repeats the paint.
-Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre) and placed with a
-`transform`, so a pattern falls at the same phase on each (`renderer.md`, Fills); a consumer reading their geometry
-applies the transform.
+Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre, or for a circle half a hatch
+cell right of it) and placed with a `transform`, so a pattern falls at the same phase on each (`renderer.md`, Fills); a
+consumer reading their geometry applies the transform.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's
@@ -167,9 +169,9 @@ highlights everyone with the first condition needs one rule and no renderer supp
 
 Fills restyle through their patterns. A pattern's content is ordinary elements with presentation attributes, so
 `#fill-carrier-0 .tone { fill: #1f77b4; }` recolours that carrier fill's tone on every symbol and in the key at once
-(`#fill-affected-0 .tone` its affected twin, `.stipple` the dots); a consumer can also replace the pattern element, or
-point a `fill` part at a paint server of its own. Keeping each fill a named paint rather than inline colour is what
-makes one rule enough.
+(`#fill-affected-0 .tone` its affected twin, `#fill-carrier-0 .hatch { stroke: … }` the lines); a consumer can also
+replace the pattern element, or point a `fill` part at a paint server of its own. Keeping each fill a named paint rather
+than inline colour is what makes one rule enough.
 
 The renderer therefore commits to three things and no more: it keeps setting appearance through presentation attributes,
 never `style`; it keeps the part classes (`backing`, `fill`, `divider`, `symbol`, `mark`, `label`, `hit`) stable; and it
@@ -246,7 +248,7 @@ may change. The cost is a wider, taller figure than the content needs, paid only
   it makes the renderer own presentation it has no opinion on, fights the consumer's cascade, and turns every theme
   change into a golden change.
 - **Leave the legend to the consumer.** Where a legend sits is the consumer's layout decision, and a drawn one resizes
-  the canvas. Rejected because the standard requires every fill to be defined in the key and a texture is meaningless
+  the canvas. Rejected because the standard requires every fill to be defined in the key and a hatch is meaningless
   without one, so a figure without its key is incomplete wherever it ends up. The ids keep the consumer's control: it
   can move, restyle or remove the key, and the canvas grows only for a pedigree that draws a fill.
 - **A drawer in the browser.** Re-running the drawing step client-side would give label reflow and let a consumer change
