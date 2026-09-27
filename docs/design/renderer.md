@@ -74,17 +74,17 @@ group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its 
 `count` absent or 1 is one person and draws none (`ir.validate` rejects `count` < 1 and `count` with
 `count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
 centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
-for a circle, 0.5 for a diamond), white when the whole shape is an affected fill and black otherwise. When a mark runs
-through the centre — the unknown `?`, the X-linked carrier dot, a divided symbol's dividers, the presymptomatic line,
-the deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a
-mating line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell
-so the count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads
-over any fill. A ghost draws the same fills as its real cell and places its count as the real cell does. Connectors:
-**mating line** (horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`,
-which is set only from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders),
-**descent/sibship line** (vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the
-order leaves beside its children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track
-above the bars with rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop
+for a circle, 0.5 for a diamond), white when the whole shape is a dark affected tone (index 0 or 1, below) and black
+otherwise. When a mark runs through the centre — the unknown `?`, the X-linked carrier dot, a divided symbol's dividers,
+the presymptomatic line, the deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the
+slash's tip, above a mating line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve
+spaces the next cell so the count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting
+colour, so it reads over any fill. A ghost draws the same fills as its real cell and places its count as the real cell
+does. Connectors: **mating line** (horizontal between partners; doubled for consanguinity — the double line is emitted
+iff `spouse==2`, which is set only from the explicit `Mating.consanguineous` flag, for every adjacent couple including
+founders), **descent/sibship line** (vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a
+drop the order leaves beside its children, as in a crossing or a cousin standing beside its mate, turns at its own elbow
+track above the bars with rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop
 standing over another's landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no
 parent cell, so the sib bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins**
 (child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a

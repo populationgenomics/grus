@@ -652,3 +652,13 @@ def test_a_count_on_a_divided_symbol_moves_beside_it() -> None:
     one, two = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[divided, lone]))), "individual")
     assert [_classes(c) for c in one if "count" in _classes(c)] == [["mark", "count", "outside"]]
     assert [_classes(c) for c in two if "count" in _classes(c)] == [["mark", "count"]]
+
+
+def test_count_is_white_only_on_a_dark_tone() -> None:
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"]
+    people = [_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCD")]
+    for ind in people:
+        ind.count = 2
+    groups = _groups(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))), "individual")
+    fills = [next(c for c in g if "count" in _classes(c)).get("fill") for g in groups]
+    assert fills == ["#ffffff", "#ffffff", "#000000", "#000000"], "black on light grey and the stipple"

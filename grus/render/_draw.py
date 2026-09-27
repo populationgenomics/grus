@@ -111,6 +111,7 @@ _STIPPLE_DOT = 1.0  # radius (px) of a stipple dot
 _AFFECTED_TONES = ("#000000", "#666666", "#bbbbbb", None)
 _CARRIER_ANGLES = (0, 90, -45, 45)
 _FILLS = len(_AFFECTED_TONES)
+_DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
 
@@ -1191,7 +1192,7 @@ class _Draw:
     def _count_mark(self, ind: pb.Individual, plan: _FillPlan, cx: float, cy: float) -> list[str]:
         """A count-collapsed symbol's number, or ``n`` for an unknown number, placed by ``_labels.count_mark``.
 
-        Inside, it is centred and shrunk to fit the shape, white on a shape wholly in an affected fill, else black;
+        Inside, it is centred and shrunk to fit the shape, white on a shape wholly in a dark tone, else black;
         beside the upper right when a mark already runs through the centre. Either way it has a halo in the
         contrasting colour, so it reads over a carrier's region fill or a line.
         """
@@ -1201,7 +1202,8 @@ class _Draw:
         if not mark.inside:
             x, y = cx + self.half + _labels.COUNT_OUTSIDE_DX, cy - self.half + mark.size / 2
             return [self._count_text(x, y, mark, _STROKE, "#ffffff", "mark count outside", anchor="start")]
-        fill, halo = ("#ffffff", _STROKE) if plan.whole is not None else (_STROKE, "#ffffff")
+        dark = plan.whole is not None and plan.whole in _DARK_TONES
+        fill, halo = ("#ffffff", _STROKE) if dark else (_STROKE, "#ffffff")
         return [self._count_text(cx, cy, mark, fill, halo, "mark count", anchor="middle")]
 
     def _count_text(
