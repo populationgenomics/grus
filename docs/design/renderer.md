@@ -111,7 +111,9 @@ presymptomatic glyph (a vertical line through the symbol).
 **Condition index.** A condition's index is its place in the pedigree's condition legend: distinct names, phenotype
 labels first, then by first appearance in `Position` order, with an unnamed condition (the figure's sole, unlabelled
 one) taking the last index. The index picks both the condition's fills and its section, pedigree-wide, so a condition
-looks the same and sits in the same place on every symbol that shows it.
+looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index whether or
+not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts towards
+quadrants and the four-fill limit — so the drawing of one individual never depends on another's status.
 
 **Fills.** One per (index, status):
 

@@ -662,3 +662,13 @@ def test_count_is_white_only_on_a_dark_tone() -> None:
     groups = _groups(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))), "individual")
     fills = [next(c for c in g if "count" in _classes(c)).get("fill") for g in groups]
     assert fills == ["#ffffff", "#ffffff", "#000000", "#000000"], "black on light grey and the stipple"
+
+
+def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
+    # Sections are keyed by legend index, not by which conditions happen to be filled, so a phenotype label nobody
+    # is shaded for still takes index 0 and a carrier of the second condition fills the right half.
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "AB"]
+    root = _parse(render.render_svg(pb.Pedigree(labels=legend, individuals=[_person(1, ("B", _CAR))])))
+    (g,) = _groups(root, "individual")
+    (section,) = _fills(g)
+    assert section.get("data-condition") == "1" and section.get("x") == "106"

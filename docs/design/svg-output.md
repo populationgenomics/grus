@@ -5,11 +5,11 @@ drawing is organised in the document), [`ir.md`](ir.md) (the identities and fact
 
 ## Overview
 
-The renderer's SVG gains structure without changing what it draws. Every individual, mating, sibship and generation
-marker becomes a group that names the IR fact it draws — the drawn position such as `II-3`, gender, clinical status per
-condition, deceased, proband — as an id, classes and data attributes. The pedigree itself carries its ordered condition
-legend. Every status fill is a named pattern in the document's `defs`, and the drawn key defines each one. No stylesheet
-and no script in the file.
+The renderer's SVG is structured for interactive use. Every individual, mating, sibship and generation marker becomes a
+group that names the IR fact it draws — the drawn position such as `II-3`, gender, clinical status per condition,
+deceased, proband — as an id, classes and data attributes. The pedigree itself carries its ordered condition legend.
+Every status fill is a named pattern in the document's `defs`, and the drawn key defines each one. No stylesheet and no
+script in the file.
 
 That is enough for the interactive figures the output feeds. A legend built outside the SVG can find every individual
 who carries a condition and restyle them with one CSS rule, because the renderer sets appearance through presentation
@@ -93,10 +93,9 @@ not depend on styling:
    reaches all status paint.
 1. **`divider`** — on a divided symbol, the lines through the centre that separate its sections: under the outline, so
    the outline stays whole.
-1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: today the
-   region rectangle is drawn last and covers the inner half of the stroke on the filled side, which is invisible while
-   both are black and visibly uneven the moment a consumer colours the stroke. Visually the two orders are identical at
-   the default styling, so the goldens' appearance does not change.
+1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
+   drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
+   consumer colours the stroke.
 1. **`mark`** — count, slash, presymptomatic line, question mark, arrow: over the outline, as they cross or leave it.
    The count is `mark count`, or `mark count outside` when it sits beside the symbol because another mark runs through
    the centre.
@@ -138,7 +137,8 @@ The groups, and what each promises:
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
 - **`generation`** — each Roman-numeral marker, naming its row by IR generation.
 - **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
-  Each entry is its own `key-entry` group with id `key-{status}-{index}` naming its condition index and status as data
+  Each entry is its own `key-entry` group with id `key-{status}-{index}` (`key-carrier-dot-{index}`, class
+  `key-entry dot`, for the X-linked dot of the inheritance-glyph style) naming its condition index and status as data
   attributes, holding a swatch painted with the same pattern the symbols use and a text label. A consumer relocates the
   key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its own from the
   pedigree's condition array.
@@ -202,10 +202,10 @@ is new geometry keyed to the legend index.
 
 The boundary between what a consumer's CSS can derive from the hooks and what needs the drawer is the boundary between
 paint and geometry. Fills are paint: they are already paint servers in the document's `defs`, and a stylesheet can
-restyle them or point `fill` elsewhere. Sections are geometry, and so are marks that leave the shape — the deceased
-slash, the proband arrow, the question mark, the presymptomatic line — are elements, and CSS cannot create SVG geometry
-(generated content is undefined on SVG shapes). A consumer that wants to change those without a round trip needs a
-drawer where it runs; see Alternatives.
+restyle them or point `fill` elsewhere. Sections are geometry, and so are the marks that leave the shape — the deceased
+slash, the proband arrow, the question mark, the presymptomatic line: they are elements, and CSS cannot create SVG
+geometry (generated content is undefined on SVG shapes). A consumer that wants to change those without a round trip
+needs a drawer where it runs; see Alternatives.
 
 ### A minimum label box stands in for reflow
 
