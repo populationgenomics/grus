@@ -1650,3 +1650,13 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     ) or any(abs(x - mid_px) < 0.5 and y <= parent_y + 0.5 for x, y in starts), (
         "the offset single-child descent must originate from the parents' mating midpoint"
     )
+
+
+def test_inheritance_glyph_draws_a_second_x_linked_carrier_as_a_section() -> None:
+    # The dot says one condition; a second X-linked carrier condition is a section and a key entry, never dropped.
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN)
+    for name in ("DMD", "HEMA"):
+        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)
+    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
+    assert 'class="fill dot" data-condition="0"' in svg and 'id="key-carrier-dot-0"' in svg
+    assert 'fill="url(#fill-carrier-1)"' in svg and 'id="key-carrier-1"' in svg

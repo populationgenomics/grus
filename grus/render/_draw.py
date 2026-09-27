@@ -469,8 +469,8 @@ class _Draw:
         if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected:
             x_linked = [c for c in carriers if c.inheritance in _X_LINKED]
             if x_linked:
-                dot = index(x_linked[0].name)
-                carriers = [c for c in carriers if c.inheritance not in _X_LINKED]
+                dot = index(x_linked[0].name)  # one dot; any other carried condition is a section
+                carriers = [c for c in carriers if index(c.name) != dot]
         carried = {index(c.name) for c in carriers} - affected  # affected and carried alike draws as affected
         sections = sorted([(i, _AFFECTED) for i in affected] + [(i, _CARRIER) for i in carried])
         for i, _ in sections:
