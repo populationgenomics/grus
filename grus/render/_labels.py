@@ -100,11 +100,26 @@ class CountMark:
     inside: bool
 
 
+def is_divided(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
+    """Whether ``ind``'s symbol is divided: two or more conditions fill sections, so divider lines cross its centre.
+
+    Counts the distinct conditions that are affected or carried, less the one the X-linked dot stands for under
+    ``CarrierStyle.INHERITANCE_GLYPH`` on an unaffected symbol — the sections ``_draw`` fills.
+    """
+    affected = {c.name for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED}
+    carried = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_CARRIER]
+    if geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected:
+        x_linked = [c for c in carried if c.inheritance in _X_LINKED]
+        if x_linked:
+            carried = [c for c in carried if c.name != x_linked[0].name]
+    return len(affected | {c.name for c in carried}) >= 2
+
+
 def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
     """Whether drawing puts a mark through the symbol's centre, where the count would go.
 
-    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), the presymptomatic
-    line and the deceased slash — the same conditions under which ``_draw`` emits them.
+    The unknown-status ``?``, the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH``), a divided symbol's
+    dividers, the presymptomatic line and the deceased slash — the same conditions under which ``_draw`` emits them.
     """
     statuses = {c.status for c in ind.conditions}
     affected = pb.CONDITION_STATUS_AFFECTED in statuses
@@ -118,6 +133,7 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry) -> bool:
         or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
         or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
         or x_linked_dot
+        or is_divided(ind, geom)
     )
 
 

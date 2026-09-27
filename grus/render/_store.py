@@ -17,7 +17,7 @@ from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry, _layout, _layout2, _xsolve
 
-LAYOUT_VERSION = 2
+LAYOUT_VERSION = 3
 """The layout-algorithm version a stored layout records. Bump it in any change that alters a layout."""
 
 # A cell's identity as a hashable key. The pass-through key carries its row: one descent crossing several rows has one

@@ -75,21 +75,21 @@ group drawn as one: `Individual.count` > 1, or `count_unspecified`) carries its 
 `count_unspecified`). The count never overprints another mark. When nothing runs through the symbol's centre it is
 centred inside, at `0.45·SYMBOL_SIZE` shrunk so its estimated width fits the shape (0.8 of the size for a square, 0.7
 for a circle, 0.5 for a diamond), white when the whole shape is an affected fill and black otherwise. When a mark runs
-through the centre — the unknown `?`, the X-linked carrier dot, the presymptomatic line, the deceased slash — it moves
-beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a mating line leaving that side,
-clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell so the count clears both its
-label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads over any fill. A ghost draws
-the same fills as its real cell and places its count as the real cell does. Connectors: **mating line** (horizontal
-between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`, which is set only from the
-explicit `Mating.consanguineous` flag, for every adjacent couple including founders), **descent/sibship line** (vertical
-drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the order leaves beside its children, as in
-a crossing or a cousin standing beside its mate, turns at its own elbow track above the bars with rounded corners and
-lands on its bar's near end, and elbows sharing a row gap stagger, a drop standing over another's landing leg turning
-higher), a **founder sibship**'s implied hanger (a partnerless mating: no parent cell, so the sib bar hangs from a short
-vertical stub rising to a point instead of a descent drop), **twins** (child stubs converge to one point; MZ adds a
-joining bar), and the **childless glyph** (a couple with no offspring: a stub from the mating midpoint down to a short
-horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars for `CHILDLESSNESS_INFERTILITY` — drawn
-instead of a descent).
+through the centre — the unknown `?`, the X-linked carrier dot, a divided symbol's dividers, the presymptomatic line,
+the deceased slash — it moves beside the symbol's upper right at `0.35·SYMBOL_SIZE`: past the slash's tip, above a
+mating line leaving that side, clear of the arrow (lower left) and the labels (below); the x-solve spaces the next cell
+so the count clears both its label and its symbol. Either way it has a 3 px halo in the contrasting colour, so it reads
+over any fill. A ghost draws the same fills as its real cell and places its count as the real cell does. Connectors:
+**mating line** (horizontal between partners; doubled for consanguinity — the double line is emitted iff `spouse==2`,
+which is set only from the explicit `Mating.consanguineous` flag, for every adjacent couple including founders),
+**descent/sibship line** (vertical drop from the mating midpoint → horizontal sib bar → per-child stubs; a drop the
+order leaves beside its children, as in a crossing or a cousin standing beside its mate, turns at its own elbow track
+above the bars with rounded corners and lands on its bar's near end, and elbows sharing a row gap stagger, a drop
+standing over another's landing leg turning higher), a **founder sibship**'s implied hanger (a partnerless mating: no
+parent cell, so the sib bar hangs from a short vertical stub rising to a point instead of a descent drop), **twins**
+(child stubs converge to one point; MZ adds a joining bar), and the **childless glyph** (a couple with no offspring: a
+stub from the mating midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars
+for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line).
@@ -129,8 +129,10 @@ a reused fill).
 
 **Sections.** A pedigree with at most two conditions in its legend divides a symbol into halves (index 0 left, 1 right);
 with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). A section is a rectangle clipped to
-the shape by a per-symbol `clipPath`, so one code path covers □ ○ ◇. A divided symbol draws divider lines through its
-centre — the vertical, and for quadrants the horizontal — so the sections read even where a fill is light.
+the shape by a per-symbol `clipPath`, so one code path covers □ ○ ◇. A symbol with two or more sections draws divider
+lines through its centre — the vertical, and for quadrants the horizontal — so the sections read even where a fill is
+light. A lone section has none: its own edge shows it, and a vertical line through an otherwise undivided symbol is the
+presymptomatic glyph.
 
 **What a symbol shows.**
 
@@ -139,7 +141,9 @@ centre — the vertical, and for quadrants the horizontal — so the sections re
 - Otherwise every affected and every carried condition fills its own section, and the symbol is divided. A carrier of
   one condition is one hatched section; affected with one condition and a carrier of another is two sections, one tone
   and one hatch. A condition that is both affected and carried on one individual (same-named entries) draws as affected.
-- Presymptomatic, unknown (`?`), deceased and proband marks are unchanged, drawn over the fills.
+- Presymptomatic, unknown (`?`), deceased and proband marks are unchanged, drawn over the fills. On a symbol divided in
+  halves the presymptomatic line coincides with the vertical divider, so there it does not read; the standard gives no
+  form for a presymptomatic individual who also shows two conditions.
 
 **Carrier style.** `Geometry.carrier_style` is a render option, not IR meaning; both styles read the same `Condition`
 entries. `CarrierStyle.PARTITION_FILL`, the default, is the standard as above. `CarrierStyle.INHERITANCE_GLYPH` draws

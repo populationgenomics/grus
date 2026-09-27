@@ -1218,7 +1218,7 @@ class _Draw:
 
         One affected condition paints the whole shape. Otherwise each section is a rectangle for its condition index,
         clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
-        math), with the divider line(s) through the centre. The X-linked dot, when drawn, sits over both.
+        math); several sections get divider line(s) through the centre. The X-linked dot, when drawn, sits over both.
         """
         out: list[str] = []
         if plan.whole is not None:
@@ -1236,10 +1236,11 @@ class _Draw:
         elif plan.sections:
             out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, cx, cy, "none", stroke=False)}</clipPath>')
             out += [self._section(cx, cy, i, status, clip_id) for i, status in plan.sections]
-            h = self.half
-            out.append(_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH))
-            if self._slots == _FILLS:
-                out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=_DIVIDER_WIDTH))
+            if len(plan.sections) > 1:  # a lone section's own edge shows it; dividers only split several
+                h = self.half
+                out.append(_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH))
+                if self._slots == _FILLS:
+                    out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=_DIVIDER_WIDTH))
         if plan.dot is not None:
             out.append(self._dot(cx, cy, plan.dot, cls="fill dot", radius=self.half * 0.26))
         return out

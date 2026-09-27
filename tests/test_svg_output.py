@@ -633,3 +633,22 @@ def test_set_render_keys_each_tile() -> None:
     assert [[k.get("id") for k in _groups(t, "key")] for t in tiles] == [["p0-key"], ["p1-key"]]
     ids = re.findall(r'\bid="([^"]+)"', svg)
     assert len(ids) == len(set(ids)) and all(ref in ids for ref in re.findall(r"url\(#([^)]+)\)", svg))
+
+
+def test_a_lone_section_has_no_divider() -> None:
+    # A carrier of one condition is one hatched section; its own edge shows it, and a divider would be the
+    # presymptomatic glyph (a vertical line through the symbol).
+    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _CAR))]))), "individual")
+    assert [f.get("data-status") for f in _fills(g)] == ["carrier"]
+    assert not [c for c in g if "divider" in _classes(c)]
+
+
+def test_a_count_on_a_divided_symbol_moves_beside_it() -> None:
+    # The dividers cross the centre, where the count would sit, so the count moves outside (never overprinted).
+    divided = _person(1, ("A", _AFF), ("B", _CAR))
+    divided.count = 3
+    lone = _person(2, ("A", _CAR))
+    lone.count = 3
+    one, two = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[divided, lone]))), "individual")
+    assert [_classes(c) for c in one if "count" in _classes(c)] == [["mark", "count", "outside"]]
+    assert [_classes(c) for c in two if "count" in _classes(c)] == [["mark", "count"]]

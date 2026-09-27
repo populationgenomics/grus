@@ -104,11 +104,11 @@ input to the layout:
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
-  (a count mark's size and reach scale with the symbol, and a carrier's dot sends a count outside it), and `x_solver`
-  (the HiGHS backend agrees with z3 only up to the position quantum, so the same key must mean the same solver).
-  Everything else in `Geometry` — row height, stubs, margins, the vertical label rhythm — is read only by drawing and
-  may vary freely. A test requires every `Geometry` field the layout modules read to be in the key, so a field that
-  starts to affect spacing cannot be left out.
+  (a count mark's size and reach scale with the symbol, and a carrier's dot or a divided symbol's dividers — which
+  depend on the style — send a count outside it), and `x_solver` (the HiGHS backend agrees with z3 only up to the
+  position quantum, so the same key must mean the same solver). Everything else in `Geometry` — row height, stubs,
+  margins, the vertical label rhythm — is read only by drawing and may vary freely. A test requires every `Geometry`
+  field the layout modules read to be in the key, so a field that starts to affect spacing cannot be left out.
 - **the layout-algorithm version**, an integer grus bumps whenever a change alters any layout. A test pins a digest of
   every golden's stored layout, under each x-solver, to the current version, so a change that moves a golden's layout
   without a bump fails. Each pin, per golden and solver, holds the golden's pedigree digest and the placement's digest.
