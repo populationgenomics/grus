@@ -202,6 +202,15 @@ entries. `CarrierStyle.PARTITION_FILL`, the default, is the standard as above. `
 figures the way the pre-2022 literature does: on a symbol with no affected condition, an X-linked carrier is a central
 dot, edged white so it reads over a tone; every other carrier is a section as above.
 
+**Colour mode.** `Geometry.palette` (the `render --colour` flag) is a render option like the carrier style.
+`Palette.GREYSCALE`, the default, is the table above and survives any printer. `Palette.COLOUR` paints the condition
+tones black (the primary condition) and then orange, blue, bluish green, vermillion and reddish purple from the
+Okabe-Ito palette, chosen to stay distinct under the common colour-vision deficiencies; its yellow is left out as too
+light against white. A carrier is still the tone with a diagonal hatch in white or black, whichever contrasts more with
+it, alternating direction by index. Only the tones change — the same patterns, ids, sections and hatch geometry — so
+colour mode meets the same edge rules, and a consumer can still restyle each tone. In colour, a condition's identity is
+carried by its colour as well as its position, which is what greys cannot do for six conditions or for a light wedge.
+
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
 status) drawn, ordered by index with affected first: a swatch and a label. In a divided pedigree the swatch is a small

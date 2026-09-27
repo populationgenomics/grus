@@ -116,7 +116,9 @@ _KEY_SYMBOL = 0.75  # a divided pedigree's key symbol, as a fraction of symbol_s
 # Conditions 4 and 5 take the two tones left between the first four and their carriers' mean greys; a sixth-divided
 # symbol places every fill in its own fixed section, so position, not tone alone, tells them apart.
 _AFFECTED_TONES = ("#000000", "#484848", "#9c9c9c", "#dbdbdb", "#262626", "#b8b8b8")
-_HATCH_COLOURS = ("#ffffff", "#ffffff", "#000000", "#000000", "#ffffff", "#000000")
+# Colour mode: black for the primary condition, then Okabe-Ito entries (Okabe & Ito, "Color Universal Design", 2008)
+# chosen to stay distinct under the common colour-vision deficiencies; its yellow is left out, as too light on white.
+_COLOUR_TONES = ("#000000", "#e69f00", "#0072b2", "#009e73", "#d55e00", "#cc79a7")
 # Fill phase: every fill part is drawn in its symbol's own frame (a key swatch about its centre), so a user-space tile
 # starts at the same place on each. The hatch lies on the lattice x + y, x - y = cell / 2 (mod cell), cell =
 # symbol_size / 4: a square's or diamond's frame is its centre, which puts a diamond's edges (parallel to the hatch)
@@ -137,7 +139,6 @@ _BOUNDARIES = {
     4: {12: (0, 1), 3: (1, 3), 6: (3, 2), 9: (2, 0)},
     6: {11: (0, 1), 1: (1, 2), 3: (2, 5), 5: (5, 4), 7: (4, 3), 9: (3, 0)},
 }
-_DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
 
@@ -434,6 +435,7 @@ class _Draw:
         self._data_legend = _labels.data_legend(p)
         # Two or more conditions: sections exist, and the key shows each entry's position.
         self._divided = len(self._data_legend) >= 2
+        self._tones = _COLOUR_TONES if geom.palette is _geometry.Palette.COLOUR else _AFFECTED_TONES
         n = len(self._data_legend)
         self._slots = 2 if n <= 2 else 4 if n <= 4 else 6  # sections per symbol: halves, quadrants or sixths
         self._plans = [self._fill_plan(ind) for ind in p.individuals]
@@ -685,14 +687,14 @@ class _Draw:
     def _pattern(self, index: int, status: str) -> str:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
-        tone = _AFFECTED_TONES[index]
+        tone = self._tones[index]
         if status == _CARRIER:
             c = self.geom.symbol_size / _CELLS_PER_SYMBOL
             return (
                 f'{head}width="{_num(c)}" height="{_num(c)}" patternUnits="userSpaceOnUse">'
                 f'<rect class="tone" width="{_num(c)}" height="{_num(c)}" fill="{tone}"/>'
                 f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c)}" fill="none" '
-                f'stroke="{_HATCH_COLOURS[index]}" stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
+                f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
             )
         # A user-space tile, like the carrier fills: cairosvg (grus.render.rasterize) fails on an objectBoundingBox
         # pattern painted more than twice.
@@ -1248,7 +1250,7 @@ class _Draw:
         if not mark.inside:
             x, y = cx + self.half + _labels.COUNT_OUTSIDE_DX, cy - self.half + mark.size / 2
             return [self._count_text(x, y, mark, _STROKE, "#ffffff", "mark count outside", anchor="start")]
-        dark = plan.whole is not None and plan.whole in _DARK_TONES
+        dark = plan.whole is not None and _contrast(self._tones[plan.whole]) == "#ffffff"
         fill, halo = ("#ffffff", _STROKE) if dark else (_STROKE, "#ffffff")
         return [self._count_text(cx, cy, mark, fill, halo, "mark count", anchor="middle")]
 
@@ -1374,6 +1376,18 @@ class _Draw:
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
+
+
+def _contrast(tone: str) -> str:
+    """White or black, whichever contrasts more with ``tone`` (WCAG relative luminance): a hatch or count colour."""
+
+    def linear(channel: int) -> float:
+        c = channel / 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (linear(int(tone[i : i + 2], 16)) for i in (1, 3, 5))
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    return "#ffffff" if (1.05 / (luminance + 0.05)) > ((luminance + 0.05) / 0.05) else "#000000"
 
 
 def _clock(hour: float) -> tuple[float, float]:

@@ -21,6 +21,7 @@ single pedigree or the reverse), or stale — reported as one line naming the fi
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import pathlib
 import sys
 from typing import Literal
@@ -99,7 +100,9 @@ def _load_input(args: argparse.Namespace, command: str) -> pb.PedigreeSet | pb.P
 def _geometry(args: argparse.Namespace) -> render.Geometry:
     geom = render.DEFAULT_GEOMETRY
     if args.carrier_style:
-        geom = render.Geometry(carrier_style=render.CarrierStyle(args.carrier_style))
+        geom = dataclasses.replace(geom, carrier_style=render.CarrierStyle(args.carrier_style))
+    if getattr(args, "colour", False):
+        geom = dataclasses.replace(geom, palette=render.Palette.COLOUR)
     return geom
 
 
@@ -244,6 +247,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--carrier-style",
         choices=[s.value for s in render.CarrierStyle],
         help="carrier glyph convention (default: partition_fill, NSGC 2022)",
+    )
+    render_cmd.add_argument(
+        "--colour",
+        action="store_true",
+        help="paint conditions in a colour-blind-safe palette instead of greys (default: greyscale)",
     )
     render_cmd.add_argument(
         "--layout",

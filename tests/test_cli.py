@@ -92,6 +92,18 @@ def test_render_carrier_style_option(tmp_path: pathlib.Path) -> None:
     assert out.read_text() == render_svg(p, Geometry(carrier_style=CarrierStyle.PARTITION_FILL))
 
 
+def test_render_colour_option(tmp_path: pathlib.Path) -> None:
+    from grus.render import Geometry, Palette, render_svg
+
+    p = ir.load_pbtxt((_GOLDENS / "six_conditions.pbtxt").read_text())
+    src = tmp_path / "c.pbtxt"
+    src.write_text(ir.dump_pbtxt(p))
+    out = tmp_path / "c.svg"
+    assert cli.main(["render", str(src), "-o", str(out), "--colour"]) == 0
+    assert out.read_text() == render_svg(p, Geometry(palette=Palette.COLOUR))
+    assert out.read_text() != render_svg(p), "greyscale stays the default"
+
+
 def test_import_writes_ir_and_roundtrips_through_validate(tmp_path: pathlib.Path) -> None:
     fixture = pathlib.Path(__file__).parent / "convert_fixture" / "two_families.fam"
     out = tmp_path / "fam.pbtxt"

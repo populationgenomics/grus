@@ -993,3 +993,34 @@ def test_a_tie_or_no_affected_keeps_the_base_order() -> None:
     assert _legend(tied) == ["B", "A", "C"], "B and C tie; B comes first in the base order"
     carriers = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _CAR))])
     assert _legend(carriers) == ["A", "B", "C"]
+
+
+# --- colour mode ----------------------------------------------------------------------------------------------------
+
+_COLOUR = dataclasses.replace(render.DEFAULT_GEOMETRY, palette=render.Palette.COLOUR)
+
+
+def test_colour_mode_changes_only_the_tones() -> None:
+    # The same patterns, ids, sections and hatches; only each pattern's tone (and so its contrasting hatch) changes.
+    people = [_person(i + 1, (n, s)) for i, (n, s) in enumerate((n, s) for n in "ABCDEF" for s in (_AFF, _CAR))]
+    grey, colour = (_parse(render.render_svg(_sixths(*people), g)) for g in (render.DEFAULT_GEOMETRY, _COLOUR))
+    assert sorted(_patterns(grey)) == sorted(_patterns(colour))
+    tones = [_patterns(colour)[f"fill-affected-{i}"].find(f"{_SVG}rect").get("fill") for i in range(6)]  # type: ignore[union-attr]
+    assert tones[0] == "#000000" and len(set(tones)) == 6, "black for the primary condition, then six colours"
+    assert all(t.lower() != "#f0e442" for t in tones if t), "no Okabe-Ito yellow: too light on white"
+    for i in range(6):
+        carrier = _patterns(colour)[f"fill-carrier-{i}"]
+        assert carrier.find(f"{_SVG}rect").get("fill") == tones[i]  # type: ignore[union-attr]
+        hatch = carrier.find(f"{_SVG}path")
+        assert hatch is not None and hatch.get("stroke") in ("#ffffff", "#000000")
+    strip = re.compile(r'fill="#[0-9a-f]{6}"|stroke="#[0-9a-f]{6}"')
+    assert strip.sub("", render.render_svg(_sixths(*people))) == strip.sub(
+        "", render.render_svg(_sixths(*people), _COLOUR)
+    ), "nothing but paint differs"
+
+
+@pytest.mark.parametrize("name", ["six_conditions", "condition_fills", "compound_carrier"])
+def test_colour_mode_keeps_the_hatch_clear_of_edges(name: str) -> None:
+    p = ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
+    gaps = _hatch_gaps(render.render_svg(p, _COLOUR))
+    assert gaps and all(gap >= 2.0 - 1e-6 for _, gap in gaps)

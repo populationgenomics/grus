@@ -26,6 +26,17 @@ class CarrierStyle(enum.Enum):
     PARTITION_FILL = "partition_fill"  # NSGC 2022 §4.5 (default): every carrier a hatched section, dot glyph retired
 
 
+class Palette(enum.Enum):
+    """Which tones condition fills are painted in — a rendering choice, not IR meaning.
+
+    Greyscale (default) survives any printer; colour adds a second identity for each condition beside its fixed
+    section, for figures with many conditions or light tones that are hard to find.
+    """
+
+    GREYSCALE = "greyscale"  # black, then greys (docs/design/renderer.md, Fills)
+    COLOUR = "colour"  # black, then Okabe-Ito: distinct under the common colour-vision deficiencies
+
+
 @dataclasses.dataclass(frozen=True)
 class Geometry:
     """Layout + drawing spacing. Defaults are the golden-producing values.
@@ -60,6 +71,7 @@ class Geometry:
             stay clear of the row below.
         carrier_style: how a carrier is drawn (``CarrierStyle``); drawing-only except that the X-linked dot sends a
             count beside its symbol.
+        palette: the condition tones (``Palette``); drawing-only.
         key_gap: pixels between the drawing's lowest label or arrow and the key below it.
         key_entry_gap: pixels between adjacent key entries on one row; rows are half a swatch apart. A key swatch is
             a plain square half the ``symbol_size``, or in a divided pedigree a small divided square three quarters
@@ -90,6 +102,7 @@ class Geometry:
     margin: float = 48.0
     gen_marker_gutter: float = 40.0
     carrier_style: CarrierStyle = CarrierStyle.PARTITION_FILL
+    palette: Palette = Palette.GREYSCALE
     key_gap: float = 24.0
     key_entry_gap: float = 18.0
     # The x-solve backend. Z3 is exact (bit-identical positions everywhere, what the goldens are pinned to);

@@ -169,11 +169,12 @@ highlights everyone with the first condition needs one rule and no renderer supp
 .individual:not([data-condition-0]) { opacity: 0.3; }
 ```
 
-Fills restyle through their patterns. A pattern's content is ordinary elements with presentation attributes, so
-`#fill-carrier-0 .tone { fill: #1f77b4; }` recolours that carrier fill's tone on every symbol and in the key at once
-(`#fill-affected-0 .tone` its affected twin, `#fill-carrier-0 .hatch { stroke: … }` the lines); a consumer can also
-replace the pattern element, or point a `fill` part at a paint server of its own. Keeping each fill a named paint rather
-than inline colour is what makes one rule enough.
+Fills restyle through their patterns (colour mode, `renderer.md`, is exactly such a restyle, done by the renderer). A
+pattern's content is ordinary elements with presentation attributes, so `#fill-carrier-0 .tone { fill: #1f77b4; }`
+recolours that carrier fill's tone on every symbol and in the key at once (`#fill-affected-0 .tone` its affected twin,
+`#fill-carrier-0 .hatch { stroke: … }` the lines); a consumer can also replace the pattern element, or point a `fill`
+part at a paint server of its own. Keeping each fill a named paint rather than inline colour is what makes one rule
+enough.
 
 The renderer therefore commits to three things and no more: it keeps setting appearance through presentation attributes,
 never `style`; it keeps the part classes (`backing`, `fill`, `divider`, `symbol`, `mark`, `label`, `hit`) stable; and it
