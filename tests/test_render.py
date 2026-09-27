@@ -1660,3 +1660,18 @@ def test_inheritance_glyph_draws_a_second_x_linked_carrier_as_a_section() -> Non
     svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
     assert 'class="fill dot" data-condition="0"' in svg and 'id="key-carrier-dot-0"' in svg
     assert 'fill="url(#fill-carrier-1)"' in svg and 'id="key-carrier-1"' in svg
+
+
+def test_the_dot_goes_to_the_lowest_index_whatever_the_ir_order() -> None:
+    def woman(i: int, names: tuple[str, str]) -> pb.Individual:
+        ind = pb.Individual(generation=1, index=i, gender=pb.GENDER_WOMAN)
+        for name in names:
+            ind.conditions.add(
+                name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE
+            )
+        return ind
+
+    svg = render.render_svg(pb.Pedigree(individuals=[woman(1, ("A", "B")), woman(2, ("B", "A"))]), _GLYPH)
+    assert svg.count('class="fill dot" data-condition="0"') == 2
+    assert re.findall(r'id="(key-[^"]+)"', svg) == ["key-carrier-dot-0", "key-carrier-1"]
+    assert ">X-linked carrier: A<" in svg

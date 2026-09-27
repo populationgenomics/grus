@@ -16,7 +16,7 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
 
 * The root ``<svg>`` (or, in a composed figure, each tile's nested ``<svg>``) is ``class="pedigree"`` with
   ``data-title`` and ``data-conditions``, a JSON array of the pedigree's condition names in legend order —
-  the same order that keys a carrier's fill region — with ``""`` appended when any individual has an
+  the same order that keys every fill and section — with ``""`` appended when any individual has an
   unnamed condition, so every condition has an index. A deferred pedigree's placeholder is ``pedigree
   deferred``.
 * ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
@@ -53,7 +53,8 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
-  for the unnamed condition. It sits below the drawing and the canvas grows to hold it.
+  for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
+  hold it.
 * ``id_prefix`` goes in front of every id and id reference (clip paths, patterns and the key included); it must be
   empty or an id-safe token (a letter or underscore, then letters, digits, ``_``, ``.``, ``-``). A composed figure
   prefixes its tiles ``p0-``, ``p1-``, … under the caller's prefix; a caller inlining several figures on
@@ -470,7 +471,9 @@ class _Draw:
         if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected:
             x_linked = [c for c in carriers if c.inheritance in _X_LINKED]
             if x_linked:
-                dot = index(x_linked[0].name)  # one dot; any other carried condition is a section
+                dot = min(
+                    index(c.name) for c in x_linked
+                )  # one dot, the lowest index; any other carried condition is a section
                 carriers = [c for c in carriers if index(c.name) != dot]
         carried = {index(c.name) for c in carriers} - affected  # affected and carried alike draws as affected
         sections = sorted([(i, _AFFECTED) for i in affected] + [(i, _CARRIER) for i in carried])
@@ -495,11 +498,12 @@ class _Draw:
                 used.add((plan.dot, _CARRIER, True))
         return sorted(used, key=lambda u: (u[0], u[1] != _AFFECTED, u[2]))
 
-    def _key_label(self, index: int, status: str) -> str:
+    def _key_label(self, index: int, status: str, dot: bool) -> str:
         name = self._data_legend[index]
         if status == _AFFECTED:
             return name or "Affected"
-        return f"Carrier: {name}" if name else "Carrier"
+        word = "X-linked carrier" if dot else "Carrier"  # one condition can be both a dot and a hatch
+        return f"{word}: {name}" if name else word
 
     def _lay_out_key(self) -> tuple[list[_KeyEntry], float, float]:
         """The key's entries placed left to right, wrapping at the drawing's width; its width and height (0 if none).
@@ -508,7 +512,7 @@ class _Draw:
         """
         geom = self.geom
         entries = [
-            _KeyEntry(index=i, status=status, dot=dot, label=self._key_label(i, status))
+            _KeyEntry(index=i, status=status, dot=dot, label=self._key_label(i, status, dot))
             for i, status, dot in self._used_fills()
         ]
         if not entries:
