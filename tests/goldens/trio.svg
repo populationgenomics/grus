@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="228" height="326.956" viewBox="0 0 228 326.956" class="pedigree" data-title="Nuclear family: two parents and one affected child" data-conditions="[&quot;&quot;]">
 <defs>
-<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#000000"/></pattern>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#000000"/></pattern>
 <pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="5" height="5" patternUnits="userSpaceOnUse"><rect x="0" y="1.75" width="5" height="1.5" fill="#000000"/></pattern>
 </defs>
 <g class="generation" data-generation="1">

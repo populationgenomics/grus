@@ -102,6 +102,7 @@ _DIVIDER_WIDTH = 1.0
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
 _HATCH = 5.0  # pitch (px) of a carrier hatch
 _HATCH_LINE = 1.5  # thickness (px) of a carrier hatch line
+_SOLID = 8.0  # tile (px) of a solid tone
 _STIPPLE = 4.0  # pitch (px) of the stipple fill
 _STIPPLE_DOT = 1.0  # radius (px) of a stipple dot
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status). Affected: a solid tone, or the
@@ -682,10 +683,11 @@ class _Draw:
                 f'<circle cx="{_num(_STIPPLE / 2)}" cy="{_num(_STIPPLE / 2)}" r="{_num(_STIPPLE_DOT)}" '
                 f'fill="{_STROKE}"/></pattern>'
             )
-        # One tile the size of the painted element's box: a solid with no tile seams.
+        # A user-space tile, like the hatches: cairosvg (grus.render.rasterize) fails on an objectBoundingBox pattern
+        # painted more than twice.
         return (
-            f'{head}width="1" height="1" patternContentUnits="objectBoundingBox">'
-            f'<rect width="1" height="1" fill="{tone}"/></pattern>'
+            f'{head}width="{_num(_SOLID)}" height="{_num(_SOLID)}" patternUnits="userSpaceOnUse">'
+            f'<rect width="{_num(_SOLID)}" height="{_num(_SOLID)}" fill="{tone}"/></pattern>'
         )
 
     def _key_group(self) -> list[str]:

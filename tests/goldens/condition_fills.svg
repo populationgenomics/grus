@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="508" height="393" viewBox="0 0 508 393" class="pedigree" data-title="Fills by condition index and status (NSGC 2022): tones affected, hatches carrier, divided only for several" data-conditions="[&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;]">
 <defs>
-<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#000000"/></pattern>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#000000"/></pattern>
 <pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="5" height="5" patternUnits="userSpaceOnUse"><rect x="0" y="1.75" width="5" height="1.5" fill="#000000"/></pattern>
-<pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#666666"/></pattern>
+<pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#666666"/></pattern>
 <pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect x="0" y="1.75" width="5" height="1.5" fill="#000000"/></pattern>
-<pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" width="1" height="1" patternContentUnits="objectBoundingBox"><rect width="1" height="1" fill="#bbbbbb"/></pattern>
+<pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#bbbbbb"/></pattern>
 <pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect x="0" y="1.75" width="5" height="1.5" fill="#000000"/></pattern>
 <pattern id="fill-affected-3" class="fill-pattern" data-condition="3" data-status="affected" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#000000"/></pattern>
 <pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect x="0" y="1.75" width="5" height="1.5" fill="#000000"/></pattern>
