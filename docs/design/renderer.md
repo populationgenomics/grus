@@ -115,8 +115,8 @@ show. A pedigree with one condition, the common case, stays undivided, as the st
 labels first, then by first appearance in `Position` order, with an unnamed condition (the figure's sole, unlabelled
 one) taking the last index. The index picks both the condition's fills and its section, pedigree-wide, so a condition
 looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index whether or
-not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts towards
-quadrants and the four-fill limit — so the drawing of one individual never depends on another's status.
+not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts towards the
+section count and the six-condition limit — so the drawing of one individual never depends on another's status.
 
 **Fills: the tone says the condition, the texture the status.**
 
@@ -126,6 +126,13 @@ quadrants and the four-fill limit — so the drawing of one individual never dep
 | 1     | dark grey `#484848`  | dark grey with white `\` hatch  |
 | 2     | mid grey `#9c9c9c`   | mid grey with black `/` hatch   |
 | 3     | light grey `#dbdbdb` | light grey with black `\` hatch |
+| 4     | near-black `#262626` | near-black with white `/` hatch |
+| 5     | pale grey `#b8b8b8`  | pale grey with black `\` hatch  |
+
+Conditions 4 and 5 take the two tones left in the gaps between the first four fills' mean greys, about 15 levels from
+their nearest neighbour where the first eight are about 26 apart. Six tones cannot all be told apart by grey alone, and
+they do not have to: a pedigree with five or six conditions is drawn in sixths, where every fill sits in its own fixed
+wedge, so a condition's position carries its identity and the tone only confirms it.
 
 A carrier is the condition's own tone with a diagonal hatch in the contrasting colour, so "carrier of A" and "affected
 with A" share A's tone and differ only in texture, and a carrier of two conditions is two hatched sections, never a
@@ -147,22 +154,36 @@ lines lie on a diagonal lattice whose cell is a quarter of the symbol size. The 
 edges, so a square or diamond is placed with its centre on the lattice's midpoint, putting a diamond's edges midway
 between two lines; a circle is placed with a lattice line through its centre, so that no line is a near-tangent chord
 hugging its outline. A key swatch is placed like a square. No line runs along a section edge, a divider or an outline;
-lines cross them. There is no fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a
-placeholder, never a reused fill).
+lines cross them. There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a
+placeholder, never a reused fill), with a message naming the supported range.
 
 **Sections, dividers and sector edges.** A pedigree with two conditions in its legend divides every symbol into halves
-(index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). The
-divider lines through the centre are drawn on every symbol, filled or not, at half the outline's stroke width, so they
-read as the frame and not as a mark. A section is a rectangle clipped to the shape by a per-symbol `clipPath`, so one
-code path covers □ ○ ◇. Every filled section has a visible edge: where it meets the outline that is the outline, and
+(index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right); with five
+or six, into sixths. The standard asks for "however many subsections are necessary"; what lets a reader find a condition
+is that each section points one way, the same way on every symbol.
+
+Sixths are six wedges from the centre, each 60° on a circle, pointing at 10, 12 and 2 o'clock (indices 0-2, the top row)
+and 8, 6 and 4 o'clock (3-5, the bottom row) — the reading order of halves and quadrants, index 0 upper left. The same
+wedges divide the square and the diamond, cut off by their outlines, so a condition points the same way on every shape:
+a 2×3 grid on the square would put index 1 in a different place on a square than on a circle, and a grid does not fit a
+diamond at all. On the square the top and bottom wedges are narrower than the corner ones (about 190 against 230 square
+pixels), on the diamond a little wider (120 against 100); neither is small enough to lose its fill. The dividers run
+through 1-7, 3-9 and 5-11 o'clock: none is vertical, so the presymptomatic line, which is vertical, never lies on one.
+In sixths every fill keeps its section, even a single affected condition (which elsewhere fills the whole shape),
+because there the position is what identifies it.
+
+The divider lines through the centre are drawn on every symbol, filled or not, at half the outline's stroke width, so
+they read as the frame and not as a mark. A section is a rectangle clipped to the shape by a per-symbol `clipPath`, so
+one code path covers □ ○ ◇. Every filled section has a visible edge: where it meets the outline that is the outline, and
 where it meets another section, a divider. In a pedigree with one condition, which has no dividers, a lone carrier's
 half gets that one thin line down the centre as its inner edge; nothing is stroked twice. A key swatch has the same thin
 outline.
 
 **What a symbol shows.**
 
-- Affected with exactly one condition and carrying none: the whole shape in that condition's affected tone. An affected
-  symbol of a single-condition pedigree is solid black, as before.
+- Affected with exactly one condition and carrying none: the whole shape in that condition's affected tone, except in
+  sixths, where it is that condition's wedge. An affected symbol of a single-condition pedigree is solid black, as
+  before.
 - Otherwise every affected and every carried condition fills its own section. A carrier of one condition is one hatched
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
   and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
@@ -179,12 +200,16 @@ dot, edged white so it reads over a tone; every other carrier is a section as ab
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
-status) drawn, ordered by index with affected first: a square swatch in that fill, the size of one symbol quadrant and
-drawn about its own centre, and a label — the condition's name when affected, `Carrier: <name>` when carried
-(`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed condition. Entries run left to right
-and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP` below the lowest label or
-arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no fills has no key and an
-unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per pedigree.
+status) drawn, ordered by index with affected first: a swatch and a label. In a divided pedigree the swatch is a small
+square symbol (three quarters of the symbol size) with the pedigree's dividers, filled in that entry's section only, so
+the key shows where a condition sits as well as its fill; this applies to halves and quadrants as to sixths, so a
+divided pedigree's key always reads the same way. An undivided pedigree has no positions to show, and its swatch is a
+plain square the size of a quadrant filled all over. Then the label — the condition's name when affected,
+`Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed
+condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits
+`KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree
+with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices
+are per pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree
@@ -258,8 +283,8 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 - **A routed mating** — partners that cannot stand side by side: a third partner, or a twin whose sides are both taken
   (a twin pair holds three partners). Its drawn form, a track over the row, read as a sibship
   ([`layout-v2.md`](layout-v2.md), Alternatives considered), so it defers (`_layout2.layout`).
-- **A fifth filled condition** — a fill (not the X-linked dot) for a condition at legend index 4 or above. The fills
-  table has four distinct fills per status, and reusing one would draw two conditions alike (`_draw`).
+- **A seventh filled condition** — a fill (not the X-linked dot) for a condition at legend index 6 or above. There are
+  six sections and six fills per status, and reusing one would draw two conditions alike (`_draw`).
 - **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).
@@ -286,6 +311,12 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 
 - **Pie sectors, as Figure 2 draws three conditions on a circle** — rejected for fixed halves / quadrants keyed by
   index: sectors sized to each individual's own conditions would move a condition from symbol to symbol.
+
+- **Sixths as a 2×3 grid on the square** — rejected: a condition would sit in a different place on a square than on a
+  circle or a diamond, and the grid has no counterpart on a diamond.
+
+- **Conditions coded by combinations of regions** (as some source figures draw many conditions) — rejected: overloaded,
+  and a quadrant's position then reads as an inheritance pattern.
 
 - **Carrier as a dot stipple on its tone** — rejected: at a density that reads, the dots blur into their tone below
   about half size, and then only the grey level tells carrier from affected; diagonal lines keep their streaks longer.

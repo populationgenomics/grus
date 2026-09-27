@@ -86,14 +86,15 @@ not depend on styling:
 
 1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
    link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
-1. **`fill`** — status paint inside the shape: the whole shape for an individual affected with one condition, else one
-   legend-indexed section per affected or carried condition, or the central dot an X-linked carrier gets under the
-   inheritance-glyph style (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status
-   (`data-status`) and paints with that pair's named pattern (the dot, a plain glyph, has none); status is never the
-   backing's colour, so one selector reaches all status paint.
-1. **`divider`** — the thin lines through the centre that separate sections (halves or quadrants): on every symbol of a
-   pedigree with two or more conditions, and otherwise as the inner edge of a lone filled section. Under the outline, so
-   the outline stays whole.
+1. **`fill`** — status paint inside the shape: the whole shape for an individual affected with one condition (outside
+   sixths), else one legend-indexed section per affected or carried condition (a clipped rectangle, or in sixths a
+   clipped wedge polygon), or the central dot an X-linked carrier gets under the inheritance-glyph style (`renderer.md`,
+   Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
+   named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
+   status paint.
+1. **`divider`** — the thin lines through the centre that separate sections (halves, quadrants or sixths): on every
+   symbol of a pedigree with two or more conditions, and otherwise as the inner edge of a lone filled section. Under the
+   outline, so the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
    drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
    consumer colours the stroke.
@@ -140,9 +141,10 @@ The groups, and what each promises:
 - **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
   Each entry is its own `key-entry` group with id `key-{status}-{index}` (`key-carrier-dot-{index}`, class
   `key-entry dot`, for the X-linked dot of the inheritance-glyph style) naming its condition index and status as data
-  attributes, holding a swatch painted with the same pattern the symbols use and a text label. A consumer relocates the
-  key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its own from the
-  pedigree's condition array.
+  attributes, holding a swatch painted with the same pattern the symbols use and a text label. In a divided pedigree the
+  swatch is a small symbol: a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, the pedigree's
+  `divider` lines and a `swatch-outline`. A consumer relocates the key with a transform on the one group, restyles or
+  hides an entry by id, or drops the key and builds its own from the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
