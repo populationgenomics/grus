@@ -5,7 +5,7 @@ Emits deterministic bytes — no randomness, no timestamps, fixed number formatt
 Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinical status as NSGC 2022 fills (one
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
 affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
-every symbol of a multi-condition pedigree has dividers, and a filled section's edge inside a symbol is drawn as one),
+a filled section's edges inside a symbol are drawn as thin borders, and nothing else divides it),
 presymptomatic vertical line (outline weight, past the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
@@ -36,9 +36,9 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   shape for one affected condition (not in sixths), else a legend-keyed section per affected or carried condition —
   a clipped ``rect``, or in sixths a clipped wedge ``polygon`` — or the X-linked
   ``fill dot`` under ``CarrierStyle.INHERITANCE_GLYPH`` — each with ``data-condition`` and ``data-status`` naming what
-  it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (the line(s)
-  through the centre between sections: on every symbol of a multi-condition pedigree, else only where a filled
-  section's edge falls inside the symbol), ``symbol`` (the shape as outline only), ``mark …``
+  it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (a filled
+  section's borders inside the symbol: rays from the centre along each boundary with a filled section on either
+  side), ``symbol`` (the shape as outline only), ``mark …``
   (``count``, a count-collapsed symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``,
   ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line),
   then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow
@@ -58,7 +58,7 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` (in a divided
   pedigree a small divided square: ``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch``
-  section, ``divider`` lines, ``swatch-outline``) and a
+  section, its ``divider`` borders, ``swatch-outline``) and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
   for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
   hold it.
@@ -127,10 +127,16 @@ _HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
 _SOLID = 8.0  # tile (px) of a flat tone; its phase does not show
 _FILLS = len(_AFFECTED_TONES)
 # Sections of a sixth-divided symbol: wedges from the centre, each named by the clock position it points at, in the
-# reading order of halves and quadrants (top row left to right, then the bottom row). Their dividers run through 1-7,
-# 3-9 and 5-11 o'clock, so none is vertical: the presymptomatic line never lies on one.
+# reading order of halves and quadrants (top row left to right, then the bottom row). Their boundaries run along 1, 3,
+# 5, 7, 9 and 11 o'clock, so none is vertical: the presymptomatic line never lies on one.
 _SIXTH_CLOCK = (10, 12, 2, 8, 6, 4)
-_SIXTH_DIVIDERS = (1, 3, 5)
+# The boundaries between sections, as rays from the centre: clock position -> the two sections it separates.
+# A symbol draws a boundary only where one of its two sections is filled.
+_BOUNDARIES = {
+    2: {12: (0, 1), 6: (0, 1)},
+    4: {12: (0, 1), 3: (1, 3), 6: (3, 2), 9: (2, 0)},
+    6: {11: (0, 1), 1: (1, 2), 3: (2, 5), 5: (5, 4), 7: (4, 3), 9: (3, 0)},
+}
 _DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
@@ -426,7 +432,8 @@ class _Draw:
         self.gen_height = max(geom.gen_height, geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub)
         # Ordered condition names plus the unnamed slot: the index keys `data-condition-{i}`, fills and sections.
         self._data_legend = _labels.data_legend(p)
-        self._divided = _labels.divided(p)  # dividers on every symbol
+        # Two or more conditions: sections exist, and the key shows each entry's position.
+        self._divided = len(self._data_legend) >= 2
         n = len(self._data_legend)
         self._slots = 2 if n <= 2 else 4 if n <= 4 else 6  # sections per symbol: halves, quadrants or sixths
         self._plans = [self._fill_plan(ind) for ind in p.individuals]
@@ -599,7 +606,7 @@ class _Draw:
         return self._label_reach(self._ind_at(idx), side=self._side[idx])
 
     def _label_reach(self, ind: pb.Individual, *, side: int) -> tuple[float, float]:
-        return _labels.label_reach(ind, self.geom, side=side, divided=self._divided)
+        return _labels.label_reach(ind, self.geom, side=side, sixths=self._slots == 6)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
@@ -726,7 +733,7 @@ class _Draw:
         return out
 
     def _key_symbol(self, e: _KeyEntry, cx: float, cy: float) -> list[str]:
-        """A divided pedigree's key swatch: a small square with the pedigree's dividers, filled in ``e``'s section only.
+        """A divided pedigree's key swatch: a small square filled in ``e``'s section only, with that section's borders.
 
         Drawn about its centre, like a square symbol, so its hatch has a square's phase; the outline is the swatch's.
         """
@@ -738,7 +745,7 @@ class _Draw:
             clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
             out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
             out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
-        out += self._divider_lines(pb.GENDER_MAN, cx, cy, h)
+            out += self._borders(pb.GENDER_MAN, cx, cy, h, {e.index})
         out.append(
             f'<rect class="swatch-outline" {square} {at} fill="none" stroke="{_STROKE}" '
             f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'
@@ -1195,7 +1202,7 @@ class _Draw:
         out += self._count_mark(ind, plan, cx, cy)
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
             mark = _text(cx, cy, "?", 20.0, cls="mark unknown")
-            if self._divided:  # a white halo keeps it clear of the dividers it sits on
+            if plan.sections:  # a white halo keeps it clear of the section borders it sits on
                 mark = mark.replace(
                     " text-anchor=",
                     f' stroke="#ffffff" stroke-width="{_num(_HALO)}" paint-order="stroke" text-anchor=',
@@ -1235,7 +1242,7 @@ class _Draw:
         beside the upper right when a mark already runs through the centre. Either way it has a halo in the
         contrasting colour, so it reads over a carrier's region fill or a line.
         """
-        mark = _labels.count_mark(ind, self.geom, divided=self._divided)
+        mark = _labels.count_mark(ind, self.geom, sixths=self._slots == 6)
         if mark is None:
             return []
         if not mark.inside:
@@ -1286,30 +1293,22 @@ class _Draw:
         return out
 
     def _dividers(self, gender: pb.Gender, cx: float, cy: float, plan: _FillPlan) -> list[str]:
-        """The section lines through the centre, at half the outline's width: halves, quadrants for 3-4, sixths for 5-6.
+        """The borders of a symbol's filled sections inside it, at half the outline's width.
 
-        In a pedigree with two or more conditions every symbol has them, filled or not, so a condition sits in a visibly
-        fixed place. In one with a single condition they are the edge of a filled section inside the symbol (a lone
-        carrier's half), so the section has a visible boundary. A section's other edges are the outline, drawn once.
+        Only a boundary with a filled section on either side is drawn: between a filled section and the rest of the
+        symbol, or between two filled ones. Empty sections get no lines, an unfilled or wholly filled symbol is its
+        outline alone, and a section's edges along the outline are the outline, drawn once.
         """
-        if not (self._divided or plan.sections):
-            return []
-        return self._divider_lines(gender, cx, cy, self.half)
+        return self._borders(gender, cx, cy, self.half, {i for i, _ in plan.sections})
 
-    def _divider_lines(
-        self, gender: pb.Gender, cx: float, cy: float, h: float, width: float = _DIVIDER_WIDTH
-    ) -> list[str]:
-        """The divider lines of a ``gender`` shape of half-size ``h`` at ``(cx, cy)``, running outline to outline."""
-        if self._slots == 6:
-            out = []
-            for clock in _SIXTH_DIVIDERS:
+    def _borders(self, gender: pb.Gender, cx: float, cy: float, h: float, filled: set[int]) -> list[str]:
+        """The rays from the centre to the outline of a ``gender`` shape of half-size ``h`` that bound ``filled``."""
+        out = []
+        for clock, pair in _BOUNDARIES[self._slots].items():
+            if filled & set(pair):
                 dx, dy = _clock(clock)
                 t = _reach(gender, dx, dy, h)
-                out.append(_line(cx - t * dx, cy - t * dy, cx + t * dx, cy + t * dy, cls="divider", width=width))
-            return out
-        out = [_line(cx, cy - h, cx, cy + h, cls="divider", width=width)]
-        if self._slots == 4:
-            out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=width))
+                out.append(_line(cx, cy, cx + t * dx, cy + t * dy, cls="divider", width=_DIVIDER_WIDTH))
         return out
 
     def _dot(self, cx: float, cy: float, index: int, *, cls: str, radius: float) -> str:
