@@ -3,8 +3,9 @@
 Reads only the per-level arrays (the geometry seam) plus each individual's symbol attributes from the IR.
 Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are stable.
 Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinical status as NSGC 2022 fills (one
-per condition index and status: affected a tone, carrier a line hatch; one affected condition fills the whole shape,
-anything else fills one legend-keyed section per condition, with dividers), presymptomatic vertical line, deceased
+per condition index and status: affected a flat tone, carrier the same tone with contrasting dots; one affected
+condition fills the whole shape, anything else fills one legend-keyed section per condition; every symbol of a
+multi-condition pedigree has dividers), presymptomatic vertical line (outline weight, past the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -48,7 +49,8 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   ``<g class="generation" data-generation=…>`` per Roman-numeral marker, numbered by IR generation.
 * ``<defs>`` first in the body: one ``<pattern class="fill-pattern" id="{prefix}fill-{status}-{i}">`` per (condition
   index ``i``, status ``affected`` / ``carrier``) the pedigree draws, with ``data-condition`` and ``data-status``.
-  Restyle a fill everywhere, key included, by restyling or replacing its pattern.
+  Each holds a ``tone`` rect, and a carrier's also a ``stipple`` dot. Restyle a fill everywhere, key included, by
+  restyling or replacing its pattern.
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` and a
@@ -99,23 +101,24 @@ _ARROW_LABEL_SIZE = 15.0
 _ARROW_LABEL_DX = 8.0
 _ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
-_DIVIDER_WIDTH = 1.0
+_DIVIDER_WIDTH = _WIDTH / 2  # half the outline: a divider is a section line, lighter than any mark
+_PRESYMPTOMATIC_OVERRUN = _WIDTH  # the presymptomatic line runs this far past the outline, top and bottom
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
-# Fill phase (docs/design/renderer.md, Fills): every fill part and key swatch is drawn in coordinates local to its
-# symbol or swatch, so a user-space pattern tile starts at the same place on each. Carrier strokes are all diagonal,
-# on the lattice x + y, x - y = cell / 2 (mod cell) with cell = symbol_size / 4: a diamond's edges (x +- y = +-half)
-# fall midway between two lattice lines. A square or diamond takes that phase about its centre; a circle's origin
-# sits half a cell right of its centre, so a lattice line passes through the centre and none is a near-tangent chord.
-# A swatch is drawn from its corner, which has the square's phase.
-_CELLS_PER_SYMBOL = 4
-_HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
-_STIPPLES_PER_SYMBOL = 8  # stipple pitch = symbol_size / 8
-_STIPPLE_DOT = 0.25  # radius of a stipple dot, as a fraction of the stipple pitch
-_SOLID = 8.0  # tile (px) of a solid tone; its phase does not show
-# NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status). Affected: a solid tone, or the
-# stipple for index 3. Carrier: "/", "\", a diagonal cross-hatch, chevrons — never a horizontal or vertical stroke.
-_AFFECTED_TONES = ("#000000", "#666666", "#bbbbbb", None)
-_CARRIER_HATCHES = ("slash", "backslash", "cross", "chevron")
+# NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status): the tone says the condition, the
+# texture the status. Affected is the flat tone; carrier is the tone with a square grid of dots in the contrasting
+# colour. The tones and the dot cover (about 17%) space the eight fills' mean greys evenly, about 26 levels apart with
+# white, so each stays distinct where the dots blur together at a small raster size.
+_AFFECTED_TONES = ("#000000", "#484848", "#9c9c9c", "#dbdbdb")
+_DOT_COLOURS = ("#ffffff", "#ffffff", "#000000", "#000000")
+# Fill phase: every fill part is drawn about its symbol's centre (a key swatch, one symbol quadrant, from its corner),
+# so a user-space tile starts at the same place on each: dots sit at pitch/2 + k * pitch from the centre. With these
+# fractions of the symbol size no dot is cut by a divider or a section edge, and a dot at an outline is either hidden
+# under its stroke or mostly visible, grazing the stroke's inner edge by at most about half a pixel
+# (tests/test_svg_output.py pins this).
+_DOT_PITCH = 5 / 24  # of symbol_size
+_DOT_RADIUS = 7 / 144  # of symbol_size
+_DOT_TILE = 15.0  # pattern units per dot tile
+_SOLID = 8.0  # tile (px) of a flat tone; its phase does not show
 _FILLS = len(_AFFECTED_TONES)
 _DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
@@ -227,37 +230,9 @@ def _check_prefix(id_prefix: str) -> None:
         raise ValueError(f"id_prefix must be empty or match {_ID_PREFIX_RE.pattern}, got {id_prefix!r}")
 
 
-def _condition_legend(p: pb.Pedigree) -> list[str]:
-    """Ordered distinct condition names in the pedigree — the index that keys each condition's fills and section.
-
-    Phenotype legend labels come first (their drawn order), then any remaining condition names by first
-    appearance, walking individuals in ``Position`` order (never input order, so the legend and every fill are
-    independent of how the IR lists its individuals). A condition's index selects its fills and its section,
-    consistently pedigree-wide, so two conditions never share a section or a fill.
-    """
-    order: list[str] = []
-    seen: set[str] = set()
-    for label in p.labels:
-        if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text and label.text not in seen:
-            seen.add(label.text)
-            order.append(label.text)
-    for ind in sorted(p.individuals, key=lambda ind: (ind.generation, ind.index)):
-        for c in ind.conditions:
-            if c.name and c.name not in seen:
-                seen.add(c.name)
-                order.append(c.name)
-    return order
-
-
-def _data_legend(p: pb.Pedigree) -> list[str]:
-    """The ``data-conditions`` array: the named legend plus a trailing ``""`` slot when any condition is unnamed."""
-    unnamed = any(not c.name for ind in p.individuals for c in ind.conditions)
-    return [*_condition_legend(p), *([""] if unnamed else [])]
-
-
 def _pedigree_attrs(p: pb.Pedigree, *, deferred: bool = False) -> str:
     """The ``pedigree`` group's attributes, for the root ``<svg>``, a composed figure's tile, or a placeholder."""
-    legend = json.dumps(_data_legend(p), ensure_ascii=False)
+    legend = json.dumps(_labels.data_legend(p), ensure_ascii=False)
     cls = "pedigree deferred" if deferred else "pedigree"
     return f'class="{cls}" data-title="{_attr(_display_title(p))}" data-conditions="{_attr(legend)}"'
 
@@ -431,7 +406,8 @@ class _Draw:
         self.label_band = max(self.label_band, geom.label_box_height * geom.label_size)
         self.gen_height = max(geom.gen_height, geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub)
         # Ordered condition names plus the unnamed slot: the index keys `data-condition-{i}`, fills and sections.
-        self._data_legend = _data_legend(p)
+        self._data_legend = _labels.data_legend(p)
+        self._divided = _labels.divided(p)  # dividers on every symbol
         # A condition's section: halves for up to two legend conditions, else quadrants (one per fill).
         self._slots = 2 if len(self._data_legend) <= 2 else _FILLS
         self._plans = [self._fill_plan(ind) for ind in p.individuals]
@@ -461,7 +437,7 @@ class _Draw:
             self.gen_height,
             geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub + tracks * geom.elbow_gap,
         )
-        self._swatch = geom.symbol_size / 2  # a key swatch is one quadrant of a symbol, in the same fill phase
+        self._swatch = geom.symbol_size / 2  # a key swatch is the size of one symbol quadrant
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
     def _fill_plan(self, ind: pb.Individual) -> _FillPlan:
@@ -508,7 +484,7 @@ class _Draw:
         name = self._data_legend[index]
         if status == _AFFECTED:
             return name or "Affected"
-        word = "X-linked carrier" if dot else "Carrier"  # one condition can be both a dot and a hatch
+        word = "X-linked carrier" if dot else "Carrier"  # one condition can be both a dot and a dotted section
         return f"{word}: {name}" if name else word
 
     def _lay_out_key(self) -> tuple[list[_KeyEntry], float, float]:
@@ -600,7 +576,7 @@ class _Draw:
         return self._label_reach(self._ind_at(idx), side=self._side[idx])
 
     def _label_reach(self, ind: pb.Individual, *, side: int) -> tuple[float, float]:
-        return _labels.label_reach(ind, self.geom, side=side)
+        return _labels.label_reach(ind, self.geom, side=side, divided=self._divided)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
@@ -679,26 +655,24 @@ class _Draw:
     def _pattern(self, index: int, status: str) -> str:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
-        if status == _CARRIER:
-            c = self.geom.symbol_size / _CELLS_PER_SYMBOL
-            return (
-                f'{head}width="{_num(c)}" height="{_num(c)}" patternUnits="userSpaceOnUse">'
-                f'<path d="{_hatch_path(_CARRIER_HATCHES[index], c)}" fill="none" stroke="{_STROKE}" '
-                f'stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
-            )
         tone = _AFFECTED_TONES[index]
-        if tone is None:  # the stipple
-            pitch = self.geom.symbol_size / _STIPPLES_PER_SYMBOL
+        if status == _CARRIER:
+            # The tile is _DOT_TILE pattern units, scaled to the pitch: cairosvg renders a tile that is not a whole
+            # number of pixels with seams between tiles, and the scaled integer tile avoids them at any raster scale.
+            scale = self.geom.symbol_size * _DOT_PITCH / _DOT_TILE
+            r = self.geom.symbol_size * _DOT_RADIUS / scale
             return (
-                f'{head}width="{_num(pitch)}" height="{_num(pitch)}" patternUnits="userSpaceOnUse">'
-                f'<circle cx="{_num(pitch / 2)}" cy="{_num(pitch / 2)}" r="{_num(pitch * _STIPPLE_DOT)}" '
-                f'fill="{_STROKE}"/></pattern>'
+                f'{head}width="{_num(_DOT_TILE)}" height="{_num(_DOT_TILE)}" patternUnits="userSpaceOnUse" '
+                f'patternTransform="scale({_num(scale)})">'
+                f'<rect class="tone" width="{_num(_DOT_TILE)}" height="{_num(_DOT_TILE)}" fill="{tone}"/>'
+                f'<circle class="stipple" cx="{_num(_DOT_TILE / 2)}" cy="{_num(_DOT_TILE / 2)}" r="{_num(r)}" '
+                f'fill="{_DOT_COLOURS[index]}"/></pattern>'
             )
-        # A user-space tile, like the hatches: cairosvg (grus.render.rasterize) fails on an objectBoundingBox pattern
-        # painted more than twice.
+        # A user-space tile, like the carrier fills: cairosvg (grus.render.rasterize) fails on an objectBoundingBox
+        # pattern painted more than twice.
         return (
             f'{head}width="{_num(_SOLID)}" height="{_num(_SOLID)}" patternUnits="userSpaceOnUse">'
-            f'<rect width="{_num(_SOLID)}" height="{_num(_SOLID)}" fill="{tone}"/></pattern>'
+            f'<rect class="tone" width="{_num(_SOLID)}" height="{_num(_SOLID)}" fill="{tone}"/></pattern>'
         )
 
     def _key_group(self) -> list[str]:
@@ -715,10 +689,10 @@ class _Draw:
             attrs["data-status"] = e.status
             out.append(_open_g(["key-entry", *(["dot"] if e.dot else [])], attrs))
             paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
-            # Drawn from its own corner, so its pattern has the phase it has in a symbol's quadrant.
+            # Drawn about its own centre, like a symbol, so its dots sit symmetrically clear of its edges.
             out.append(
-                f'<rect class="swatch" x="0" y="0" width="{_num(s)}" height="{_num(s)}" '
-                f'transform="translate({_num(x)} {_num(y)})" fill="{paint}" stroke="{_STROKE}" '
+                f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" height="{_num(s)}" '
+                f'transform="translate({_num(x + s / 2)} {_num(y + s / 2)})" fill="{paint}" stroke="{_STROKE}" '
                 f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'
             )
             if e.dot:
@@ -1074,6 +1048,7 @@ class _Draw:
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         suffix = f"-{ordinal}" if ordinal > 1 else ""
         out += self._status_fill(ind, plan, cx, cy, clip_id=f"{self.id_prefix}clip-ghost-{_position(ind)}{suffix}")
+        out += self._dividers(cx, cy)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
         out += self._count_mark(ind, plan, cx, cy)
         lines, ys = _label_lines(ind), self._line_ys(ind)
@@ -1173,12 +1148,22 @@ class _Draw:
         out = [self._open_individual(ind)]
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         out += self._status_fill(ind, plan, cx, cy, clip_id=f"{self.id_prefix}clip-{_position(ind)}")
+        out += self._dividers(cx, cy)
         out.append(self._shape(ind.gender, cx, cy, "none", cls="symbol"))
         out += self._count_mark(ind, plan, cx, cy)
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
-            out.append(_text(cx, cy, "?", 20.0, cls="mark unknown"))
+            mark = _text(cx, cy, "?", 20.0, cls="mark unknown")
+            if self._divided:  # a white halo keeps it clear of the dividers it sits on
+                mark = mark.replace(
+                    " text-anchor=",
+                    f' stroke="#ffffff" stroke-width="{_num(_HALO)}" paint-order="stroke" text-anchor=',
+                    1,
+                )
+            out.append(mark)
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
-            out.append(_line(cx, cy - self.half, cx, cy + self.half, cls="mark presymptomatic"))
+            # Outline weight and past the outline top and bottom, so it never reads as the lighter vertical divider.
+            reach = self.half + _PRESYMPTOMATIC_OVERRUN
+            out.append(_line(cx, cy - reach, cx, cy + reach, cls="mark presymptomatic"))
         if ind.deceased:
             d = self.half * 1.4
             out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
@@ -1208,7 +1193,7 @@ class _Draw:
         beside the upper right when a mark already runs through the centre. Either way it has a halo in the
         contrasting colour, so it reads over a carrier's region fill or a line.
         """
-        mark = _labels.count_mark(ind, self.geom)
+        mark = _labels.count_mark(ind, self.geom, divided=self._divided)
         if mark is None:
             return []
         if not mark.inside:
@@ -1232,18 +1217,16 @@ class _Draw:
 
         One affected condition paints the whole shape. Otherwise each section is a rectangle for its condition index,
         clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
-        math); several sections get divider line(s) through the centre. The X-linked dot, when drawn, sits over both.
+        math). The X-linked dot, when drawn, sits over it.
         """
-        # Fill parts are drawn about the symbol's own origin and moved into place, so each pattern has one phase per
-        # symbol: the centre, or half a cell right of it for a circle (see _CELLS_PER_SYMBOL).
-        ox = self.geom.symbol_size / _CELLS_PER_SYMBOL / 2 if ind.gender == pb.GENDER_WOMAN else 0.0
-        at = f'transform="translate({_num(cx + ox)} {_num(cy)})"'
+        # Fill parts are drawn about the symbol's centre and moved into place, so each pattern has one phase per symbol.
+        at = f'transform="translate({_num(cx)} {_num(cy)})"'
         out: list[str] = []
         if plan.whole is not None:
             out.append(
                 self._shape(
                     ind.gender,
-                    -ox,
+                    0.0,
                     0.0,
                     f"url(#{self._fill_id(plan.whole, _AFFECTED)})",
                     stroke=False,
@@ -1252,35 +1235,43 @@ class _Draw:
                 )
             )
         elif plan.sections:
-            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, -ox, 0.0, "none", stroke=False)}</clipPath>')
-            out += [self._section(i, status, clip_id, at, -ox) for i, status in plan.sections]
-            if len(plan.sections) > 1:  # a lone section's own edge shows it; dividers only split several
-                h = self.half
-                out.append(_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH))
-                if self._slots == _FILLS:
-                    out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=_DIVIDER_WIDTH))
+            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, 0.0, 0.0, "none", stroke=False)}</clipPath>')
+            out += [self._section(i, status, clip_id, at) for i, status in plan.sections]
         if plan.dot is not None:
             out.append(self._dot(cx, cy, plan.dot, cls="fill dot", radius=self.half * 0.26))
         return out
 
+    def _dividers(self, cx: float, cy: float) -> list[str]:
+        """In a pedigree with two or more conditions, every symbol's section lines: halves, or quadrants for 3-4.
+
+        Drawn filled or not, so a condition sits in a visibly fixed place on every symbol; at half the outline's width.
+        """
+        if not self._divided:
+            return []
+        h = self.half
+        out = [_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH)]
+        if self._slots == _FILLS:
+            out.append(_line(cx - h, cy, cx + h, cy, cls="divider", width=_DIVIDER_WIDTH))
+        return out
+
     def _dot(self, cx: float, cy: float, index: int, *, cls: str, radius: float) -> str:
-        """The X-linked carrier dot, edged white so it reads over a hatch."""
+        """The X-linked carrier dot, edged white so it reads over a tone."""
         return (
             f'<circle class="{cls}" data-condition="{index}" data-status="{_CARRIER}" cx="{_num(cx)}" cy="{_num(cy)}" '
             f'r="{_num(radius)}" fill="{_STROKE}" stroke="#ffffff" stroke-width="{_num(_DIVIDER_WIDTH)}"/>'
         )
 
-    def _section(self, index: int, status: str, clip_id: str, at: str, cx: float) -> str:
-        """The ``fill`` rectangle of condition ``index``'s section in the symbol's local frame, clipped to its shape.
+    def _section(self, index: int, status: str, clip_id: str, at: str) -> str:
+        """The ``fill`` rectangle of condition ``index``'s section about the symbol's centre, clipped to its shape.
 
         Halves (left, right) when the legend has at most two conditions, else quadrants (TL, TR, BL, BR). ``at`` is
-        the transform that places it on the symbol; ``cx`` the symbol's centre in the local frame.
+        the transform that places it on the symbol.
         """
         h = self.half
         if self._slots == 2:
-            rx, ry, rw, rh = cx + (-h if index == 0 else 0.0), -h, h, 2 * h
+            rx, ry, rw, rh = -h if index == 0 else 0.0, -h, h, 2 * h
         else:
-            rx = cx + (-h if index in (0, 2) else 0.0)
+            rx = -h if index in (0, 2) else 0.0
             ry = -h if index in (0, 1) else 0.0
             rw = rh = h
         return (
@@ -1317,30 +1308,6 @@ class _Draw:
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
-
-
-def _hatch_path(kind: str, c: float) -> str:
-    r"""One ``c``-square tile of a carrier hatch: segments on the lattice x +- y = c/2 (mod c), run past the tile.
-
-    ``slash`` is "/" (x + y = c/2, 3c/2), ``backslash`` "\" (x - y = +-c/2), ``cross`` both, and ``chevron`` rows
-    of "^" teeth, apexes at y = 0 and valleys at y = c/2, whose arms are lattice segments. The tile clips the overrun.
-    """
-    h, e = c / 2, c / 8  # half a cell; the overrun past the tile
-    slash = (
-        f"M{_num(-e)},{_num(h + e)}L{_num(h + e)},{_num(-e)}M{_num(h - e)},{_num(c + e)}L{_num(c + e)},{_num(h - e)}"
-    )
-    back = f"M{_num(h - e)},{_num(-e)}L{_num(c + e)},{_num(h + e)}M{_num(-e)},{_num(h - e)}L{_num(h + e)},{_num(c + e)}"
-    if kind == "slash":
-        return slash
-    if kind == "backslash":
-        return back
-    if kind == "cross":
-        return slash + back
-    rows = []
-    for y in (0.0, c):  # the tile's row, and the next row's apexes, which reach up into it
-        pts = [(-h, y), (0.0, y + h), (h, y), (c, y + h), (c + h, y)]
-        rows.append("M" + "L".join(f"{_num(x)},{_num(py)}" for x, py in pts))
-    return "".join(rows)
 
 
 def _cls(cls: str) -> str:

@@ -274,13 +274,14 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
     label may be narrower than it: ``_row_seps`` adds that as its own floor (``_count_clearance``).
     """
     out: dict[int, tuple[float, float]] = {}
+    divided = _labels.divided(p)
     for level, row in enumerate(lay.nid):
         for k, c in enumerate(row):
             if c in lay.passthrough or c in lay.phantom:
                 out[c] = (0.0, 0.0)
                 continue
             ind = p.individuals[lay.ghost_of.get(c, c)]
-            left, right = _labels.label_reach(ind, geom, side=lay.label_side(level, k))
+            left, right = _labels.label_reach(ind, geom, side=lay.label_side(level, k), divided=divided)
             out[c] = ((left + geom.label_size / 2) / geom.x_unit, (right + geom.label_size / 2) / geom.x_unit)
     return out
 
@@ -291,11 +292,12 @@ def _count_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
     The count's reach right of centre, then half the label gap, then the neighbour's symbol half.
     """
     out: dict[int, float] = {}
+    divided = _labels.divided(p)
     for row in lay.nid:
         for c in row:
             if c in lay.passthrough or c in lay.phantom:
                 continue
-            if reach := _labels.outside_count_reach(p.individuals[lay.ghost_of.get(c, c)], geom):
+            if reach := _labels.outside_count_reach(p.individuals[lay.ghost_of.get(c, c)], geom, divided=divided):
                 out[c] = (reach + geom.label_size / 2 + geom.symbol_size / 2) / geom.x_unit
     return out
 

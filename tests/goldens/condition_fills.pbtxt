@@ -17,3 +17,6 @@ individuals { generation: 3 index: 2 gender: GENDER_MAN conditions { name: "A" s
 individuals { generation: 3 index: 3 gender: GENDER_NONBINARY conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_CARRIER } }
 individuals { generation: 3 index: 4 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_AFFECTED } conditions { name: "D" status: CONDITION_STATUS_AFFECTED } }
 individuals { generation: 3 index: 5 gender: GENDER_MAN conditions { name: "C" status: CONDITION_STATUS_CARRIER } conditions { name: "D" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 6 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_PRESYMPTOMATIC } }
+individuals { generation: 3 index: 7 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_PRESYMPTOMATIC } conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
+individuals { generation: 3 index: 8 gender: GENDER_NONBINARY }

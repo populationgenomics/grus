@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1111.56" height="1053.647" viewBox="0 0 1111.56 1053.647" class="pedigree" data-title="Counts 3, 12, 100 and n on every status and mark: inside when the centre is free, beside the upper right when a mark runs through it" data-conditions="[&quot;&quot;]">
 <defs>
-<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#000000"/></pattern>
-<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
+<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="15" height="15" patternUnits="userSpaceOnUse" patternTransform="scale(0.5)"><rect class="tone" width="15" height="15" fill="#000000"/><circle class="stipple" cx="7.5" cy="7.5" r="3.5" fill="#ffffff"/></pattern>
 </defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
@@ -157,7 +157,7 @@
 </g>
 <g id="ind-II-2" class="individual affected" data-position="II-2" data-generation="2" data-index="2" data-gender="woman" data-count="12" data-condition-0="affected">
 <circle class="backing" cx="190" cy="183.956" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(194.5 183.956)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(190 183.956)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="190" cy="183.956" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="190" y="183.956" font-family="sans-serif" font-size="16.2" fill="#ffffff" stroke="#000000" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">12</text>
 <text class="label" x="190" y="213.456" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
@@ -181,7 +181,7 @@
 </g>
 <g id="ind-II-5" class="individual affected deceased" data-position="II-5" data-generation="2" data-index="5" data-gender="woman" data-count="3" data-condition-0="affected">
 <circle class="backing" cx="442" cy="183.956" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(446.5 183.956)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(442 183.956)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="442" cy="183.956" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="468" y="172.256" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
 <line class="mark deceased" x1="416.8" y1="209.156" x2="467.2" y2="158.756" stroke="#000000" stroke-width="2"/>
@@ -208,7 +208,7 @@
 </g>
 <g id="ind-II-8" class="individual affected deceased" data-position="II-8" data-generation="2" data-index="8" data-gender="woman" data-count="n" data-condition-0="affected">
 <circle class="backing" cx="694" cy="183.956" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(698.5 183.956)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(694 183.956)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="694" cy="183.956" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="720" y="172.256" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
 <line class="mark deceased" x1="668.8" y1="209.156" x2="719.2" y2="158.756" stroke="#000000" stroke-width="2"/>
@@ -245,7 +245,7 @@
 </g>
 <g id="ind-II-11" class="individual affected proband" data-position="II-11" data-generation="2" data-index="11" data-gender="woman" data-count="100" data-condition-0="affected">
 <circle class="backing" cx="946" cy="183.956" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(950.5 183.956)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(946 183.956)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="946" cy="183.956" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="946" y="183.956" font-family="sans-serif" font-size="14" fill="#ffffff" stroke="#000000" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">100</text>
 <g class="mark proband">
@@ -282,8 +282,8 @@
 </g>
 <g id="ind-III-2" class="individual carrier" data-position="III-2" data-generation="3" data-index="2" data-gender="woman" data-count="12" data-condition-0="carrier">
 <circle class="backing" cx="190" cy="301.912" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(194.5 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-2)"/>
+<clipPath id="clip-III-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(190 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-2)"/>
 <circle class="symbol" cx="190" cy="301.912" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="190" y="301.912" font-family="sans-serif" font-size="16.2" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">12</text>
 <text class="label" x="190" y="331.412" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-2</text>
@@ -309,8 +309,8 @@
 </g>
 <g id="ind-III-5" class="individual carrier deceased" data-position="III-5" data-generation="3" data-index="5" data-gender="woman" data-count="3" data-condition-0="carrier">
 <circle class="backing" cx="442" cy="301.912" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-5"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(446.5 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-5)"/>
+<clipPath id="clip-III-5"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(442 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-5)"/>
 <circle class="symbol" cx="442" cy="301.912" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="468" y="290.212" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
 <line class="mark deceased" x1="416.8" y1="327.112" x2="467.2" y2="276.712" stroke="#000000" stroke-width="2"/>
@@ -339,8 +339,8 @@
 </g>
 <g id="ind-III-8" class="individual carrier deceased" data-position="III-8" data-generation="3" data-index="8" data-gender="woman" data-count="n" data-condition-0="carrier">
 <circle class="backing" cx="694" cy="301.912" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-8"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(698.5 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-8)"/>
+<clipPath id="clip-III-8"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(694 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-8)"/>
 <circle class="symbol" cx="694" cy="301.912" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="720" y="290.212" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
 <line class="mark deceased" x1="668.8" y1="327.112" x2="719.2" y2="276.712" stroke="#000000" stroke-width="2"/>
@@ -379,8 +379,8 @@
 </g>
 <g id="ind-III-11" class="individual carrier proband" data-position="III-11" data-generation="3" data-index="11" data-gender="woman" data-count="100" data-condition-0="carrier">
 <circle class="backing" cx="946" cy="301.912" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-11"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(950.5 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-11)"/>
+<clipPath id="clip-III-11"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(946 301.912)" fill="url(#fill-carrier-0)" clip-path="url(#clip-III-11)"/>
 <circle class="symbol" cx="946" cy="301.912" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="946" y="301.912" font-family="sans-serif" font-size="14" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">100</text>
 <g class="mark proband">
@@ -418,8 +418,8 @@
 </g>
 <g id="ind-IV-2" class="individual carrier" data-position="IV-2" data-generation="4" data-index="2" data-gender="woman" data-count="12" data-condition-0="carrier">
 <circle class="backing" cx="190" cy="419.868" r="18" fill="#ffffff"/>
-<clipPath id="clip-IV-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(194.5 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-2)"/>
+<clipPath id="clip-IV-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(190 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-2)"/>
 <circle class="symbol" cx="190" cy="419.868" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="190" y="419.868" font-family="sans-serif" font-size="16.2" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">12</text>
 <text class="label" x="190" y="449.368" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">IV-2</text>
@@ -445,8 +445,8 @@
 </g>
 <g id="ind-IV-5" class="individual carrier deceased" data-position="IV-5" data-generation="4" data-index="5" data-gender="woman" data-count="3" data-condition-0="carrier">
 <circle class="backing" cx="442" cy="419.868" r="18" fill="#ffffff"/>
-<clipPath id="clip-IV-5"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(446.5 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-5)"/>
+<clipPath id="clip-IV-5"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(442 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-5)"/>
 <circle class="symbol" cx="442" cy="419.868" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="468" y="408.168" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
 <line class="mark deceased" x1="416.8" y1="445.068" x2="467.2" y2="394.668" stroke="#000000" stroke-width="2"/>
@@ -475,8 +475,8 @@
 </g>
 <g id="ind-IV-8" class="individual carrier deceased" data-position="IV-8" data-generation="4" data-index="8" data-gender="woman" data-count="n" data-condition-0="carrier">
 <circle class="backing" cx="694" cy="419.868" r="18" fill="#ffffff"/>
-<clipPath id="clip-IV-8"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(698.5 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-8)"/>
+<clipPath id="clip-IV-8"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(694 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-8)"/>
 <circle class="symbol" cx="694" cy="419.868" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="720" y="408.168" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
 <line class="mark deceased" x1="668.8" y1="445.068" x2="719.2" y2="394.668" stroke="#000000" stroke-width="2"/>
@@ -515,8 +515,8 @@
 </g>
 <g id="ind-IV-11" class="individual carrier proband" data-position="IV-11" data-generation="4" data-index="11" data-gender="woman" data-count="100" data-condition-0="carrier">
 <circle class="backing" cx="946" cy="419.868" r="18" fill="#ffffff"/>
-<clipPath id="clip-IV-11"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="carrier" x="-22.5" y="-18" width="18" height="36" transform="translate(950.5 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-11)"/>
+<clipPath id="clip-IV-11"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(946 419.868)" fill="url(#fill-carrier-0)" clip-path="url(#clip-IV-11)"/>
 <circle class="symbol" cx="946" cy="419.868" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count" x="946" y="419.868" font-family="sans-serif" font-size="14" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">100</text>
 <g class="mark proband">
@@ -547,7 +547,7 @@
 <rect class="backing" x="88" y="519.823" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="88" y="519.823" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="132" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
-<line class="mark presymptomatic" x1="106" y1="519.823" x2="106" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="106" y1="517.823" x2="106" y2="557.823" stroke="#000000" stroke-width="2"/>
 <text class="label" x="106" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-1</text>
 <rect class="hit" x="88" y="519.823" width="51.56" height="89.956" fill="none" pointer-events="all"/>
 </g>
@@ -555,7 +555,7 @@
 <circle class="backing" cx="190" cy="537.823" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="190" cy="537.823" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="216" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">12</text>
-<line class="mark presymptomatic" x1="190" y1="519.823" x2="190" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="190" y1="517.823" x2="190" y2="557.823" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-2</text>
 <rect class="hit" x="172" y="519.823" width="59.12" height="89.956" fill="none" pointer-events="all"/>
 </g>
@@ -563,7 +563,7 @@
 <polygon class="backing" points="274,519.823 292,537.823 274,555.823 256,537.823" fill="#ffffff"/>
 <polygon class="symbol" points="274,519.823 292,537.823 274,555.823 256,537.823" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="300" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">100</text>
-<line class="mark presymptomatic" x1="274" y1="519.823" x2="274" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="274" y1="517.823" x2="274" y2="557.823" stroke="#000000" stroke-width="2"/>
 <text class="label" x="274" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-3</text>
 <rect class="hit" x="256" y="519.823" width="66.68" height="89.956" fill="none" pointer-events="all"/>
 </g>
@@ -571,7 +571,7 @@
 <rect class="backing" x="340" y="519.823" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="340" y="519.823" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="384" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
-<line class="mark presymptomatic" x1="358" y1="519.823" x2="358" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="358" y1="517.823" x2="358" y2="557.823" stroke="#000000" stroke-width="2"/>
 <text class="label" x="358" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-4</text>
 <rect class="hit" x="340" y="519.823" width="51.56" height="89.956" fill="none" pointer-events="all"/>
 </g>
@@ -579,7 +579,7 @@
 <circle class="backing" cx="442" cy="537.823" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="442" cy="537.823" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="468" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
-<line class="mark presymptomatic" x1="442" y1="519.823" x2="442" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="442" y1="517.823" x2="442" y2="557.823" stroke="#000000" stroke-width="2"/>
 <line class="mark deceased" x1="416.8" y1="563.023" x2="467.2" y2="512.623" stroke="#000000" stroke-width="2"/>
 <text class="label" x="442" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-5</text>
 <rect class="hit" x="424" y="519.823" width="51.56" height="89.956" fill="none" pointer-events="all"/>
@@ -588,7 +588,7 @@
 <polygon class="backing" points="526,519.823 544,537.823 526,555.823 508,537.823" fill="#ffffff"/>
 <polygon class="symbol" points="526,519.823 544,537.823 526,555.823 508,537.823" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="552" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">12</text>
-<line class="mark presymptomatic" x1="526" y1="519.823" x2="526" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="526" y1="517.823" x2="526" y2="557.823" stroke="#000000" stroke-width="2"/>
 <line class="mark deceased" x1="500.8" y1="563.023" x2="551.2" y2="512.623" stroke="#000000" stroke-width="2"/>
 <text class="label" x="526" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-6</text>
 <rect class="hit" x="508" y="519.823" width="59.12" height="89.956" fill="none" pointer-events="all"/>
@@ -597,7 +597,7 @@
 <rect class="backing" x="592" y="519.823" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="592" y="519.823" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="636" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">100</text>
-<line class="mark presymptomatic" x1="610" y1="519.823" x2="610" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="610" y1="517.823" x2="610" y2="557.823" stroke="#000000" stroke-width="2"/>
 <line class="mark deceased" x1="584.8" y1="563.023" x2="635.2" y2="512.623" stroke="#000000" stroke-width="2"/>
 <text class="label" x="610" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-7</text>
 <rect class="hit" x="592" y="519.823" width="66.68" height="89.956" fill="none" pointer-events="all"/>
@@ -606,7 +606,7 @@
 <circle class="backing" cx="694" cy="537.823" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="694" cy="537.823" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="720" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
-<line class="mark presymptomatic" x1="694" y1="519.823" x2="694" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="694" y1="517.823" x2="694" y2="557.823" stroke="#000000" stroke-width="2"/>
 <line class="mark deceased" x1="668.8" y1="563.023" x2="719.2" y2="512.623" stroke="#000000" stroke-width="2"/>
 <text class="label" x="694" y="567.323" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">V-8</text>
 <rect class="hit" x="676" y="519.823" width="51.56" height="89.956" fill="none" pointer-events="all"/>
@@ -615,7 +615,7 @@
 <polygon class="backing" points="778,519.823 796,537.823 778,555.823 760,537.823" fill="#ffffff"/>
 <polygon class="symbol" points="778,519.823 796,537.823 778,555.823 760,537.823" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="804" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">3</text>
-<line class="mark presymptomatic" x1="778" y1="519.823" x2="778" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="778" y1="517.823" x2="778" y2="557.823" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="734.544" y1="581.279" x2="760" y2="555.823" stroke="#000000" stroke-width="2"/>
 <line x1="760" y1="555.823" x2="757.671" y2="564.517" stroke="#000000" stroke-width="2"/>
@@ -629,7 +629,7 @@
 <rect class="backing" x="844" y="519.823" width="36" height="36" fill="#ffffff"/>
 <rect class="symbol" x="844" y="519.823" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="888" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">12</text>
-<line class="mark presymptomatic" x1="862" y1="519.823" x2="862" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="862" y1="517.823" x2="862" y2="557.823" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="818.544" y1="581.279" x2="844" y2="555.823" stroke="#000000" stroke-width="2"/>
 <line x1="844" y1="555.823" x2="841.671" y2="564.517" stroke="#000000" stroke-width="2"/>
@@ -643,7 +643,7 @@
 <circle class="backing" cx="946" cy="537.823" r="18" fill="#ffffff"/>
 <circle class="symbol" cx="946" cy="537.823" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="972" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">100</text>
-<line class="mark presymptomatic" x1="946" y1="519.823" x2="946" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="946" y1="517.823" x2="946" y2="557.823" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="902.544" y1="581.279" x2="928" y2="555.823" stroke="#000000" stroke-width="2"/>
 <line x1="928" y1="555.823" x2="925.671" y2="564.517" stroke="#000000" stroke-width="2"/>
@@ -657,7 +657,7 @@
 <polygon class="backing" points="1030,519.823 1048,537.823 1030,555.823 1012,537.823" fill="#ffffff"/>
 <polygon class="symbol" points="1030,519.823 1048,537.823 1030,555.823 1012,537.823" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="mark count outside" x="1056" y="526.123" font-family="sans-serif" font-size="12.6" fill="#000000" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" text-anchor="start" dominant-baseline="central">n</text>
-<line class="mark presymptomatic" x1="1030" y1="519.823" x2="1030" y2="555.823" stroke="#000000" stroke-width="2"/>
+<line class="mark presymptomatic" x1="1030" y1="517.823" x2="1030" y2="557.823" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="986.544" y1="581.279" x2="1012" y2="555.823" stroke="#000000" stroke-width="2"/>
 <line x1="1012" y1="555.823" x2="1009.671" y2="564.517" stroke="#000000" stroke-width="2"/>
@@ -816,11 +816,11 @@
 </g>
 <g id="key" class="key">
 <g id="key-affected-0" class="key-entry" data-condition="0" data-status="affected">
-<rect class="swatch" x="0" y="0" width="18" height="18" transform="translate(88 987.647)" fill="url(#fill-affected-0)" stroke="#000000" stroke-width="1"/>
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(97 996.647)" fill="url(#fill-affected-0)" stroke="#000000" stroke-width="1"/>
 <text class="key-label" x="112" y="996.647" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Affected</text>
 </g>
 <g id="key-carrier-0" class="key-entry" data-condition="0" data-status="carrier">
-<rect class="swatch" x="0" y="0" width="18" height="18" transform="translate(182.8 987.647)" fill="url(#fill-carrier-0)" stroke="#000000" stroke-width="1"/>
+<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(191.8 996.647)" fill="url(#fill-carrier-0)" stroke="#000000" stroke-width="1"/>
 <text class="key-label" x="206.8" y="996.647" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier</text>
 </g>
 </g>

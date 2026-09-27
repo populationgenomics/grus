@@ -526,34 +526,60 @@ def test_patterns_are_emitted_only_for_the_fills_drawn() -> None:
             assert f.get("fill") == f"url(#f-fill-{f.get('data-status')}-{f.get('data-condition')})"
 
 
-def test_a_carrier_of_two_conditions_is_two_hatched_sections_and_a_divider() -> None:
+def _dividers(g: ET.Element) -> list[ET.Element]:
+    return [c for c in g if "divider" in _classes(c)]
+
+
+def test_a_carrier_of_two_conditions_is_two_dotted_sections_of_different_tones() -> None:
     root = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("HEXA", _CAR), ("CFTR", _CAR))])))
     (g,) = _groups(root, "individual")
     fills = _fills(g)
     assert [(f.get("data-condition"), f.get("data-status")) for f in fills] == [("0", "carrier"), ("1", "carrier")]
-    assert fills[0].get("fill") != fills[1].get("fill"), "each condition has its own hatch"
     assert all(f.get("clip-path") for f in fills), "sections are clipped to the shape, never the solid shape"
     assert float(fills[0].get("x", "0")) < float(fills[1].get("x", "0")), "index 0 left, index 1 right"
-    assert len([c for c in g if "divider" in _classes(c)]) == 1
     pats = _patterns(root)
-    assert all(pat.find(f"{_SVG}rect[@width='1']") is None for pat in pats.values()), "a hatch, not a solid tone"
+    tones = [pats[f"fill-carrier-{i}"].find(f"{_SVG}rect").get("fill") for i in (0, 1)]  # type: ignore[union-attr]
+    dots = [pats[f"fill-carrier-{i}"].find(f"{_SVG}circle").get("fill") for i in (0, 1)]  # type: ignore[union-attr]
+    assert tones[0] != tones[1], "each condition has its own tone"
+    assert dots == ["#ffffff", "#ffffff"], "white dots on the dark tones"
 
 
-def test_one_affected_condition_is_undivided_and_several_are_divided() -> None:
-    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _AFF), ("B", _AFF))])
-    one, two = _groups(_parse(render.render_svg(p)), "individual")
-    (whole,) = _fills(one)
+def test_carrier_is_the_affected_tone_with_contrasting_dots() -> None:
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"]
+    people = [_person(i + 1, (n, s)) for i, (n, s) in enumerate((n, s) for n in "ABCD" for s in (_AFF, _CAR))]
+    pats = _patterns(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))))
+    for i, dot in enumerate(("#ffffff", "#ffffff", "#000000", "#000000")):
+        affected, carrier = pats[f"fill-affected-{i}"], pats[f"fill-carrier-{i}"]
+        tone = affected.find(f"{_SVG}rect").get("fill")  # type: ignore[union-attr]
+        assert carrier.find(f"{_SVG}rect").get("fill") == tone  # type: ignore[union-attr]
+        assert carrier.find(f"{_SVG}circle").get("fill") == dot  # type: ignore[union-attr]
+        assert affected.find(f"{_SVG}circle") is None
+
+
+def test_one_condition_leaves_every_symbol_undivided() -> None:
+    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _CAR)), _person(3)])
+    groups = _groups(_parse(render.render_svg(p)), "individual")
+    (whole,) = _fills(groups[0])
     assert whole.tag == f"{_SVG}rect" and whole.get("clip-path") is None and whole.get("width") == "36"
-    assert not [c for c in one if "divider" in _classes(c)]
-    assert [f.get("data-condition") for f in _fills(two)] == ["0", "1"]
-    assert [c for c in two if "divider" in _classes(c)]
+    assert all(not _dividers(g) for g in groups)
+
+
+def test_two_conditions_divide_every_symbol_in_halves_filled_or_not() -> None:
+    p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3)])
+    groups = _groups(_parse(render.render_svg(p)), "individual")
+    for g in groups:
+        (divider,) = _dividers(g)
+        assert divider.get("x1") == divider.get("x2"), "halves: one vertical divider"
+        assert divider.get("stroke-width") == "1", "half the outline's width"
+    assert [f.get("width") for f in _fills(groups[0])] == ["36"], "one affected condition still fills the shape"
 
 
 def test_three_or_four_conditions_divide_into_quadrants() -> None:
     legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
     p = pb.Pedigree(labels=legend, individuals=[_person(1, ("A", _AFF), ("C", _CAR)), _person(2, ("B", _AFF))])
-    g = _groups(_parse(render.render_svg(p)), "individual")[0]
-    assert len([c for c in g if "divider" in _classes(c)]) == 2
+    groups = _groups(_parse(render.render_svg(p)), "individual")
+    assert all(len(_dividers(g)) == 2 for g in groups), "quadrants on every symbol"
+    g = groups[0]
     a, c = _fills(g)
     assert a.get("width") == c.get("width") == "18" and a.get("height") == "18"
     assert float(c.get("y", "0")) > float(a.get("y", "0")), "index 2 is the bottom-left quadrant"
@@ -621,7 +647,11 @@ def test_key_sits_below_every_individual(name: str) -> None:
         assert not _patterns(root)
         return
     (key,) = keys
-    swatches = [(*_translate(sw), float(sw.get("height", "0"))) for sw in key.iter(f"{_SVG}rect")]
+    swatches = [
+        (tx + float(sw.get("x", "0")), ty + float(sw.get("y", "0")), float(sw.get("height", "0")))
+        for sw in key.iter(f"{_SVG}rect")
+        for tx, ty in [_translate(sw)]
+    ]
     top = min(y for _, y, _ in swatches)
     # Each hit rect covers its symbol, the reserved label box and any arrow.
     lowest = max(_bottom(next(c for c in g if "hit" in _classes(c))) for g in _groups(root, "individual"))
@@ -644,33 +674,36 @@ def test_set_render_keys_each_tile() -> None:
     assert len(ids) == len(set(ids)) and all(ref in ids for ref in re.findall(r"url\(#([^)]+)\)", svg))
 
 
-def test_a_lone_section_has_no_divider() -> None:
-    # A carrier of one condition is one hatched section; its own edge shows it, and a divider would be the
-    # presymptomatic glyph (a vertical line through the symbol).
-    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _CAR))]))), "individual")
-    assert [f.get("data-status") for f in _fills(g)] == ["carrier"]
-    assert not [c for c in g if "divider" in _classes(c)]
+def test_a_count_moves_beside_every_symbol_of_a_divided_pedigree() -> None:
+    # The dividers cross every symbol's centre, where the count would sit, so the count moves outside.
+    def counted(*conditions: tuple[str, int]) -> list[list[str]]:
+        ind = _person(1, *conditions)
+        ind.count = 3
+        (g,) = _groups(
+            _parse(render.render_svg(pb.Pedigree(individuals=[ind, _person(2, ("A", _AFF), ("B", _CAR))]))),
+            "individual",
+        )[:1]
+        return [_classes(c) for c in g if "count" in _classes(c)]
+
+    assert counted() == [["mark", "count", "outside"]]
+    one = _person(1, ("A", _AFF))
+    one.count = 3
+    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[one]))), "individual")
+    (count,) = [c for c in g if "count" in _classes(c)]
+    assert _classes(count) == ["mark", "count"] and count.get("fill") == "#ffffff", "white on the black tone"
 
 
-def test_a_count_on_a_divided_symbol_moves_beside_it() -> None:
-    # The dividers cross the centre, where the count would sit, so the count moves outside (never overprinted).
-    divided = _person(1, ("A", _AFF), ("B", _CAR))
-    divided.count = 3
-    lone = _person(2, ("A", _CAR))
-    lone.count = 3
-    one, two = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[divided, lone]))), "individual")
-    assert [_classes(c) for c in one if "count" in _classes(c)] == [["mark", "count", "outside"]]
-    assert [_classes(c) for c in two if "count" in _classes(c)] == [["mark", "count"]]
-
-
-def test_count_is_white_only_on_a_dark_tone() -> None:
-    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"]
-    people = [_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCD")]
-    for ind in people:
-        ind.count = 2
-    groups = _groups(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))), "individual")
-    fills = [next(c for c in g if "count" in _classes(c)).get("fill") for g in groups]
-    assert fills == ["#ffffff", "#ffffff", "#000000", "#000000"], "black on light grey and the stipple"
+def test_presymptomatic_line_is_outline_weight_and_overruns_the_symbol() -> None:
+    # In a divided pedigree the vertical divider and the presymptomatic line share a place; weight and overrun tell
+    # them apart.
+    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC))
+    (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind, _person(2, ("B", _AFF))]))), "individual")[:1]
+    (line,) = [c for c in g if "presymptomatic" in _classes(c)]
+    (divider,) = _dividers(g)
+    symbol = next(c for c in g if "symbol" in _classes(c))
+    assert float(line.get("stroke-width", "0")) == 2 * float(divider.get("stroke-width", "0"))
+    top, bottom = float(symbol.get("y", "0")), float(symbol.get("y", "0")) + float(symbol.get("height", "0"))
+    assert float(line.get("y1", "0")) == top - 2 and float(line.get("y2", "0")) == bottom + 2
 
 
 def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
@@ -683,92 +716,105 @@ def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
     assert section.get("data-condition") == "1" and section.get("x") == "0", "the right half, about the centre"
 
 
-def _segments_of(d: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
-    """The straight segments of a path of ``M`` / ``L`` commands."""
-    out = []
-    for run in re.findall(r"M[^M]+", d):
-        pts = [tuple(map(float, xy.split(","))) for xy in re.findall(r"[-0-9.]+,[-0-9.]+", run)]
-        out += list(itertools.pairwise(pts))
-    return out  # type: ignore[return-value]
+_GRAZE = 0.75  # px a carrier dot may reach into an outline's stroke from inside (_draw._DOT_PITCH)
 
 
-def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
-    """For every carrier-hatched fill part and key swatch, the clear gap from its strokes to the edges they run along.
+def _local_outline(
+    symbol: ET.Element | None, part: ET.Element, box: tuple[float, ...]
+) -> tuple[str, float, float, float]:
+    """The outline a fill part sits in, in the part's own frame, as ``(shape, centre x, centre y, half size)``."""
+    tx, ty = _translate(part)
+    if symbol is None:  # a key swatch: its own rectangle is the outline
+        x, y, w, _ = box
+        return ("square", x + w / 2, y + w / 2, w / 2)
+    if symbol.tag == f"{_SVG}circle":
+        return (
+            "circle",
+            float(symbol.get("cx", "0")) - tx,
+            float(symbol.get("cy", "0")) - ty,
+            float(symbol.get("r", "0")),
+        )
+    if symbol.tag == f"{_SVG}polygon":
+        pts = [tuple(map(float, xy.split(","))) for xy in symbol.get("points", "").split()]
+        cx, cy = sum(px for px, _ in pts) / 4, sum(py for _, py in pts) / 4
+        return ("diamond", cx - tx, cy - ty, max(abs(px - cx) for px, _ in pts))
+    half = float(symbol.get("width", "0")) / 2
+    return ("square", float(symbol.get("x", "0")) + half - tx, float(symbol.get("y", "0")) + half - ty, half)
 
-    Each hatch segment, repeated over the pattern's tiles, is an infinite line in the part's local frame. Against a
-    straight edge (a section rectangle's side, a square's or diamond's outline edge) only a parallel line counts: its
-    gap is the distance between them less half the stroke. Against a circle's outline, a line inside it (or within
-    half a stroke outside, so still painted) counts as a chord whose gap is the radius less its distance from the
-    centre less half the stroke. Strokes crossing an edge have no gap to report.
+
+def _inside_depth(outline: tuple[str, float, float, float], px: float, py: float) -> float:
+    """How far ``(px, py)`` lies inside the outline (negative outside)."""
+    shape, cx, cy, half = outline
+    ax, ay = abs(px - cx), abs(py - cy)
+    if shape == "circle":
+        return half - math.hypot(ax, ay)
+    if shape == "diamond":
+        return (half - ax - ay) / math.sqrt(2)
+    return half - max(ax, ay)
+
+
+def _dot_faults(svg: str) -> tuple[list[str], int]:
+    """The carrier dots that a section edge, divider or outline cuts badly, and how many dots were checked.
+
+    A carrier pattern is a tone tile with one dot; repeated over the tiles, in each fill part's (or key swatch's) own
+    frame, it is a grid of discs. A disc straddling an edge between sections, or a divider's stroke, is a fault: it
+    must lie wholly on one side, clear of the stroke. At an outline a disc is fine wholly under the stroke (hidden) or
+    reaching at most ``_GRAZE`` into it from inside; a disc cut deeper shows as a notch or a sliver.
     """
     root = _parse(svg)
-    hatches: dict[str, tuple[float, float, list[tuple[tuple[float, float], tuple[float, float]]]]] = {}
+    dots: dict[str, tuple[float, float, float, float]] = {}  # pattern id -> (pitch, dot x, dot y, radius)
     for pat in root.iter(f"{_SVG}pattern"):
         if pat.get("data-status") != "carrier":
             continue
-        (path,) = list(pat)
-        assert not pat.get("patternTransform"), "a hatch's phase comes from the part's frame alone"
-        hatches[pat.get("id", "")] = (
-            float(pat.get("width", "0")),
-            float(path.get("stroke-width", "0")),
-            _segments_of(path.get("d", "")),
+        m = re.fullmatch(r"scale\(([-0-9.]+)\)", pat.get("patternTransform", "scale(1)"))
+        assert m
+        k = float(m.group(1))
+        dot = pat.find(f"{_SVG}circle")
+        assert dot is not None
+        dots[pat.get("id", "")] = (
+            float(pat.get("width", "0")) * k,
+            float(dot.get("cx", "0")) * k,
+            float(dot.get("cy", "0")) * k,
+            float(dot.get("r", "0")) * k,
         )
-    out: list[tuple[str, float]] = []
+    faults: list[str] = []
+    checked = 0
     for group in root.iter(f"{_SVG}g"):
         symbol = next((c for c in group if "symbol" in _classes(c)), None)
+        divided = bool(_dividers(group))
         for part in group:
             ref = re.fullmatch(r"url\(#(.+)\)", part.get("fill", ""))
-            if not ref or ref.group(1) not in hatches:
+            if not ref or ref.group(1) not in dots:
                 continue
-            tile, thick, segments = hatches[ref.group(1)]
-            tx, ty = _translate(part)
-            x, y = float(part.get("x", "0")), float(part.get("y", "0"))
-            w, h = float(part.get("width", "0")), float(part.get("height", "0"))
-            corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]  # the section or swatch, local frame
-            circle = None
-            if symbol is not None and symbol.tag == f"{_SVG}polygon":
-                pts = [tuple(map(float, xy.split(","))) for xy in symbol.get("points", "").split()]
-                outline = [(px - tx, py - ty) for px, py in pts]
-                edges = list(itertools.pairwise([*outline, outline[0]]))
-            elif symbol is not None and symbol.tag == f"{_SVG}circle":
-                circle = (
-                    float(symbol.get("cx", "0")) - tx,
-                    float(symbol.get("cy", "0")) - ty,
-                    float(symbol.get("r", "0")),
-                )
-                edges = []
-            else:
-                sx, sy = (
-                    (float(symbol.get("x", "0")) - tx, float(symbol.get("y", "0")) - ty)
-                    if symbol is not None
-                    else (x, y)
-                )
-                sw = float(symbol.get("width", "0")) if symbol is not None else w
-                edges = list(itertools.pairwise([(sx, sy), (sx + sw, sy), (sx + sw, sy + sw), (sx, sy + sw), (sx, sy)]))
-            edges += list(itertools.pairwise([*corners, corners[0]]))
-            what = f"{ref.group(1)} {group.get('id')}"
-            for (x1, y1), (x2, y2) in segments:
-                length = math.hypot(x2 - x1, y2 - y1)
-                n = (-(y2 - y1) / length, (x2 - x1) / length)
-                offsets = [n[0] * (x1 + i * tile) + n[1] * (y1 + j * tile) for i in range(-8, 9) for j in range(-8, 9)]
-                for (ex1, ey1), (ex2, ey2) in edges:
-                    elen = math.hypot(ex2 - ex1, ey2 - ey1)
-                    m = (-(ey2 - ey1) / elen, (ex2 - ex1) / elen)
-                    if abs(m[0] * n[1] - m[1] * n[0]) > 1e-6:
-                        continue  # crosses the edge
-                    b = n[0] * ex1 + n[1] * ey1
-                    out.append((f"{what} edge", min(abs(o - b) for o in offsets) - thick / 2))
-                if circle is not None:
-                    cx, cy, r = circle
-                    c = n[0] * cx + n[1] * cy
-                    for o in offsets:
-                        if abs(o - c) < r + thick / 2:
-                            out.append((f"{what} chord", r - abs(o - c) - thick / 2))
-    return out
+            pitch, dx, dy, r = dots[ref.group(1)]
+            box = tuple(float(part.get(a, "0")) for a in ("x", "y", "width", "height"))
+            outline = _local_outline(symbol, part, box)
+            stroke = 1.0 if symbol is not None else 0.5  # half the outline's (or the swatch's) stroke
+            # Inside a symbol the section's edges on the centre lines are shared with another section.
+            x, y, w, h = box
+            shared = [(a, v) for a, v in ((0, x), (0, x + w), (1, y), (1, y + h)) if symbol is not None and v == 0]
+            for i in range(-12, 13):
+                for j in range(-12, 13):
+                    px, py = dx + i * pitch, dy + j * pitch
+                    if not (x - r < px < x + w + r and y - r < py < y + h + r):
+                        continue
+                    where = f"{ref.group(1)} {group.get('id')} dot ({px:g}, {py:g})"
+                    for axis, v in shared:
+                        if abs((px, py)[axis] - v) < r + (0.5 if divided else 0.0):
+                            faults.append(f"{where}: cut by the section edge at {'xy'[axis]}={v:g}")
+                    if not (x <= px <= x + w and y <= py <= y + h):
+                        continue
+                    depth = _inside_depth(outline, px, py)
+                    if depth + r <= stroke:
+                        continue  # wholly under the outline's stroke, or outside it
+                    checked += 1
+                    if stroke - (depth - r) > _GRAZE:
+                        faults.append(f"{where}: cut by the outline, {stroke - (depth - r):.2f} px into its stroke")
+    return faults, checked
 
 
-def _all_hatches() -> pb.Pedigree:
-    """Every carrier hatch in its quadrant on each shape (indices 2 and 3 only ever sit in quadrants)."""
+def _every_carrier() -> pb.Pedigree:
+    """Every carrier fill in its quadrant on each shape, singly and all four together."""
     genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
     people = [
         _person(i + 1, (name, _CAR), gender=gender)
@@ -780,24 +826,24 @@ def _all_hatches() -> pb.Pedigree:
     return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"], individuals=people)
 
 
-@pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "halves"])
-def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
-    # Every carrier stroke is diagonal and each fill part is drawn in its symbol's own frame (a swatch from its
-    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, a square's or
-    # diamond's outline edge, or close inside a circle's outline, where it would read as a thicker edge or a mark.
-    if name == "all_hatches":
-        svg = render.render_svg(_all_hatches())
+@pytest.mark.parametrize("name", [*_NAMES, "every_carrier", "halves", "undivided"])
+def test_no_carrier_dot_is_cut_by_an_edge_divider_or_outline(name: str) -> None:
+    # Each fill part is drawn about its symbol's centre (a swatch about its own), so the dot grid has one phase per
+    # symbol, and the pitch keeps every dot whole between sections and clear of the dividers; at an outline a dot is
+    # hidden under the stroke or grazes it.
+    genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
+    if name == "every_carrier":
+        svg = render.render_svg(_every_carrier())
     elif name == "halves":
-        genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
+        people = [_person(i + 1, ("A", _CAR), ("B", _CAR), gender=g) for i, g in enumerate(genders)]
+        svg = render.render_svg(pb.Pedigree(individuals=people))
+    elif name == "undivided":
         svg = render.render_svg(
-            pb.Pedigree(individuals=[_person(i + 1, ("A", _CAR), ("B", _CAR), gender=g) for i, g in enumerate(genders)])
+            pb.Pedigree(individuals=[_person(i + 1, ("A", _CAR), gender=g) for i, g in enumerate(genders)])
         )
     else:
         svg = (_GOLDENS / f"{name}.svg").read_text()
-    gaps = _hatch_gaps(svg)
-    stroke = 2.0  # the outline's stroke width
-    assert all(gap >= stroke - 1e-6 for _, gap in gaps), sorted(g for g in gaps if g[1] < stroke - 1e-6)[:5]
-    if name in ("all_hatches", "halves"):
-        kinds = {what.split()[0] for what, _ in gaps}
-        want = {f"fill-carrier-{i}" for i in (range(4) if name == "all_hatches" else range(2))}
-        assert kinds == want, "the check saw every hatch run alongside some edge"
+    faults, checked = _dot_faults(svg)
+    assert not faults, faults[:5]
+    if name in ("every_carrier", "halves", "undivided", "compound_carrier", "trio"):
+        assert checked, "the check saw carrier dots"
