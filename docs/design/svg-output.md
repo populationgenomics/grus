@@ -116,9 +116,9 @@ The groups, and what each promises:
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
   legend**: the same order the drawer uses to pick each condition's fills and its section of a divided symbol
-  (`renderer.md`, Clinical status), so index *i* in the array is the condition `data-condition-i` names on every
-  individual below it. When any individual has an unnamed condition (the figure's sole, unlabelled one) the array ends
-  with an empty string, so every condition has an index.
+  (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
+  condition `data-condition-i` names on every individual below it. When any individual has an unnamed condition (the
+  figure's sole, unlabelled one) the array ends with an empty string, so every condition has an index.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the

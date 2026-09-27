@@ -944,3 +944,40 @@ def test_conditions_4_and_5_have_their_own_tones_and_hatches() -> None:
         assert carrier.find(f"{_SVG}rect").get("fill") == tones[i]  # type: ignore[union-attr]
         (x1, y1), (x2, y2) = _segments_of(carrier.find(f"{_SVG}path").get("d", ""))[0]  # type: ignore[union-attr]
         assert ((x2 - x1) * (y2 - y1) < 0) == (i % 2 == 0), "/ for even indices, \\ for odd"
+
+
+# --- the primary condition takes index 0 ----------------------------------------------------------------------------
+
+
+def _legend(p: pb.Pedigree) -> list[str]:
+    return json.loads(_parse(render.render_svg(p)).get("data-conditions", "null"))
+
+
+def test_the_probands_affected_condition_takes_index_0() -> None:
+    proband = _person(3, ("C", _AFF))
+    proband.proband = True
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
+    p = pb.Pedigree(labels=labels, individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _AFF)), proband])
+    assert _legend(p) == ["C", "A", "B"], "the proband's condition first, even when another has more affected"
+
+
+def test_else_the_most_affected_condition_takes_index_0() -> None:
+    # Review-set c03: the proband is unaffected, and Polyneuropathy has the most affected individuals.
+    proband = _person(4)
+    proband.proband = True
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in ("Bone Cancer", "Polyneuropathy", "Polio")]
+    people = [
+        _person(1, ("Bone Cancer", _AFF)),
+        _person(2, ("Polyneuropathy", _AFF)),
+        _person(3, ("Polyneuropathy", _AFF)),
+    ]
+    p = pb.Pedigree(labels=labels, individuals=[*people, proband, _person(5, ("Polio", _CAR))])
+    assert _legend(p) == ["Polyneuropathy", "Bone Cancer", "Polio"]
+
+
+def test_a_tie_or_no_affected_keeps_the_base_order() -> None:
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
+    tied = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _AFF)), _person(2, ("B", _AFF))])
+    assert _legend(tied) == ["B", "A", "C"], "B and C tie; B comes first in the base order"
+    carriers = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _CAR))])
+    assert _legend(carriers) == ["A", "B", "C"]
