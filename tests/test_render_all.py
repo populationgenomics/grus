@@ -1,8 +1,9 @@
 """Every golden and every case of the standard fuzz corpus draws, not only lays out.
 
 A refusal can come from drawing as well as layout (a fill the drawer has no form for), and a passing layout check
-would hide it. So each pedigree that lays out is drawn in full, as the IR gives it and again with conditions spread
-over its individuals, up to the six the drawing supports: every layout that succeeds must also draw.
+would hide it. So every golden is drawn in full, and every fuzz case that lays out is drawn as the generator gives it
+and again with a legend of exactly 1, 2, 4 and 6 conditions spread over its individuals: every layout that succeeds
+must also draw.
 """
 
 from __future__ import annotations
@@ -40,10 +41,11 @@ def _lays_out(seed: int) -> bool:
 
 
 def _with_conditions(p: pb.Pedigree, n: int) -> pb.Pedigree:
-    """``p`` with ``n`` named conditions spread over its individuals: statuses and sets vary by position."""
+    """``p`` with a legend of ``n`` conditions spread over its individuals: statuses and sets vary by position."""
     out = pb.Pedigree()
     out.CopyFrom(p)
     names = [f"cond{i}" for i in range(n)]
+    out.labels.extend(pb.Label(text=name, kind=pb.LABEL_KIND_PHENOTYPE) for name in names)  # the legend is exactly n
     for ind in out.individuals:
         k = ind.generation * 7 + ind.index * 3
         for j, name in enumerate(names):

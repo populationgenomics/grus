@@ -777,6 +777,7 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
                 w, h = float(part.get("width", "0")), float(part.get("height", "0"))
                 corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]  # the section or swatch, local frame
             circle = None
+            local = symbol is not None and "swatch-outline" in _classes(symbol)  # drawn in the part's own frame
             if symbol is not None and symbol.tag == f"{_SVG}polygon":
                 pts = [tuple(map(float, xy.split(","))) for xy in symbol.get("points", "").split()]
                 outline = [(px - tx, py - ty) for px, py in pts]
@@ -790,7 +791,10 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
                 edges = []
             else:
                 sx, sy = (
-                    (float(symbol.get("x", "0")) - tx, float(symbol.get("y", "0")) - ty)
+                    (
+                        float(symbol.get("x", "0")) - (0 if local else tx),
+                        float(symbol.get("y", "0")) - (0 if local else ty),
+                    )
                     if symbol is not None
                     else (x, y)
                 )
@@ -875,13 +879,14 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
 # --- sixths: five or six conditions -----------------------------------------------------------------------------
 
 
-def _sixths(*people: pb.Individual) -> pb.Pedigree:
-    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCDE"], individuals=people)
+def _sixths(*people: pb.Individual, names: str = "ABCDEF") -> pb.Pedigree:
+    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
 
 
-def test_five_or_six_conditions_divide_every_symbol_into_six_wedges() -> None:
+@pytest.mark.parametrize("names", ["ABCDE", "ABCDEF"])
+def test_five_or_six_conditions_divide_every_symbol_into_six_wedges(names: str) -> None:
     genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
-    root = _parse(render.render_svg(_sixths(*(_person(i + 1, gender=g) for i, g in enumerate(genders)))))
+    root = _parse(render.render_svg(_sixths(*(_person(i + 1, gender=g) for i, g in enumerate(genders)), names=names)))
     for g in _groups(root, "individual"):
         dividers = _dividers(g)
         assert len(dividers) == 3, "three lines through the centre: six wedges"
@@ -891,17 +896,20 @@ def test_five_or_six_conditions_divide_every_symbol_into_six_wedges() -> None:
         assert all(d.get("stroke-width") == "1" for d in dividers), "half the outline's width"
 
 
-def test_a_sixth_is_a_wedge_toward_its_clock_position() -> None:
-    # Index order is the reading order of halves and quadrants: 10, 12 and 2 o'clock, then 8, 6 and 4 o'clock.
-    people = [_person(i + 1, (n, _AFF)) for i, n in enumerate("ABCDE")]
+@pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
+def test_a_sixth_is_a_wedge_toward_its_clock_position(gender: pb.Gender) -> None:
+    # Index order is the reading order of halves and quadrants: 10, 12 and 2 o'clock, then 8, 6 and 4 o'clock. The
+    # wedge's point is the symbol's centre on every shape, a circle's offset fill frame included.
+    people = [_person(i + 1, (n, _AFF), gender=gender) for i, n in enumerate("ABCDEF")]
     groups = _groups(_parse(render.render_svg(_sixths(*people))), "individual")
-    want = [(-1, -1), (0, -1), (1, -1), (-1, 1), (0, 1)]  # sign of the wedge's far point from the centre
-    for g, (sx, sy) in zip(groups, want, strict=True):
+    for g, clock in zip(groups, (10, 12, 2, 8, 6, 4), strict=True):
         (wedge,) = _fills(g)
         assert wedge.tag == f"{_SVG}polygon", "in sixths one affected condition keeps its section"
-        (c, *far) = [tuple(map(float, xy.split(","))) for xy in wedge.get("points", "").split()]
-        dx, dy = far[1][0] - c[0], far[1][1] - c[1]  # the wedge's middle ray
-        assert (round(dx / abs(dx)) if abs(dx) > 1e-6 else 0, round(dy / abs(dy))) == (sx, sy)
+        tx, ty = _translate(wedge)
+        (c, _, mid, _) = [tuple(map(float, xy.split(","))) for xy in wedge.get("points", "").split()]
+        assert (c[0] + tx, c[1] + ty) == _centre(next(e for e in g if "symbol" in _classes(e)))
+        angle = math.degrees(math.atan2(mid[0] - c[0], -(mid[1] - c[1]))) % 360  # clockwise from 12
+        assert abs(angle - clock * 30 % 360) < 1e-2, "3-decimal coordinates"
 
 
 def test_a_presymptomatic_line_reads_over_sixth_dividers() -> None:
