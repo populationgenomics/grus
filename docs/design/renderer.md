@@ -102,7 +102,8 @@ The drawing follows the NSGC 2022 revision (Bennett et al., §4.5 and Figure 2),
    per condition, each with its own fill.
 1. **Carrier status is a fill**, not the central dot of the 2008 standard: a dot cannot say *which* of several
    conditions a person carries, and a condition's fill can hide it. The standard's example is a HEXA and CFTR carrier
-   drawn in halves, horizontal lines on the left, vertical on the right.
+   drawn in halves, and says a horizontal line fill *could* be used for one half and a vertical for the other; what it
+   requires is a unique fill per section, defined in the key.
 1. **Every fill is defined in the key** (Box 1 item 3). The standard never ties a fill to a mode of inheritance.
 
 Dividing *every* symbol, as kinship2 does, is not the standard, and a divided empty symbol is exactly the standard's
@@ -117,23 +118,32 @@ quadrants and the four-fill limit — so the drawing of one individual never dep
 
 **Fills.** One per (index, status):
 
-| index | affected         | carrier             |
-| ----- | ---------------- | ------------------- |
-| 0     | solid black      | horizontal lines    |
-| 1     | solid dark grey  | vertical lines      |
-| 2     | solid light grey | diagonal lines, `/` |
-| 3     | black stipple    | diagonal lines, `\` |
+| index | affected         | carrier                      |
+| ----- | ---------------- | ---------------------------- |
+| 0     | solid black      | diagonal lines, `/`          |
+| 1     | solid dark grey  | diagonal lines, `\`          |
+| 2     | solid light grey | diagonal cross-hatch, `×`    |
+| 3     | black stipple    | chevrons (rows of `^` teeth) |
 
 Affected fills are tones and carrier fills are line hatches, so a carrier never reads as affected with the same
 condition, and a carrier of two conditions never reads as a solid, affected symbol, as two black carrier halves would.
 
-A pattern tiles from a fixed origin, so where its lines fall on a symbol depends on where the symbol is — at an
-arbitrary phase a hatch line lies flush against a section edge or the outline and reads as a thicker edge, or a mark.
-Every fill is therefore drawn about its symbol's centre and moved into place, so each pattern has the same phase on
-every symbol, and the hatch pitch is a sixth of the symbol size: every section edge (the outline, the centre lines)
-falls midway between two hatch lines, clear of both. The stipple's pitch divides the symbol the same way. There is no
-fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a placeholder, never a reused
-fill).
+Every carrier stroke is diagonal; none is horizontal or vertical, though the standard's example uses both. A vertical
+line through a symbol is the standard's presymptomatic glyph and the dividers are vertical, so a vertically hatched half
+beside a divider reads as more dividers; horizontal lines echo the mating lines, sib bars, the childless bar and the
+square's own edges. Diagonals are the one direction nothing else in a pedigree draws, apart from the deceased slash,
+which crosses the whole symbol and its outline.
+
+A pattern tiles from a fixed origin, so where its strokes fall on a symbol depends on where the symbol is — at an
+arbitrary phase a stroke lies flush against a section edge or the outline and reads as a thicker edge, or a mark. Every
+fill is therefore drawn in its symbol's own frame and moved into place, so each pattern has one phase per shape. The
+strokes lie on a diagonal lattice whose cell is a quarter of the symbol size, and each shape is placed on it so that no
+stroke runs along an edge. The diagonals run parallel to a diamond's edges, and a diamond or square is placed with its
+edges midway between two lattice lines. A circle is placed with a lattice line through its centre, so that none is a
+near-tangent chord hugging its outline. Strokes that cross an edge, a divider, or where two hatches meet at a divider
+(in halves, the `/` and `\` lines meet on it), are not runs along it. The stipple's pitch divides the symbol the same
+way. There is no fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a placeholder,
+never a reused fill).
 
 **Sections.** A pedigree with at most two conditions in its legend divides a symbol into halves (index 0 left, 1 right);
 with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). A section is a rectangle clipped to
@@ -163,7 +173,7 @@ dot, edged white so it reads over a hatch; every other carrier is a section as a
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a hatch means nothing to a reader who does not hold the IR. It has one entry per (index, status)
 drawn, ordered by index with affected first: a square swatch in that fill — one quadrant of a symbol, drawn from its
-corner, so its fill has the symbols' phase — and a label — the condition's name when affected, `Carrier: <name>` when
+corner, so its fill has a square's phase — and a label — the condition's name when affected, `Carrier: <name>` when
 carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed condition. Entries run left
 to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP` below the lowest
 label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no fills has no key

@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="508" height="398" viewBox="0 0 508 398" class="pedigree" data-title="Fills by condition index and status" data-conditions="[&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;]">
 <defs>
 <pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#000000"/></pattern>
-<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="6" height="6" patternUnits="userSpaceOnUse"><rect x="0" y="2.25" width="6" height="1.5" fill="#000000"/></pattern>
+<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
 <pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#666666"/></pattern>
-<pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect x="0" y="2.25" width="6" height="1.5" fill="#000000"/></pattern>
+<pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
 <pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#bbbbbb"/></pattern>
-<pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect x="0" y="2.25" width="6" height="1.5" fill="#000000"/></pattern>
+<pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
 <pattern id="fill-affected-3" class="fill-pattern" data-condition="3" data-status="affected" width="4.5" height="4.5" patternUnits="userSpaceOnUse"><circle cx="2.25" cy="2.25" r="1.125" fill="#000000"/></pattern>
-<pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect x="0" y="2.25" width="6" height="1.5" fill="#000000"/></pattern>
+<pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><path d="M-4.5,0L0,4.5L4.5,0L9,4.5L13.5,0M-4.5,9L0,13.5L4.5,9L9,13.5L13.5,9" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
 </defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
@@ -27,7 +27,7 @@
 </g>
 <g id="ind-I-2" class="individual affected" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-1="affected">
 <circle class="backing" cx="190" cy="66" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="1" data-status="affected" transform="translate(190 66)" cx="0" cy="0" r="18" fill="url(#fill-affected-1)"/>
+<circle class="fill" data-condition="1" data-status="affected" transform="translate(194.5 66)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-1)"/>
 <circle class="symbol" cx="190" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="172" y="48" width="36" height="53" fill="none" pointer-events="all"/>
@@ -56,8 +56,8 @@
 </g>
 <g id="ind-II-2" class="individual carrier" data-position="II-2" data-generation="2" data-index="2" data-gender="woman" data-condition-1="carrier">
 <circle class="backing" cx="190" cy="156" r="18" fill="#ffffff"/>
-<clipPath id="clip-II-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="1" data-status="carrier" x="0" y="-18" width="18" height="18" transform="translate(190 156)" fill="url(#fill-carrier-1)" clip-path="url(#clip-II-2)"/>
+<clipPath id="clip-II-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="1" data-status="carrier" x="-4.5" y="-18" width="18" height="18" transform="translate(194.5 156)" fill="url(#fill-carrier-1)" clip-path="url(#clip-II-2)"/>
 <circle class="symbol" cx="190" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
 <rect class="hit" x="172" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -80,9 +80,9 @@
 </g>
 <g id="ind-III-1" class="individual affected" data-position="III-1" data-generation="3" data-index="1" data-gender="woman" data-condition-0="affected" data-condition-1="affected">
 <circle class="backing" cx="106" cy="246" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-1"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="affected" x="-18" y="-18" width="18" height="18" transform="translate(106 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-1)"/>
-<rect class="fill" data-condition="1" data-status="affected" x="0" y="-18" width="18" height="18" transform="translate(106 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-1)"/>
+<clipPath id="clip-III-1"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-22.5" y="-18" width="18" height="18" transform="translate(110.5 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-1)"/>
+<rect class="fill" data-condition="1" data-status="affected" x="-4.5" y="-18" width="18" height="18" transform="translate(110.5 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-1)"/>
 <line class="divider" x1="106" y1="228" x2="106" y2="264" stroke="#000000" stroke-width="1"/>
 <line class="divider" x1="88" y1="246" x2="124" y2="246" stroke="#000000" stroke-width="1"/>
 <circle class="symbol" cx="106" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
@@ -113,11 +113,11 @@
 </g>
 <g id="ind-III-4" class="individual affected" data-position="III-4" data-generation="3" data-index="4" data-gender="woman" data-condition-0="affected" data-condition-1="affected" data-condition-2="affected" data-condition-3="affected">
 <circle class="backing" cx="358" cy="246" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-4"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
-<rect class="fill" data-condition="0" data-status="affected" x="-18" y="-18" width="18" height="18" transform="translate(358 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-4)"/>
-<rect class="fill" data-condition="1" data-status="affected" x="0" y="-18" width="18" height="18" transform="translate(358 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-4)"/>
-<rect class="fill" data-condition="2" data-status="affected" x="-18" y="0" width="18" height="18" transform="translate(358 246)" fill="url(#fill-affected-2)" clip-path="url(#clip-III-4)"/>
-<rect class="fill" data-condition="3" data-status="affected" x="0" y="0" width="18" height="18" transform="translate(358 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-4)"/>
+<clipPath id="clip-III-4"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-22.5" y="-18" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="1" data-status="affected" x="-4.5" y="-18" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="2" data-status="affected" x="-22.5" y="0" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-2)" clip-path="url(#clip-III-4)"/>
+<rect class="fill" data-condition="3" data-status="affected" x="-4.5" y="0" width="18" height="18" transform="translate(362.5 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-4)"/>
 <line class="divider" x1="358" y1="228" x2="358" y2="264" stroke="#000000" stroke-width="1"/>
 <line class="divider" x1="340" y1="246" x2="376" y2="246" stroke="#000000" stroke-width="1"/>
 <circle class="symbol" cx="358" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>

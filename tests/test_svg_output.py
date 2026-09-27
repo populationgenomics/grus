@@ -683,75 +683,108 @@ def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
     assert section.get("data-condition") == "1" and section.get("x") == "0", "the right half, about the centre"
 
 
+def _segments_of(d: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """The straight segments of a path of ``M`` / ``L`` commands."""
+    out = []
+    for run in re.findall(r"M[^M]+", d):
+        pts = [tuple(map(float, xy.split(","))) for xy in re.findall(r"[-0-9.]+,[-0-9.]+", run)]
+        out += list(itertools.pairwise(pts))
+    return out  # type: ignore[return-value]
+
+
 def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
-    """The clear gap from each hatch-parallel region boundary to its nearest hatch line, as ``(what, gap)``.
+    """For every carrier-hatched fill part and key swatch, the clear gap from its strokes to the edges they run along.
 
-    Covers every carrier-hatched fill part and key swatch.
-
-    A hatch line is ``y = c + k * pitch`` in pattern space, rotated by the pattern's ``rotate``; a region is a fill
-    rectangle (or swatch) in its own local coordinates, plus the diamond's edges that bound it.
+    Each hatch segment, repeated over the pattern's tiles, is an infinite line in the part's local frame. Against a
+    straight edge (a section rectangle's side, a square's or diamond's outline edge) only a parallel line counts: its
+    gap is the distance between them less half the stroke. Against a circle's outline, a line inside it (or within
+    half a stroke outside, so still painted) counts as a chord whose gap is the radius less its distance from the
+    centre less half the stroke. Strokes crossing an edge have no gap to report.
     """
     root = _parse(svg)
-    hatches: dict[str, tuple[float, float, float, float]] = {}  # id -> (pitch, line centre, thickness, angle)
+    hatches: dict[str, tuple[float, float, list[tuple[tuple[float, float], tuple[float, float]]]]] = {}
     for pat in root.iter(f"{_SVG}pattern"):
         if pat.get("data-status") != "carrier":
             continue
-        line = pat.find(f"{_SVG}rect")
-        assert line is not None
-        turn = re.fullmatch(r"rotate\(([-0-9.]+)\)", pat.get("patternTransform", "rotate(0)"))
-        assert turn
-        thick = float(line.get("height", "0"))
+        (path,) = list(pat)
+        assert not pat.get("patternTransform"), "a hatch's phase comes from the part's frame alone"
         hatches[pat.get("id", "")] = (
             float(pat.get("width", "0")),
-            float(line.get("y", "0")) + thick / 2,
-            thick,
-            float(turn.group(1)),
+            float(path.get("stroke-width", "0")),
+            _segments_of(path.get("d", "")),
         )
     out: list[tuple[str, float]] = []
     for group in root.iter(f"{_SVG}g"):
-        diamond = any(c.tag == f"{_SVG}polygon" and "symbol" in _classes(c) for c in group)
+        symbol = next((c for c in group if "symbol" in _classes(c)), None)
         for part in group:
             ref = re.fullmatch(r"url\(#(.+)\)", part.get("fill", ""))
             if not ref or ref.group(1) not in hatches:
                 continue
-            pitch, centre, thick, angle = hatches[ref.group(1)]
+            tile, thick, segments = hatches[ref.group(1)]
+            tx, ty = _translate(part)
             x, y = float(part.get("x", "0")), float(part.get("y", "0"))
             w, h = float(part.get("width", "0")), float(part.get("height", "0"))
-            # Boundaries as (unit normal, offset): the rectangle's sides, and a diamond's edges within the rectangle.
-            bounds = [((0.0, 1.0), y), ((0.0, 1.0), y + h), ((1.0, 0.0), x), ((1.0, 0.0), x + w)]
-            if diamond and "fill" in _classes(part):
-                half = render.DEFAULT_GEOMETRY.symbol_size / 2
-                for sx, sy in itertools.product((-1, 1), repeat=2):
-                    if (x < 0 if sx < 0 else x + w > 0) and (y < 0 if sy < 0 else y + h > 0):
-                        r = 2**-0.5
-                        bounds.append(((sx * r, sy * r), half * r))
-            a = math.radians(angle)
-            normal = (-math.sin(a), math.cos(a))
-            for (nx, ny), offset in bounds:
-                dot = nx * normal[0] + ny * normal[1]
-                if abs(abs(dot) - 1) > 1e-6:
-                    continue  # crosses the hatch, not alongside it
-                b = offset * dot  # the boundary's offset along the hatch normal
-                dist = abs((b - centre + pitch / 2) % pitch - pitch / 2)
-                out.append((f"{part.get('class')} {ref.group(1)} {group.get('id')}", dist - thick / 2))
+            corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]  # the section or swatch, local frame
+            circle = None
+            if symbol is not None and symbol.tag == f"{_SVG}polygon":
+                pts = [tuple(map(float, xy.split(","))) for xy in symbol.get("points", "").split()]
+                outline = [(px - tx, py - ty) for px, py in pts]
+                edges = list(itertools.pairwise([*outline, outline[0]]))
+            elif symbol is not None and symbol.tag == f"{_SVG}circle":
+                circle = (
+                    float(symbol.get("cx", "0")) - tx,
+                    float(symbol.get("cy", "0")) - ty,
+                    float(symbol.get("r", "0")),
+                )
+                edges = []
+            else:
+                sx, sy = (
+                    (float(symbol.get("x", "0")) - tx, float(symbol.get("y", "0")) - ty)
+                    if symbol is not None
+                    else (x, y)
+                )
+                sw = float(symbol.get("width", "0")) if symbol is not None else w
+                edges = list(itertools.pairwise([(sx, sy), (sx + sw, sy), (sx + sw, sy + sw), (sx, sy + sw), (sx, sy)]))
+            edges += list(itertools.pairwise([*corners, corners[0]]))
+            what = f"{ref.group(1)} {group.get('id')}"
+            for (x1, y1), (x2, y2) in segments:
+                length = math.hypot(x2 - x1, y2 - y1)
+                n = (-(y2 - y1) / length, (x2 - x1) / length)
+                offsets = [n[0] * (x1 + i * tile) + n[1] * (y1 + j * tile) for i in range(-8, 9) for j in range(-8, 9)]
+                for (ex1, ey1), (ex2, ey2) in edges:
+                    elen = math.hypot(ex2 - ex1, ey2 - ey1)
+                    m = (-(ey2 - ey1) / elen, (ex2 - ex1) / elen)
+                    if abs(m[0] * n[1] - m[1] * n[0]) > 1e-6:
+                        continue  # crosses the edge
+                    b = n[0] * ex1 + n[1] * ey1
+                    out.append((f"{what} edge", min(abs(o - b) for o in offsets) - thick / 2))
+                if circle is not None:
+                    cx, cy, r = circle
+                    c = n[0] * cx + n[1] * cy
+                    for o in offsets:
+                        if abs(o - c) < r + thick / 2:
+                            out.append((f"{what} chord", r - abs(o - c) - thick / 2))
     return out
 
 
 def _all_hatches() -> pb.Pedigree:
-    """Every carrier hatch in every quadrant of every shape."""
+    """Every carrier hatch in its quadrant on each shape (indices 2 and 3 only ever sit in quadrants)."""
     genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
     people = [
         _person(i + 1, (name, _CAR), gender=gender)
         for i, (gender, name) in enumerate(itertools.product(genders, "ABCD"))
+    ]
+    people += [
+        _person(len(people) + i + 1, *((n, _CAR) for n in "ABCD"), gender=gender) for i, gender in enumerate(genders)
     ]
     return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"], individuals=people)
 
 
 @pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "halves"])
 def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
-    # Each fill part is drawn about its symbol's centre (a swatch from its corner), so a hatch has one phase per
-    # symbol; the pitch puts every section edge midway between two lines, clear of a line that would read as a
-    # thicker edge or a mark.
+    # Every carrier stroke is diagonal and each fill part is drawn in its symbol's own frame (a swatch from its
+    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, a square's or
+    # diamond's outline edge, or close inside a circle's outline, where it would read as a thicker edge or a mark.
     if name == "all_hatches":
         svg = render.render_svg(_all_hatches())
     elif name == "halves":
@@ -762,6 +795,9 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
     else:
         svg = (_GOLDENS / f"{name}.svg").read_text()
     gaps = _hatch_gaps(svg)
-    assert all(gap >= 2.0 - 1e-6 for _, gap in gaps), [g for g in gaps if g[1] < 2.0 - 1e-6]
-    if name in ("all_hatches", "halves", "compound_carrier", "trio"):
-        assert gaps, "the check saw the hatched parts"
+    stroke = 2.0  # the outline's stroke width
+    assert all(gap >= stroke - 1e-6 for _, gap in gaps), sorted(g for g in gaps if g[1] < stroke - 1e-6)[:5]
+    if name in ("all_hatches", "halves"):
+        kinds = {what.split()[0] for what, _ in gaps}
+        want = {f"fill-carrier-{i}" for i in (range(4) if name == "all_hatches" else range(2))}
+        assert kinds == want, "the check saw every hatch run alongside some edge"

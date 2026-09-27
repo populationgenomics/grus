@@ -63,7 +63,6 @@ emitted markup has this shape (coordinates elided):
   <clipPath id="clip-II-3"><circle …/></clipPath>
   <rect class="fill" data-condition="0" data-status="carrier" … fill="url(#fill-carrier-0)"
         clip-path="url(#clip-II-3)"/>
-  <line class="divider" …/>
   <circle class="symbol" … fill="none" stroke="#000000"/>
   <line class="mark deceased" …/>
   <g class="mark proband"><line …/><line …/><line …/><text …>P</text></g>
@@ -166,7 +165,7 @@ highlights everyone with the first condition needs one rule and no renderer supp
 ```
 
 Fills restyle through their patterns. A pattern's content is ordinary elements with presentation attributes, so
-`#fill-carrier-0 rect { fill: #1f77b4; }` recolours that hatch on every symbol and in the key at once; a consumer can
+`#fill-carrier-0 path { stroke: #1f77b4; }` recolours that hatch on every symbol and in the key at once; a consumer can
 also replace the pattern element, or point a `fill` part at a paint server of its own. Keeping each fill a named paint
 rather than inline colour is what makes one rule enough.
 

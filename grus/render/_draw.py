@@ -101,19 +101,21 @@ _ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = 1.0
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
-# Fill phase: every fill part and key swatch is drawn in coordinates local to its symbol (origin at the centre) or its
-# swatch (origin at the corner), so a user-space pattern tile starts at the same place on each. The pitches divide the
-# symbol so that every section and swatch edge falls midway between two hatch lines or stipple rows, never on one.
-_HATCHES_PER_SYMBOL = 6  # hatch pitch = symbol_size / 6: lines half a pitch in from every section edge
-_HATCH_LINE = 1.5  # thickness (px) of a carrier hatch line
+# Fill phase (docs/design/renderer.md, Fills): every fill part and key swatch is drawn in coordinates local to its
+# symbol or swatch, so a user-space pattern tile starts at the same place on each. Carrier strokes are all diagonal,
+# on the lattice x + y, x - y = cell / 2 (mod cell) with cell = symbol_size / 4: a diamond's edges (x +- y = +-half)
+# fall midway between two lattice lines. A square or diamond takes that phase about its centre; a circle's origin
+# sits half a cell right of its centre, so a lattice line passes through the centre and none is a near-tangent chord.
+# A swatch is drawn from its corner, which has the square's phase.
+_CELLS_PER_SYMBOL = 4
+_HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
 _STIPPLES_PER_SYMBOL = 8  # stipple pitch = symbol_size / 8
 _STIPPLE_DOT = 0.25  # radius of a stipple dot, as a fraction of the stipple pitch
 _SOLID = 8.0  # tile (px) of a solid tone; its phase does not show
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status). Affected: a solid tone, or the
-# stipple for index 3. Carrier: a horizontal line hatch rotated by this many degrees (0 horizontal, 90 vertical,
-# -45 "/", 45 "\").
+# stipple for index 3. Carrier: "/", "\", a diagonal cross-hatch, chevrons — never a horizontal or vertical stroke.
 _AFFECTED_TONES = ("#000000", "#666666", "#bbbbbb", None)
-_CARRIER_ANGLES = (0, 90, -45, 45)
+_CARRIER_HATCHES = ("slash", "backslash", "cross", "chevron")
 _FILLS = len(_AFFECTED_TONES)
 _DARK_TONES = frozenset({0, 1})  # indices whose affected tone takes a white count
 _AFFECTED, _CARRIER = "affected", "carrier"
@@ -678,13 +680,11 @@ class _Draw:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
         if status == _CARRIER:
-            angle = _CARRIER_ANGLES[index]
-            turn = f' patternTransform="rotate({angle})"' if angle else ""
-            pitch = self.geom.symbol_size / _HATCHES_PER_SYMBOL
+            c = self.geom.symbol_size / _CELLS_PER_SYMBOL
             return (
-                f'{head}width="{_num(pitch)}" height="{_num(pitch)}" patternUnits="userSpaceOnUse"{turn}>'
-                f'<rect x="0" y="{_num((pitch - _HATCH_LINE) / 2)}" width="{_num(pitch)}" '
-                f'height="{_num(_HATCH_LINE)}" fill="{_STROKE}"/></pattern>'
+                f'{head}width="{_num(c)}" height="{_num(c)}" patternUnits="userSpaceOnUse">'
+                f'<path d="{_hatch_path(_CARRIER_HATCHES[index], c)}" fill="none" stroke="{_STROKE}" '
+                f'stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
             )
         tone = _AFFECTED_TONES[index]
         if tone is None:  # the stipple
@@ -1234,14 +1234,16 @@ class _Draw:
         clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
         math); several sections get divider line(s) through the centre. The X-linked dot, when drawn, sits over both.
         """
-        # Fill parts are drawn about the symbol's centre and moved into place, so each pattern has one phase per symbol.
-        at = f'transform="translate({_num(cx)} {_num(cy)})"'
+        # Fill parts are drawn about the symbol's own origin and moved into place, so each pattern has one phase per
+        # symbol: the centre, or half a cell right of it for a circle (see _CELLS_PER_SYMBOL).
+        ox = self.geom.symbol_size / _CELLS_PER_SYMBOL / 2 if ind.gender == pb.GENDER_WOMAN else 0.0
+        at = f'transform="translate({_num(cx + ox)} {_num(cy)})"'
         out: list[str] = []
         if plan.whole is not None:
             out.append(
                 self._shape(
                     ind.gender,
-                    0.0,
+                    -ox,
                     0.0,
                     f"url(#{self._fill_id(plan.whole, _AFFECTED)})",
                     stroke=False,
@@ -1250,8 +1252,8 @@ class _Draw:
                 )
             )
         elif plan.sections:
-            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, 0.0, 0.0, "none", stroke=False)}</clipPath>')
-            out += [self._section(i, status, clip_id, at) for i, status in plan.sections]
+            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, -ox, 0.0, "none", stroke=False)}</clipPath>')
+            out += [self._section(i, status, clip_id, at, -ox) for i, status in plan.sections]
             if len(plan.sections) > 1:  # a lone section's own edge shows it; dividers only split several
                 h = self.half
                 out.append(_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH))
@@ -1268,17 +1270,17 @@ class _Draw:
             f'r="{_num(radius)}" fill="{_STROKE}" stroke="#ffffff" stroke-width="{_num(_DIVIDER_WIDTH)}"/>'
         )
 
-    def _section(self, index: int, status: str, clip_id: str, at: str) -> str:
-        """The ``fill`` rectangle of condition ``index``'s section, about the symbol's centre, clipped to its shape.
+    def _section(self, index: int, status: str, clip_id: str, at: str, cx: float) -> str:
+        """The ``fill`` rectangle of condition ``index``'s section in the symbol's local frame, clipped to its shape.
 
         Halves (left, right) when the legend has at most two conditions, else quadrants (TL, TR, BL, BR). ``at`` is
-        the transform that places it on the symbol.
+        the transform that places it on the symbol; ``cx`` the symbol's centre in the local frame.
         """
         h = self.half
         if self._slots == 2:
-            rx, ry, rw, rh = (-h if index == 0 else 0.0), -h, h, 2 * h
+            rx, ry, rw, rh = cx + (-h if index == 0 else 0.0), -h, h, 2 * h
         else:
-            rx = -h if index in (0, 2) else 0.0
+            rx = cx + (-h if index in (0, 2) else 0.0)
             ry = -h if index in (0, 1) else 0.0
             rw = rh = h
         return (
@@ -1315,6 +1317,30 @@ class _Draw:
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
+
+
+def _hatch_path(kind: str, c: float) -> str:
+    r"""One ``c``-square tile of a carrier hatch: segments on the lattice x +- y = c/2 (mod c), run past the tile.
+
+    ``slash`` is "/" (x + y = c/2, 3c/2), ``backslash`` "\" (x - y = +-c/2), ``cross`` both, and ``chevron`` rows
+    of "^" teeth, apexes at y = 0 and valleys at y = c/2, whose arms are lattice segments. The tile clips the overrun.
+    """
+    h, e = c / 2, c / 8  # half a cell; the overrun past the tile
+    slash = (
+        f"M{_num(-e)},{_num(h + e)}L{_num(h + e)},{_num(-e)}M{_num(h - e)},{_num(c + e)}L{_num(c + e)},{_num(h - e)}"
+    )
+    back = f"M{_num(h - e)},{_num(-e)}L{_num(c + e)},{_num(h + e)}M{_num(-e)},{_num(h - e)}L{_num(h + e)},{_num(c + e)}"
+    if kind == "slash":
+        return slash
+    if kind == "backslash":
+        return back
+    if kind == "cross":
+        return slash + back
+    rows = []
+    for y in (0.0, c):  # the tile's row, and the next row's apexes, which reach up into it
+        pts = [(-h, y), (0.0, y + h), (h, y), (c, y + h), (c + h, y)]
+        rows.append("M" + "L".join(f"{_num(x)},{_num(py)}" for x, py in pts))
+    return "".join(rows)
 
 
 def _cls(cls: str) -> str:
