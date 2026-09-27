@@ -146,7 +146,9 @@ The groups, and what each promises:
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
 attributes. Every fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none
-repeats the paint.
+repeats the paint. Those parts are drawn in coordinates local to their symbol (origin at its centre) or swatch (origin
+at its corner) and placed with a `transform`, so a pattern falls at the same phase on each (`renderer.md`, Fills); a
+consumer reading their geometry applies the transform.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's

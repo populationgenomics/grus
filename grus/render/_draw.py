@@ -101,11 +101,14 @@ _ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = 1.0
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
-_HATCH = 5.0  # pitch (px) of a carrier hatch
+# Fill phase: every fill part and key swatch is drawn in coordinates local to its symbol (origin at the centre) or its
+# swatch (origin at the corner), so a user-space pattern tile starts at the same place on each. The pitches divide the
+# symbol so that every section and swatch edge falls midway between two hatch lines or stipple rows, never on one.
+_HATCHES_PER_SYMBOL = 6  # hatch pitch = symbol_size / 6: lines half a pitch in from every section edge
 _HATCH_LINE = 1.5  # thickness (px) of a carrier hatch line
-_SOLID = 8.0  # tile (px) of a solid tone
-_STIPPLE = 4.0  # pitch (px) of the stipple fill
-_STIPPLE_DOT = 1.0  # radius (px) of a stipple dot
+_STIPPLES_PER_SYMBOL = 8  # stipple pitch = symbol_size / 8
+_STIPPLE_DOT = 0.25  # radius of a stipple dot, as a fraction of the stipple pitch
+_SOLID = 8.0  # tile (px) of a solid tone; its phase does not show
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status). Affected: a solid tone, or the
 # stipple for index 3. Carrier: a horizontal line hatch rotated by this many degrees (0 horizontal, 90 vertical,
 # -45 "/", 45 "\").
@@ -456,6 +459,7 @@ class _Draw:
             self.gen_height,
             geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub + tracks * geom.elbow_gap,
         )
+        self._swatch = geom.symbol_size / 2  # a key swatch is one quadrant of a symbol, in the same fill phase
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
     def _fill_plan(self, ind: pb.Individual) -> _FillPlan:
@@ -519,10 +523,10 @@ class _Draw:
             return [], 0.0, 0.0
 
         def width(e: _KeyEntry) -> float:
-            return geom.key_swatch + geom.label_gap + 0.6 * geom.label_size * len(e.label)
+            return self._swatch + geom.label_gap + 0.6 * geom.label_size * len(e.label)
 
         wrap = max(self._x_hi - self._x_lo, *(width(e) for e in entries))
-        pitch = max(geom.key_swatch, geom.label_size) + geom.key_swatch / 2
+        pitch = max(self._swatch, geom.label_size) + self._swatch / 2
         placed: list[_KeyEntry] = []
         x = y = key_w = 0.0
         for e in entries:
@@ -531,7 +535,7 @@ class _Draw:
             placed.append(dataclasses.replace(e, x=x, y=y))
             key_w = max(key_w, x + width(e))
             x += width(e) + geom.key_entry_gap
-        return placed, key_w, y + max(geom.key_swatch, geom.label_size)
+        return placed, key_w, y + max(self._swatch, geom.label_size)
 
     def _key_top(self) -> float:
         """The key's top edge: ``key_gap`` below the bottom row's label band and any arrow reaching past it."""
@@ -676,16 +680,18 @@ class _Draw:
         if status == _CARRIER:
             angle = _CARRIER_ANGLES[index]
             turn = f' patternTransform="rotate({angle})"' if angle else ""
+            pitch = self.geom.symbol_size / _HATCHES_PER_SYMBOL
             return (
-                f'{head}width="{_num(_HATCH)}" height="{_num(_HATCH)}" patternUnits="userSpaceOnUse"{turn}>'
-                f'<rect x="0" y="{_num((_HATCH - _HATCH_LINE) / 2)}" width="{_num(_HATCH)}" '
+                f'{head}width="{_num(pitch)}" height="{_num(pitch)}" patternUnits="userSpaceOnUse"{turn}>'
+                f'<rect x="0" y="{_num((pitch - _HATCH_LINE) / 2)}" width="{_num(pitch)}" '
                 f'height="{_num(_HATCH_LINE)}" fill="{_STROKE}"/></pattern>'
             )
         tone = _AFFECTED_TONES[index]
         if tone is None:  # the stipple
+            pitch = self.geom.symbol_size / _STIPPLES_PER_SYMBOL
             return (
-                f'{head}width="{_num(_STIPPLE)}" height="{_num(_STIPPLE)}" patternUnits="userSpaceOnUse">'
-                f'<circle cx="{_num(_STIPPLE / 2)}" cy="{_num(_STIPPLE / 2)}" r="{_num(_STIPPLE_DOT)}" '
+                f'{head}width="{_num(pitch)}" height="{_num(pitch)}" patternUnits="userSpaceOnUse">'
+                f'<circle cx="{_num(pitch / 2)}" cy="{_num(pitch / 2)}" r="{_num(pitch * _STIPPLE_DOT)}" '
                 f'fill="{_STROKE}"/></pattern>'
             )
         # A user-space tile, like the hatches: cairosvg (grus.render.rasterize) fails on an objectBoundingBox pattern
@@ -701,7 +707,7 @@ class _Draw:
             return []
         geom = self.geom
         x0, y0 = geom.gen_marker_gutter + geom.margin, self._key_top()
-        s = geom.key_swatch
+        s = self._swatch
         out = [_open_g(["key"], {"id": f"{self.id_prefix}key"})]
         for e in self._key:
             x, y = x0 + e.x, y0 + e.y
@@ -709,9 +715,11 @@ class _Draw:
             attrs["data-status"] = e.status
             out.append(_open_g(["key-entry", *(["dot"] if e.dot else [])], attrs))
             paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
+            # Drawn from its own corner, so its pattern has the phase it has in a symbol's quadrant.
             out.append(
-                f'<rect class="swatch" x="{_num(x)}" y="{_num(y)}" width="{_num(s)}" height="{_num(s)}" '
-                f'fill="{paint}" stroke="{_STROKE}" stroke-width="{_num(_SWATCH_WIDTH)}"/>'
+                f'<rect class="swatch" x="0" y="0" width="{_num(s)}" height="{_num(s)}" '
+                f'transform="translate({_num(x)} {_num(y)})" fill="{paint}" stroke="{_STROKE}" '
+                f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'
             )
             if e.dot:
                 out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
@@ -1226,22 +1234,24 @@ class _Draw:
         clipped to the shape by reusing the shape as a clipPath (a half-disc / half-square / triangle with no per-shape
         math); several sections get divider line(s) through the centre. The X-linked dot, when drawn, sits over both.
         """
+        # Fill parts are drawn about the symbol's centre and moved into place, so each pattern has one phase per symbol.
+        at = f'transform="translate({_num(cx)} {_num(cy)})"'
         out: list[str] = []
         if plan.whole is not None:
             out.append(
                 self._shape(
                     ind.gender,
-                    cx,
-                    cy,
+                    0.0,
+                    0.0,
                     f"url(#{self._fill_id(plan.whole, _AFFECTED)})",
                     stroke=False,
                     cls="fill",
-                    extra=f'data-condition="{plan.whole}" data-status="{_AFFECTED}"',
+                    extra=f'data-condition="{plan.whole}" data-status="{_AFFECTED}" {at}',
                 )
             )
         elif plan.sections:
-            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, cx, cy, "none", stroke=False)}</clipPath>')
-            out += [self._section(cx, cy, i, status, clip_id) for i, status in plan.sections]
+            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, 0.0, 0.0, "none", stroke=False)}</clipPath>')
+            out += [self._section(i, status, clip_id, at) for i, status in plan.sections]
             if len(plan.sections) > 1:  # a lone section's own edge shows it; dividers only split several
                 h = self.half
                 out.append(_line(cx, cy - h, cx, cy + h, cls="divider", width=_DIVIDER_WIDTH))
@@ -1258,21 +1268,22 @@ class _Draw:
             f'r="{_num(radius)}" fill="{_STROKE}" stroke="#ffffff" stroke-width="{_num(_DIVIDER_WIDTH)}"/>'
         )
 
-    def _section(self, cx: float, cy: float, index: int, status: str, clip_id: str) -> str:
-        """The ``fill`` rectangle of condition ``index``'s section, clipped to the symbol shape.
+    def _section(self, index: int, status: str, clip_id: str, at: str) -> str:
+        """The ``fill`` rectangle of condition ``index``'s section, about the symbol's centre, clipped to its shape.
 
-        Halves (left, right) when the legend has at most two conditions, else quadrants (TL, TR, BL, BR).
+        Halves (left, right) when the legend has at most two conditions, else quadrants (TL, TR, BL, BR). ``at`` is
+        the transform that places it on the symbol.
         """
         h = self.half
         if self._slots == 2:
-            rx, ry, rw, rh = (cx - h if index == 0 else cx), cy - h, h, 2 * h
+            rx, ry, rw, rh = (-h if index == 0 else 0.0), -h, h, 2 * h
         else:
-            rx = cx - h if index in (0, 2) else cx
-            ry = cy - h if index in (0, 1) else cy
+            rx = -h if index in (0, 2) else 0.0
+            ry = -h if index in (0, 1) else 0.0
             rw = rh = h
         return (
             f'<rect class="fill" data-condition="{index}" data-status="{status}" x="{_num(rx)}" y="{_num(ry)}" '
-            f'width="{_num(rw)}" height="{_num(rh)}" fill="url(#{self._fill_id(index, status)})" '
+            f'width="{_num(rw)}" height="{_num(rh)}" {at} fill="url(#{self._fill_id(index, status)})" '
             f'clip-path="url(#{clip_id})"/>'
         )
 

@@ -74,7 +74,10 @@ _SYMBOL_CIRCLE_RE = re.compile(r'<circle class="symbol" cx="([-0-9.]+)" cy="([-0
 _SYMBOL_RECT_RE = re.compile(r'<rect class="symbol" x="([-0-9.]+)" y="([-0-9.]+)"')
 # Drawn (non-hit) elements: the invisible pointer targets carry class="hit" and are not glyphs.
 _GLYPH_LINE_RE = re.compile(r'<line (?!class="hit")(?:class="[^"]*" )?x1="([-0-9.]+)" y1="[-0-9.]+" x2="([-0-9.]+)"')
-_GLYPH_RECT_RE = re.compile(r'<rect (?!class="hit")(?:class="[^"]*" )?(?:data-condition="\d+" )?x="([-0-9.]+)"')
+# A fill part or key swatch is drawn in local coordinates and placed by a transform; these read absolute ones only.
+_GLYPH_RECT_RE = re.compile(
+    r'<rect (?!class="hit")(?![^>]*transform=)(?:class="[^"]*" )?(?:data-condition="\d+" )?x="([-0-9.]+)"'
+)
 _GLYPH_CIRCLE_RE = re.compile(r'<circle (?:class="[^"]*" )?cx="([-0-9.]+)" cy="[-0-9.]+" r="([-0-9.]+)"')
 _GLYPH_POLYGON_RE = re.compile(r'<polygon (?:class="[^"]*" )?points="([^"]+)"')
 _WIDTH_RE = re.compile(r'<svg [^>]*\bwidth="([-0-9.]+)"')

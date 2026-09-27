@@ -11,6 +11,7 @@ import collections
 import dataclasses
 import itertools
 import json
+import math
 import pathlib
 import re
 import xml.etree.ElementTree as ET
@@ -601,6 +602,13 @@ def test_no_fill_draws_no_key_and_no_defs() -> None:
     assert 'class="key"' not in svg and "<defs>" not in svg and "<pattern" not in svg
 
 
+def _translate(el: ET.Element) -> tuple[float, float]:
+    """The offset of an element drawn in local coordinates (``transform="translate(x y)"``)."""
+    m = re.fullmatch(r"translate\(([-0-9.]+) ([-0-9.]+)\)", el.get("transform", ""))
+    assert m, el.attrib
+    return float(m.group(1)), float(m.group(2))
+
+
 def _bottom(el: ET.Element) -> float:
     return float(el.get("y", "0")) + float(el.get("height", "0"))
 
@@ -613,11 +621,12 @@ def test_key_sits_below_every_individual(name: str) -> None:
         assert not _patterns(root)
         return
     (key,) = keys
-    top = min(float(sw.get("y", "0")) for sw in key.iter(f"{_SVG}rect"))
+    swatches = [(*_translate(sw), float(sw.get("height", "0"))) for sw in key.iter(f"{_SVG}rect")]
+    top = min(y for _, y, _ in swatches)
     # Each hit rect covers its symbol, the reserved label box and any arrow.
     lowest = max(_bottom(next(c for c in g if "hit" in _classes(c))) for g in _groups(root, "individual"))
     assert top >= lowest + render.DEFAULT_GEOMETRY.key_gap - 1e-6
-    bottom = max(_bottom(sw) for sw in key.iter(f"{_SVG}rect"))
+    bottom = max(y + h for _, y, h in swatches)
     assert bottom <= float(root.get("height", "0")) - render.DEFAULT_GEOMETRY.margin + 1e-6
     for e in _groups(key, "key-entry"):
         label = next(t for t in e if "key-label" in _classes(t))
@@ -671,4 +680,88 @@ def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
     root = _parse(render.render_svg(pb.Pedigree(labels=legend, individuals=[_person(1, ("B", _CAR))])))
     (g,) = _groups(root, "individual")
     (section,) = _fills(g)
-    assert section.get("data-condition") == "1" and section.get("x") == "106"
+    assert section.get("data-condition") == "1" and section.get("x") == "0", "the right half, about the centre"
+
+
+def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
+    """The clear gap from each hatch-parallel region boundary to its nearest hatch line, as ``(what, gap)``.
+
+    Covers every carrier-hatched fill part and key swatch.
+
+    A hatch line is ``y = c + k * pitch`` in pattern space, rotated by the pattern's ``rotate``; a region is a fill
+    rectangle (or swatch) in its own local coordinates, plus the diamond's edges that bound it.
+    """
+    root = _parse(svg)
+    hatches: dict[str, tuple[float, float, float, float]] = {}  # id -> (pitch, line centre, thickness, angle)
+    for pat in root.iter(f"{_SVG}pattern"):
+        if pat.get("data-status") != "carrier":
+            continue
+        line = pat.find(f"{_SVG}rect")
+        assert line is not None
+        turn = re.fullmatch(r"rotate\(([-0-9.]+)\)", pat.get("patternTransform", "rotate(0)"))
+        assert turn
+        thick = float(line.get("height", "0"))
+        hatches[pat.get("id", "")] = (
+            float(pat.get("width", "0")),
+            float(line.get("y", "0")) + thick / 2,
+            thick,
+            float(turn.group(1)),
+        )
+    out: list[tuple[str, float]] = []
+    for group in root.iter(f"{_SVG}g"):
+        diamond = any(c.tag == f"{_SVG}polygon" and "symbol" in _classes(c) for c in group)
+        for part in group:
+            ref = re.fullmatch(r"url\(#(.+)\)", part.get("fill", ""))
+            if not ref or ref.group(1) not in hatches:
+                continue
+            pitch, centre, thick, angle = hatches[ref.group(1)]
+            x, y = float(part.get("x", "0")), float(part.get("y", "0"))
+            w, h = float(part.get("width", "0")), float(part.get("height", "0"))
+            # Boundaries as (unit normal, offset): the rectangle's sides, and a diamond's edges within the rectangle.
+            bounds = [((0.0, 1.0), y), ((0.0, 1.0), y + h), ((1.0, 0.0), x), ((1.0, 0.0), x + w)]
+            if diamond and "fill" in _classes(part):
+                half = render.DEFAULT_GEOMETRY.symbol_size / 2
+                for sx, sy in itertools.product((-1, 1), repeat=2):
+                    if (x < 0 if sx < 0 else x + w > 0) and (y < 0 if sy < 0 else y + h > 0):
+                        r = 2**-0.5
+                        bounds.append(((sx * r, sy * r), half * r))
+            a = math.radians(angle)
+            normal = (-math.sin(a), math.cos(a))
+            for (nx, ny), offset in bounds:
+                dot = nx * normal[0] + ny * normal[1]
+                if abs(abs(dot) - 1) > 1e-6:
+                    continue  # crosses the hatch, not alongside it
+                b = offset * dot  # the boundary's offset along the hatch normal
+                dist = abs((b - centre + pitch / 2) % pitch - pitch / 2)
+                out.append((f"{part.get('class')} {ref.group(1)} {group.get('id')}", dist - thick / 2))
+    return out
+
+
+def _all_hatches() -> pb.Pedigree:
+    """Every carrier hatch in every quadrant of every shape."""
+    genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
+    people = [
+        _person(i + 1, (name, _CAR), gender=gender)
+        for i, (gender, name) in enumerate(itertools.product(genders, "ABCD"))
+    ]
+    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABCD"], individuals=people)
+
+
+@pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "halves"])
+def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
+    # Each fill part is drawn about its symbol's centre (a swatch from its corner), so a hatch has one phase per
+    # symbol; the pitch puts every section edge midway between two lines, clear of a line that would read as a
+    # thicker edge or a mark.
+    if name == "all_hatches":
+        svg = render.render_svg(_all_hatches())
+    elif name == "halves":
+        genders = (pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY)
+        svg = render.render_svg(
+            pb.Pedigree(individuals=[_person(i + 1, ("A", _CAR), ("B", _CAR), gender=g) for i, g in enumerate(genders)])
+        )
+    else:
+        svg = (_GOLDENS / f"{name}.svg").read_text()
+    gaps = _hatch_gaps(svg)
+    assert all(gap >= 2.0 - 1e-6 for _, gap in gaps), [g for g in gaps if g[1] < 2.0 - 1e-6]
+    if name in ("all_hatches", "halves", "compound_carrier", "trio"):
+        assert gaps, "the check saw the hatched parts"

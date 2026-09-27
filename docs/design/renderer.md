@@ -126,8 +126,14 @@ quadrants and the four-fill limit — so the drawing of one individual never dep
 
 Affected fills are tones and carrier fills are line hatches, so a carrier never reads as affected with the same
 condition, and a carrier of two conditions never reads as a solid, affected symbol, as two black carrier halves would.
-There is no fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a placeholder, never
-a reused fill).
+
+A pattern tiles from a fixed origin, so where its lines fall on a symbol depends on where the symbol is — at an
+arbitrary phase a hatch line lies flush against a section edge or the outline and reads as a thicker edge, or a mark.
+Every fill is therefore drawn about its symbol's centre and moved into place, so each pattern has the same phase on
+every symbol, and the hatch pitch is a sixth of the symbol size: every section edge (the outline, the centre lines)
+falls midway between two hatch lines, clear of both. The stipple's pitch divides the symbol the same way. There is no
+fifth distinct fill: a pedigree that would fill a condition at index 4 or above defers (a placeholder, never a reused
+fill).
 
 **Sections.** A pedigree with at most two conditions in its legend divides a symbol into halves (index 0 left, 1 right);
 with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right). A section is a rectangle clipped to
@@ -156,12 +162,12 @@ dot, edged white so it reads over a hatch; every other carrier is a section as a
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a hatch means nothing to a reader who does not hold the IR. It has one entry per (index, status)
-drawn, ordered by index with affected first: a square swatch in that fill and a label — the condition's name when
-affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an
-unnamed condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key
-sits `KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a
-pedigree with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since
-indices are per pedigree.
+drawn, ordered by index with affected first: a square swatch in that fill — one quadrant of a symbol, drawn from its
+corner, so its fill has the symbols' phase — and a label — the condition's name when affected, `Carrier: <name>` when
+carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed condition. Entries run left
+to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP` below the lowest
+label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no fills has no key
+and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree
@@ -201,8 +207,8 @@ sized from the actual pedigree, not a fixed band:
   pedigree, keeping golden bytes stable.
 
 Spacing constants exposed: `GEN_HEIGHT`, `X_UNIT`, `SYMBOL_SIZE`, `COUPLE_GAP`, `SIB_GAP`, `SIB_STUB`,
-`DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`, and the key's `KEY_SWATCH`,
-`KEY_GAP`, `KEY_ENTRY_GAP` (drawing-only: the key never moves a symbol).
+`DOUBLE_LINE_OFFSET`, `LABEL_SIZE`, `LABEL_GAP`, `LABEL_LINE_GAP`, `GEN_MARKER_GUTTER`, and the key's `KEY_GAP`,
+`KEY_ENTRY_GAP` (drawing-only: the key never moves a symbol).
 
 ### Figure render (PedigreeSet → tiled SVG)
 
