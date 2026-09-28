@@ -734,19 +734,64 @@ def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
     assert _classes(count) == ["mark", "count"] and count.get("fill") == "#ffffff", "white on the black tone"
 
 
-def test_presymptomatic_line_is_outline_weight_from_outline_to_outline() -> None:
-    # A filled half's inner border and the presymptomatic line share a place; the weight tells them apart. The line
-    # ends on the outline, so it does not run on into a descent line above.
+def _presymptomatic(g: ET.Element) -> tuple[ET.Element, ET.Element]:
+    """A group's presymptomatic mark as its (halo, line)."""
+    (mark,) = [c for c in g if "presymptomatic" in _classes(c)]
+    halo, line = list(mark)
+    assert "halo" in _classes(halo), "the halo is drawn first, under the line"
+    return halo, line
+
+
+def test_presymptomatic_line_is_heavy_round_capped_haloed_and_inset() -> None:
+    # Twice the outline's width with round caps, over a white halo that parts it from any fill and from a filled
+    # half's thin border it may lie on; inset from the outline so the child's stub above does not run into it.
     ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
     (g,) = _groups(_parse(render.render_svg(pb.Pedigree(individuals=[ind]))), "individual")
-    (line,) = [c for c in g if "presymptomatic" in _classes(c)]
+    halo, line = _presymptomatic(g)
     borders = _dividers(g)
-    symbol = next(c for c in g if "symbol" in _classes(c))
     assert borders and all(
-        float(line.get("stroke-width", "0")) == 2 * float(b.get("stroke-width", "0")) for b in borders
+        float(line.get("stroke-width", "0")) == 4 * float(b.get("stroke-width", "0")) for b in borders
     )
+    assert line.get("stroke-width") == "4" and line.get("stroke-linecap") == "round" and line.get("stroke") == "#000000"
+    assert halo.get("stroke") == "#ffffff" and float(halo.get("stroke-width", "0")) > 4
+    assert halo.get("stroke-linecap") == "round"
+    assert all(halo.get(a) == line.get(a) for a in ("x1", "y1", "x2", "y2"))
+    symbol = next(c for c in g if "symbol" in _classes(c))
     top, bottom = float(symbol.get("y", "0")), float(symbol.get("y", "0")) + float(symbol.get("height", "0"))
-    assert float(line.get("y1", "0")) == top and float(line.get("y2", "0")) == bottom
+    halo_r = float(halo.get("stroke-width", "0")) / 2
+    y1, y2 = float(line.get("y1", "0")), float(line.get("y2", "0"))
+    assert y1 - halo_r > top + 1 and y2 + halo_r < bottom - 1, "the halo stays clear of the outline's stroke"
+    assert y1 - 2 >= top + 4, "the line's cap stops 4 px inside the outline"
+
+
+@pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
+def test_the_presymptomatic_halo_stays_inside_the_shape(gender: pb.Gender) -> None:
+    # At a diamond's narrow vertex too: the white halo never paints over the outline.
+    (g,) = _groups(
+        _parse(
+            render.render_svg(
+                pb.Pedigree(individuals=[_person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), gender=gender)])
+            )
+        ),
+        "individual",
+    )
+    halo, _ = _presymptomatic(g)
+    _, cy = _centre(next(c for c in g if "symbol" in _classes(c)))
+    half, r = render.DEFAULT_GEOMETRY.symbol_size / 2, float(halo.get("stroke-width", "0")) / 2
+    for y in (float(halo.get("y1", "0")), float(halo.get("y2", "0"))):
+        depth = half - abs(y - cy)  # from the top or bottom point of the outline, along the centre line
+        inside = depth if gender != pb.GENDER_NONBINARY else depth / math.sqrt(2)
+        assert inside - r >= 1.0 - 1e-6, f"halo reaches the outline stroke ({inside - r:.2f})"
+
+
+def test_the_key_presymptomatic_swatch_has_the_same_mark() -> None:
+    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "AB"]
+    people = [_person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC)), _person(2, ("B", _CAR))]
+    (key,) = _groups(_parse(render.render_svg(pb.Pedigree(labels=legend, individuals=people))), "key")
+    entry = next(e for e in _groups(key, "key-entry") if e.get("data-status") == "presymptomatic")
+    halo, line = _presymptomatic(entry)
+    assert line.get("stroke-width") == "4" and line.get("stroke-linecap") == "round" and halo.get("stroke") == "#ffffff"
+    assert not _dividers(entry), "no section borders: it must not read as a plain split symbol"
 
 
 def test_the_key_names_each_presymptomatic_condition() -> None:
@@ -757,7 +802,7 @@ def test_the_key_names_each_presymptomatic_condition() -> None:
     entry = next(e for e in _groups(key, "key-entry") if e.get("data-status") == "presymptomatic")
     assert entry.get("id") == "key-presymptomatic-0" and entry.get("data-condition") == "0"
     assert [t.text for t in entry if "key-label" in _classes(t)] == ["Presymptomatic: A"]
-    assert [c for c in entry if "presymptomatic" in _classes(c)], "a swatch with the vertical line"
+    _presymptomatic(entry)  # a swatch with the presymptomatic bar
     unnamed = pb.Pedigree(individuals=[_person(1, ("", pb.CONDITION_STATUS_PRESYMPTOMATIC))])
     (key,) = _groups(_parse(render.render_svg(unnamed)), "key")
     (entry,) = _groups(key, "key-entry")
@@ -963,8 +1008,8 @@ def test_a_sixth_is_a_wedge_toward_its_clock_position(gender: pb.Gender) -> None
 def test_a_presymptomatic_line_reads_over_sixth_borders() -> None:
     ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
     (g, *_) = _groups(_parse(render.render_svg(_sixths(ind, _person(2, ("E", _AFF))))), "individual")
-    (line,) = [c for c in g if "presymptomatic" in _classes(c)]
-    assert _vertical(line) and line.get("stroke-width") == "2"
+    halo, line = _presymptomatic(g)
+    assert _vertical(line) and line.get("stroke-width") == "4" and halo.get("stroke") == "#ffffff"
     assert _dividers(g) and not any(_vertical(d) for d in _dividers(g))
 
 

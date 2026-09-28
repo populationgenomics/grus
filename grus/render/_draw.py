@@ -6,7 +6,7 @@ Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinica
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
 affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
 a filled section's edges inside a symbol are drawn as thin borders, and nothing else divides it),
-presymptomatic vertical line (outline weight, outline to outline), deceased
+presymptomatic bar (twice the outline, round caps, white halo, inset from the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -40,9 +40,9 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   section's borders inside the symbol: one round-joined path of rays from the centre along each boundary with a filled
   section on either side), ``symbol`` (the shape as outline only), ``mark …``
   (``count``, a count-collapsed symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``,
-  ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line),
-  then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow
-  when one is drawn: the one element a consumer needs for hover and click.
+  ``presymptomatic`` group of a ``halo`` line and the bar, ``unknown``, ``proband`` / ``consultand`` arrow group),
+  ``label`` (one ``<text>`` per line), then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol,
+  its reserved label box and the arrow when one is drawn: the one element a consumer needs for hover and click.
 * ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
@@ -102,6 +102,14 @@ _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
 _HALO = 3.0  # stroke width of the contrasting outline behind a count, so it reads over any fill or line
+# The presymptomatic line: twice the outline's width with round caps, over a white halo that parts it from any fill and
+# from a section border it may lie on. Its cap centres sit this far in from the outline, top and bottom, so the child's
+# stub arriving at the top does not run into it and its halo stays clear of the outline (a diamond's narrow vertex
+# needs the most room); the key's small swatch uses a shorter inset.
+_PRESYMPTOMATIC_WIDTH = 4.0
+_PRESYMPTOMATIC_HALO = 1.5  # white each side of the line
+_PRESYMPTOMATIC_INSET = 7.0
+_PRESYMPTOMATIC_KEY_INSET = 5.0
 # The proband's 'P': font size, and its offset left of and below the arrow tail (_arrow, _arrow_bottom, _hit_rect).
 _ARROW_LABEL_SIZE = 15.0
 _ARROW_LABEL_DX = 8.0
@@ -747,7 +755,9 @@ class _Draw:
             if e.dot:
                 out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
             if e.status == _PRESYMPTOMATIC:
-                out.append(_line(x + s / 2, y, x + s / 2, y + s, cls="swatch presymptomatic"))
+                out += _presymptomatic_mark(
+                    x + s / 2, y + s / 2, s / 2, _PRESYMPTOMATIC_KEY_INSET, cls="swatch presymptomatic"
+                )
             label_x = x + s + geom.label_gap
             out.append(_text(label_x, y + s / 2, _escape(e.label), geom.label_size, cls="key-label", anchor="start"))
             out.append("</g>")
@@ -1232,8 +1242,7 @@ class _Draw:
                 )
             out.append(mark)
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
-            # Outline weight, outline to outline: twice a filled half's border, which may lie under it.
-            out.append(_line(cx, cy - self.half, cx, cy + self.half, cls="mark presymptomatic"))
+            out += _presymptomatic_mark(cx, cy, self.half, _PRESYMPTOMATIC_INSET, cls="mark presymptomatic")
         if ind.deceased:
             d = self.half * 1.4
             out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
@@ -1452,6 +1461,19 @@ def _hatch_path(backslash: bool, c: float, t: float) -> str:
             sm = c / 2 + k * c  # x + y = sm
             runs.append(((max(0.0, sm - t), min(sm, t)), (min(sm, t), max(0.0, sm - t))))
     return "".join(f"M{_num(x1)},{_num(y1)}L{_num(x2)},{_num(y2)}" for (x1, y1), (x2, y2) in runs)
+
+
+def _presymptomatic_mark(cx: float, cy: float, h: float, inset: float, *, cls: str) -> list[str]:
+    """The presymptomatic line of a symbol of half-height ``h`` at ``(cx, cy)``: a halo, then the line, one group."""
+    y1, y2 = cy - h + inset, cy + h - inset
+    halo = _PRESYMPTOMATIC_WIDTH + 2 * _PRESYMPTOMATIC_HALO
+    ends = f'x1="{_num(cx)}" y1="{_num(y1)}" x2="{_num(cx)}" y2="{_num(y2)}"'
+    return [
+        f'<g class="{cls}">',
+        f'<line class="halo" {ends} stroke="#ffffff" stroke-width="{_num(halo)}" stroke-linecap="round"/>',
+        f'<line {ends} stroke="{_STROKE}" stroke-width="{_num(_PRESYMPTOMATIC_WIDTH)}" stroke-linecap="round"/>',
+        "</g>",
+    ]
 
 
 def _cls(cls: str) -> str:

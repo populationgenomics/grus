@@ -197,10 +197,12 @@ spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke,
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
   and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
   individual (same-named entries) draws as affected.
-- The **presymptomatic** line runs from outline to outline at the outline's full stroke width, twice a border's, so it
-  never reads as the thinner vertical border of a filled half it may lie on. It stops at the outline: running past it
-  would meet the child's stub above and read as a descent line through the symbol. The line does not say which condition
-  is presymptomatic, so the key does (below).
+- The **presymptomatic** line is a heavy vertical bar: twice the outline's width, with round caps, over a white halo,
+  inset from the outline at top and bottom. The weight parts it from a filled half's thin border it may lie on, the halo
+  from any fill beneath it (a black whole fill, a dark tone, a hatch) and from a coincident border, and the inset from
+  the child's stub arriving at the top, which would otherwise run on into it and read as a descent line through the
+  symbol. The inset leaves the halo clear of the outline even at a diamond's narrow vertex. The line does not say which
+  condition is presymptomatic, so the key does, with a swatch carrying the same bar (below).
 - Unknown (`?`), deceased and proband marks are unchanged, drawn over the fills; on a symbol with borders the `?` has a
   white halo so it reads over them.
 
@@ -226,7 +228,7 @@ only, with that section's borders, so the key shows where a condition sits as we
 and quadrants as to sixths, so a divided pedigree's key always reads the same way. An undivided pedigree has no
 positions to show, and its swatch is a plain square the size of a quadrant filled all over. Then the label — the
 condition's name when affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot),
-`Presymptomatic: <name>` (a swatch with the vertical line) for each condition someone is presymptomatic for — the
+`Presymptomatic: <name>` (a swatch with the presymptomatic bar) for each condition someone is presymptomatic for — the
 standard asks for the condition in the legend — and `Affected` / `Carrier` / `Presymptomatic` for an unnamed condition.
 Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP`
 below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no
