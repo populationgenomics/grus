@@ -95,15 +95,18 @@ their individuals or matings produce byte-identical records.
 A stored layout is valid for a pedigree and a geometry only if a fresh layout would produce it. The key captures every
 input to the layout:
 
-- **a content digest of the pedigree** — SHA-256 over a canonical serialization: individuals sorted by `Position`,
-  matings sorted by their own serialized bytes, the whole message serialized deterministically. Offspring order, which
-  the IR gives meaning (birth order), is kept. The digest covers the whole pedigree, not only the fields the layout
-  reads today: annotations change label widths, which change spacing, and tracking which fields matter would be one more
-  thing every layout change must keep in step. A change to a title then invalidates a layout it did not affect; that
-  costs one recomputation and never a wrong drawing. The one exclusion is a pedigree's citation `evidence` and
-  `supports` (`ir.md`, Citations): provenance, never read by layout or drawing, which a harness adds or edits after the
-  fact, so they must not mark a stored layout stale. The set-level citation list is outside the pedigree and so outside
-  the digest already.
+- **a content digest of what layout and drawing read** — SHA-256 over a canonical serialization of the pedigree with
+  every field that neither reads cleared first: individuals sorted by `Position`, matings sorted by their own serialized
+  bytes, the rest serialized deterministically. Offspring order, which the IR gives meaning (birth order), is kept.
+  Every field of every message the digest reaches is classified in `grus.render._store` as rendered (hashed) or not
+  (cleared), and a test fails on a field in neither, so a new IR field cannot silently mark stored layouts stale nor
+  silently be ignored when it is drawn. Cleared today: the pedigree's `id`, `provenance` and citation `evidence` and
+  `supports`; an individual's `sex_assigned_at_birth`, `reproductive_outcome`, `reproductive_role` and
+  `documented_evaluation`; a condition's `onset_age`; an annotation's `type`; a mating's `status` and `annotations`; an
+  offspring edge's `parentage` and `adoption`. Drawing's fields are hashed along with layout's (a stored layout is drawn
+  with the pedigree in hand either way), so the classification is one question — does rendering read it — and a field
+  that becomes drawn moves from cleared to hashed with the change that draws it. The set-level citation list is outside
+  the pedigree and so outside the digest.
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
