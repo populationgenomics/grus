@@ -179,8 +179,7 @@
 <text class="key-label" x="178.6" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: A</text>
 </g>
 <g id="key-presymptomatic-0" class="key-entry" data-condition="0" data-status="presymptomatic">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 318.5)" fill="#ffffff"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<rect class="swatch" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 318.5)" fill="#ffffff" stroke="#000000" stroke-width="1"/>
 <g class="swatch presymptomatic">
 <line class="halo" x1="276.1" y1="310" x2="276.1" y2="327" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
 <line x1="276.1" y1="310" x2="276.1" y2="327" stroke="#000000" stroke-width="4" stroke-linecap="round"/>

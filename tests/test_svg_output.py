@@ -809,14 +809,32 @@ def test_the_key_names_each_presymptomatic_condition() -> None:
     assert [t.text for t in entry if "key-label" in _classes(t)] == ["Presymptomatic"]
 
 
-def test_an_unfilled_legend_entry_still_holds_its_section() -> None:
-    # Sections are keyed by legend index, not by which conditions happen to be filled, so a phenotype label nobody
-    # is shaded for still takes index 0 and a carrier of the second condition fills the right half.
-    legend = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "AB"]
-    root = _parse(render.render_svg(pb.Pedigree(labels=legend, individuals=[_person(1, ("B", _CAR))])))
-    (g,) = _groups(root, "individual")
-    (section,) = _fills(g)
-    assert section.get("data-condition") == "1" and section.get("x") == "0", "the right half, about the centre"
+def test_a_phenotype_label_no_condition_carries_takes_no_index() -> None:
+    # Review-set s025: one condition, "DUH", and a phenotype label "DUH family" that no one's condition carries.
+    # The label is not a condition: the pedigree is undivided, every affected person whole-filled, the key whole.
+    labels = [
+        pb.Label(text="DUH", kind=pb.LABEL_KIND_PHENOTYPE),
+        pb.Label(text="DUH family", kind=pb.LABEL_KIND_PHENOTYPE),
+    ]
+    people = [_person(1, ("DUH", _AFF)), _person(2, ("DUH", _AFF)), _person(3)]
+    root = _parse(render.render_svg(pb.Pedigree(labels=labels, individuals=people)))
+    assert json.loads(root.get("data-conditions", "null")) == ["DUH"]
+    for g in _groups(root, "individual")[:2]:
+        (whole,) = _fills(g)
+        assert whole.get("width") == "36" and whole.get("clip-path") is None and not _dividers(g)
+    (key,) = _groups(root, "key")
+    (entry,) = _groups(key, "key-entry")
+    (swatch,) = [c for c in entry if "swatch" in _classes(c)]
+    assert swatch.tag == f"{_SVG}rect" and swatch.get("clip-path") is None and not _dividers(entry), "a whole swatch"
+
+
+def test_a_label_orders_the_conditions_it_names() -> None:
+    # A matching phenotype label still sets the order; a second real condition still divides.
+    labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in ("B", "unused", "A")]
+    people = [_person(1, ("A", _CAR)), _person(2, ("B", _CAR))]
+    root = _parse(render.render_svg(pb.Pedigree(labels=labels, individuals=people)))
+    assert json.loads(root.get("data-conditions", "null")) == ["B", "A"]
+    assert all(_dividers(g) for g in _groups(root, "individual")), "two conditions: halves"
 
 
 def _segments_of(d: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
@@ -971,8 +989,15 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
 # --- sixths: five or six conditions -----------------------------------------------------------------------------
 
 
-def _sixths(*people: pb.Individual, names: str = "ABCDEF") -> pb.Pedigree:
-    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
+def _sixths(*people: pb.Individual, names: str = "ABCDEF", occur: bool = False) -> pb.Pedigree:
+    """A pedigree with a legend of ``names``.
+
+    ``occur`` adds an unaffected bystander carrying every name, since only a condition someone carries takes an index.
+    """
+    everyone = list(people)
+    if occur:
+        everyone.append(_person(99, *((n, pb.CONDITION_STATUS_UNAFFECTED) for n in names)))
+    return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=everyone)
 
 
 @pytest.mark.parametrize("names", ["ABCDE", "ABCDEF"])
@@ -1007,7 +1032,7 @@ def test_a_sixth_is_a_wedge_toward_its_clock_position(gender: pb.Gender) -> None
 
 def test_a_presymptomatic_line_reads_over_sixth_borders() -> None:
     ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
-    (g, *_) = _groups(_parse(render.render_svg(_sixths(ind, _person(2, ("E", _AFF))))), "individual")
+    (g, *_) = _groups(_parse(render.render_svg(_sixths(ind, _person(2, ("E", _AFF)), occur=True))), "individual")
     halo, line = _presymptomatic(g)
     assert _vertical(line) and line.get("stroke-width") == "4" and halo.get("stroke") == "#ffffff"
     assert _dividers(g) and not any(_vertical(d) for d in _dividers(g))
@@ -1017,15 +1042,15 @@ def test_a_divided_pedigrees_key_shows_each_entrys_section() -> None:
     # The key draws a small square per entry, filled in that entry's section only and bordered by that section's
     # two boundaries, so it shows where a condition sits as well as its fill; an undivided pedigree keeps plain
     # swatches.
-    root = _parse(render.render_svg(_sixths(_person(1, ("C", _CAR)), _person(2, ("E", _AFF)))))
+    root = _parse(render.render_svg(_sixths(_person(1, ("C", _CAR)), _person(2, ("E", _AFF)), occur=True)))
     (key,) = _groups(root, "key")
     for e in _groups(key, "key-entry"):
         (swatch,) = [c for c in e if "swatch" in _classes(c)]
         assert swatch.tag == f"{_SVG}polygon" and swatch.get("clip-path")
         assert len(_dividers(e)) == 2 and [c for c in e if "swatch-outline" in _classes(c)]
-    undivided = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _CAR))])))
+    undivided = _parse(render.render_svg(pb.Pedigree(individuals=[_person(1, ("A", _AFF))])))
     (key,) = _groups(undivided, "key")
-    assert not any(_dividers(e) for e in _groups(key, "key-entry"))
+    assert not any(_dividers(e) for e in _groups(key, "key-entry")), "a whole fill, a whole swatch"
 
 
 def test_conditions_4_and_5_have_their_own_tones_and_hatches() -> None:
@@ -1052,7 +1077,7 @@ def test_the_probands_affected_condition_takes_index_0() -> None:
     proband.proband = True
     labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
     p = pb.Pedigree(labels=labels, individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _AFF)), proband])
-    assert _legend(p) == ["C", "A", "B"], "the proband's condition first, even when another has more affected"
+    assert _legend(p) == ["C", "A"], "the proband's condition first, even when another has more affected"
 
 
 def test_else_the_most_affected_condition_takes_index_0() -> None:
@@ -1090,9 +1115,9 @@ def test_an_unnamed_affected_condition_can_be_primary() -> None:
 def test_a_tie_or_no_affected_keeps_the_base_order() -> None:
     labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in "ABC"]
     tied = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _AFF)), _person(2, ("B", _AFF))])
-    assert _legend(tied) == ["B", "A", "C"], "B and C tie; B comes first in the base order"
-    carriers = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _CAR))])
-    assert _legend(carriers) == ["A", "B", "C"]
+    assert _legend(tied) == ["B", "C"], "B and C tie; B comes first in the base order"
+    carriers = pb.Pedigree(labels=labels, individuals=[_person(1, ("C", _CAR)), _person(2, ("A", _CAR))])
+    assert _legend(carriers) == ["A", "C"], "no one affected: the base order"
 
 
 # --- colour mode ----------------------------------------------------------------------------------------------------
@@ -1181,3 +1206,57 @@ def test_a_flat_fill_has_no_seams_through_pdf() -> None:
         x, y = 37.3 * 233 / 72 + cx * k, 91.7 * 233 / 72 + cy * k
         grey = {pix.pixel(int(x + dx), int(y + dy))[0] for dx in range(-12, 12) for dy in range(-12, 12)}
         assert len(grey) == 1, f"{g.get('data-position')}: a seam in the flat fill ({sorted(grey)})"
+
+
+# --- key swatches look like the symbols ---------------------------------------------------------------------------
+
+
+def _swatch_forms(entry: ET.Element) -> list[str]:
+    """Each swatch of a key entry, as the symbols draw it: "whole" (a plain filled square) or "section" (clipped)."""
+    return ["section" if c.get("clip-path") else "whole" for c in entry if _classes(c)[:1] == ["swatch"]]
+
+
+def _symbol_forms(root: ET.Element) -> dict[tuple[str, str], set[str]]:
+    forms: dict[tuple[str, str], set[str]] = collections.defaultdict(set)
+    for g in _groups(root, "individual"):
+        for f in _fills(g):
+            if "dot" not in _classes(f):
+                forms[(f.get("data-condition", ""), f.get("data-status", ""))].add(
+                    "section" if f.get("clip-path") else "whole"
+                )
+    return forms
+
+
+@pytest.mark.parametrize("names", ["AB", "ABCD", "ABCDEF"])
+def test_every_key_swatch_matches_how_the_symbols_draw_its_fill(names: str) -> None:
+    # One lone affected person per condition (whole outside sixths), a pair affected with the first two together
+    # (sections), and a carrier of each (sections).
+    people = [_person(i + 1, (n, _AFF)) for i, n in enumerate(names)]
+    people += [_person(20, (names[0], _AFF), (names[1], _AFF))]
+    people += [_person(30 + i, (n, _CAR)) for i, n in enumerate(names)]
+    root = _parse(render.render_svg(_sixths(*people, names=names)))
+    symbols = _symbol_forms(root)
+    (key,) = _groups(root, "key")
+    keyed = {}
+    for e in _groups(key, "key-entry"):
+        if e.get("data-status") != "presymptomatic":
+            keyed[(e.get("data-condition", ""), e.get("data-status", ""))] = set(_swatch_forms(e))
+    assert keyed == symbols, "each key entry shows exactly the forms its fill takes on the symbols"
+    sixths = len(names) > 4
+    last = str(len(names) - 1)  # a condition only ever alone
+    assert ("whole" in keyed[(last, "affected")]) is not sixths, "whole outside sixths, a wedge in sixths"
+    assert keyed[("0", "affected")] == ({"section"} if sixths else {"whole", "section"})
+
+
+@pytest.mark.parametrize("name", _NAMES)
+def test_golden_key_swatches_match_the_symbols(name: str) -> None:
+    root = _parse((_GOLDENS / f"{name}.svg").read_text())
+    keys = _groups(root, "key")
+    if not keys:
+        return
+    keyed = {
+        (e.get("data-condition", ""), e.get("data-status", "")): set(_swatch_forms(e))
+        for e in _groups(keys[0], "key-entry")
+        if e.get("data-status") != "presymptomatic" and "dot" not in _classes(e)
+    }
+    assert keyed == _symbol_forms(root)

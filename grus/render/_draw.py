@@ -58,8 +58,9 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot, ``key-presymptomatic-{i}`` with ``data-status="presymptomatic"`` and a
   ``swatch presymptomatic`` line per condition someone is presymptomatic for), in index order, affected first,
-  holding a ``swatch`` (in a divided pedigree a small divided square: ``swatch-backing``, clip path
-  ``{prefix}key-clip-{kind}-{i}``, the ``swatch`` section, its ``divider`` borders, ``swatch-outline``) and a
+  holding a swatch per form the symbols draw the fill in — a whole ``swatch`` square, and/or a section swatch
+  (``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch`` section, its ``divider`` borders,
+  ``swatch-outline``) — and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
   for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
   hold it.
@@ -118,6 +119,7 @@ _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = _WIDTH / 2  # half the outline: a divider is a section line, lighter than any mark
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
 _KEY_SYMBOL = 0.75  # a divided pedigree's key symbol, as a fraction of symbol_size
+_KEY_FORM_GAP = 4.0  # between an entry's whole and section swatches
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status): the tone says the condition, the
 # texture the status. Affected is the flat tone; carrier is the tone with a diagonal hatch in the contrasting colour,
 # "/" for even indices and "\\" for odd, so neighbouring tones also differ in direction where they merge when small.
@@ -415,6 +417,7 @@ class _KeyEntry:
     status: str
     dot: bool
     label: str
+    forms: tuple[str, ...] = ("plain",)  # the swatches: "whole", "section" (as the symbols draw it), or "plain"
     x: float = 0.0
     y: float = 0.0
 
@@ -475,8 +478,7 @@ class _Draw:
             self.gen_height,
             geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub + tracks * geom.elbow_gap,
         )
-        # A key swatch: in a divided pedigree a small divided square, filled in its entry's section only, so the key
-        # shows where a condition sits as well as its fill; otherwise a plain square the size of a quadrant.
+        # A key swatch's size: in a divided pedigree larger, so a section swatch shows where its condition sits.
         self._swatch = geom.symbol_size * (_KEY_SYMBOL if self._divided else 0.5)
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
@@ -522,6 +524,16 @@ class _Draw:
                 used.add((plan.dot, _CARRIER, True))
         return sorted(used, key=lambda u: (u[0], u[1] != _AFFECTED, u[2]))
 
+    def _fill_forms(self) -> dict[tuple[int, str], tuple[str, ...]]:
+        """How each ``(index, status)`` fill is drawn on the symbols: whole shape, a section, or both (whole first)."""
+        forms: dict[tuple[int, str], set[str]] = collections.defaultdict(set)
+        for plan in self._plans:
+            if plan.whole is not None:
+                forms[(plan.whole, _AFFECTED)].add("whole")
+            for i, status in plan.sections:
+                forms[(i, status)].add("section")
+        return {key: tuple(f for f in ("whole", "section") if f in found) for key, found in forms.items()}
+
     def _presymptomatic(self) -> list[int]:
         """Every condition index some individual is presymptomatic for: the glyph does not say which, the key does."""
         return sorted(
@@ -550,15 +562,22 @@ class _Draw:
         geom = self.geom
         keyed = [*self._used_fills(), *((i, _PRESYMPTOMATIC, False) for i in self._presymptomatic())]
         keyed.sort(key=lambda u: (u[0], (_AFFECTED, _CARRIER, _PRESYMPTOMATIC).index(u[1]), u[2]))
+        forms = self._fill_forms()
         entries = [
-            _KeyEntry(index=i, status=status, dot=dot, label=self._key_label(i, status, dot))
+            _KeyEntry(
+                index=i,
+                status=status,
+                dot=dot,
+                label=self._key_label(i, status, dot),
+                forms=("plain",) if dot or status == _PRESYMPTOMATIC else forms[(i, status)],
+            )
             for i, status, dot in keyed
         ]
         if not entries:
             return [], 0.0, 0.0
 
         def width(e: _KeyEntry) -> float:
-            return self._swatch + geom.label_gap + 0.6 * geom.label_size * len(e.label)
+            return self._swatches_width(e) + geom.label_gap + 0.6 * geom.label_size * len(e.label)
 
         wrap = max(self._x_hi - self._x_lo, *(width(e) for e in entries))
         pitch = max(self._swatch, geom.label_size) + self._swatch / 2
@@ -571,6 +590,9 @@ class _Draw:
             key_w = max(key_w, x + width(e))
             x += width(e) + geom.key_entry_gap
         return placed, key_w, y + max(self._swatch, geom.label_size)
+
+    def _swatches_width(self, e: _KeyEntry) -> float:
+        return len(e.forms) * self._swatch + (len(e.forms) - 1) * _KEY_FORM_GAP
 
     def _key_top(self) -> float:
         """The key's top edge: ``key_gap`` below the bottom row's label band and any arrow reaching past it."""
@@ -742,31 +764,31 @@ class _Draw:
             attrs = {"id": f"{self.id_prefix}key-{e.kind}-{e.index}", "data-condition": str(e.index)}
             attrs["data-status"] = e.status
             out.append(_open_g(["key-entry", *(["dot"] if e.dot else [])], attrs))
-            if self._divided:
-                out += self._key_symbol(e, x + s / 2, y + s / 2)
-            else:
-                plain = e.dot or e.status == _PRESYMPTOMATIC
-                paint = "#ffffff" if plain else f"url(#{self._fill_id(e.index, e.status)})"
+            # One swatch per form the symbols draw this fill in: the whole shape, a section, or both.
+            for k, form in enumerate(e.forms):
+                cx, cy = x + k * (s + _KEY_FORM_GAP) + s / 2, y + s / 2
+                if form == "section":
+                    out += self._key_symbol(e, cx, cy)
+                    continue
+                paint = "#ffffff" if form == "plain" else f"url(#{self._fill_id(e.index, e.status)})"
                 # Drawn about its own centre, like a square symbol, so its hatch has a square's phase.
                 out.append(
                     f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" '
-                    f'height="{_num(s)}" transform="translate({_num(x + s / 2)} {_num(y + s / 2)})" fill="{paint}" '
+                    f'height="{_num(s)}" transform="translate({_num(cx)} {_num(cy)})" fill="{paint}" '
                     f'stroke="{_STROKE}" stroke-width="{_num(_SWATCH_WIDTH)}"/>'
                 )
-            if e.dot:
-                out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
-            if e.status == _PRESYMPTOMATIC:
-                out += _presymptomatic_mark(
-                    x + s / 2, y + s / 2, s / 2, _PRESYMPTOMATIC_KEY_INSET, cls="swatch presymptomatic"
-                )
-            label_x = x + s + geom.label_gap
+                if e.dot:
+                    out.append(self._dot(cx, cy, e.index, cls="swatch dot", radius=s * 0.13))
+                if e.status == _PRESYMPTOMATIC:
+                    out += _presymptomatic_mark(cx, cy, s / 2, _PRESYMPTOMATIC_KEY_INSET, cls="swatch presymptomatic")
+            label_x = x + self._swatches_width(e) + geom.label_gap
             out.append(_text(label_x, y + s / 2, _escape(e.label), geom.label_size, cls="key-label", anchor="start"))
             out.append("</g>")
         out.append("</g>")
         return out
 
     def _key_symbol(self, e: _KeyEntry, cx: float, cy: float) -> list[str]:
-        """A divided pedigree's key swatch: a small square filled in ``e``'s section only, with that section's borders.
+        """A section swatch: a small square filled in ``e``'s section only, with that section's borders.
 
         Drawn about its centre, like a square symbol, so its hatch has a square's phase; the outline is the swatch's.
         """
@@ -774,11 +796,10 @@ class _Draw:
         at = f'transform="translate({_num(cx)} {_num(cy)})"'
         square = f'x="{_num(-h)}" y="{_num(-h)}" width="{_num(2 * h)}" height="{_num(2 * h)}"'
         out = [f'<rect class="swatch-backing" {square} {at} fill="#ffffff"/>']
-        if not e.dot and e.status != _PRESYMPTOMATIC:
-            clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
-            out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
-            out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
-            out += self._borders(pb.GENDER_MAN, cx, cy, h, {e.index})
+        clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
+        out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
+        out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
+        out += self._borders(pb.GENDER_MAN, cx, cy, h, {e.index})
         out.append(
             f'<rect class="swatch-outline" {square} {at} fill="none" stroke="{_STROKE}" '
             f'stroke-width="{_num(_SWATCH_WIDTH)}"/>'

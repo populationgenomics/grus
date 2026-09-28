@@ -880,7 +880,11 @@
 <text class="key-label" x="112" y="996.647" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Affected</text>
 </g>
 <g id="key-carrier-0" class="key-entry" data-condition="0" data-status="carrier">
-<rect class="swatch" x="-9" y="-9" width="18" height="18" transform="translate(191.8 996.647)" fill="url(#fill-carrier-0)" stroke="#000000" stroke-width="1"/>
+<rect class="swatch-backing" x="-9" y="-9" width="18" height="18" transform="translate(191.8 996.647)" fill="#ffffff"/>
+<clipPath id="key-clip-carrier-0"><rect x="-9" y="-9" width="18" height="18"/></clipPath>
+<rect class="swatch" data-condition="0" data-status="carrier" x="-9" y="-9" width="9" height="18" transform="translate(191.8 996.647)" fill="url(#fill-carrier-0)" clip-path="url(#key-clip-carrier-0)"/>
+<path class="divider" d="M191.8,1005.647L191.8,996.647L191.8,987.647L191.8,996.647" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-9" y="-9" width="18" height="18" transform="translate(191.8 996.647)" fill="none" stroke="#000000" stroke-width="1"/>
 <text class="key-label" x="206.8" y="996.647" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier</text>
 </g>
 <g id="key-presymptomatic-0" class="key-entry" data-condition="0" data-status="presymptomatic">
