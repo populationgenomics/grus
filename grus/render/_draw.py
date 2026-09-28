@@ -713,8 +713,9 @@ class _Draw:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
         tone = self._tones[index]
-        # A user-space tile (cairosvg fails on an objectBoundingBox pattern painted more than twice), one tile large
-        # enough to hold any fill part whole about its frame origin, so no tile seam falls inside a symbol.
+        # A user-space tile (some rasterizers, e.g. cairosvg, fail on an objectBoundingBox pattern painted more than
+        # twice), one tile large enough to hold any fill part whole about its frame origin, so no tile seam falls
+        # inside a symbol.
         c = self.geom.symbol_size / _CELLS_PER_SYMBOL
         t = c * _TILE_CELLS
         tile = (

@@ -32,12 +32,12 @@ dependencies = [
 # Codegen: grpcio-tools' protoc emits the committed Python stubs (its bundled protoc pins the
 # generated-code version to the protobuf 6.x runtime). buf drives export/lint/breaking.
 codegen = ["grpcio-tools>=1.68"]
-# Lint + test toolchain.
-lint = ["pre-commit>=4", "ruff>=0.15", "pyright>=1.1.390", "pytest>=8", "types-protobuf>=6"]
+# Lint + test toolchain. pillow decodes rasterized PNGs in the raster tests.
+lint = ["pre-commit>=4", "ruff>=0.15", "pyright>=1.1.390", "pytest>=8", "types-protobuf>=6", "pillow>=11"]
 
 [project.optional-dependencies]
-# SVG -> PNG (`grus render --png`); cairosvg needs native libcairo.
-raster = ["cairosvg>=2.7"]
+# SVG -> PNG (`grus render --png`, the eval): resvg, a self-contained wheel.
+raster = ["resvg-py>=0.5"]
 # A floating-point alternative x-solve backend (Geometry(x_solver=XSolver.HIGHS)).
 highs = ["highspy>=1.7"]
 
