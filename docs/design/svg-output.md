@@ -119,7 +119,8 @@ The groups, and what each promises:
   (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
   condition `data-condition-i` names on every individual below it. When any individual has an unnamed condition (the
   figure's sole, unlabelled one) the array holds an empty string for it, so every condition has an index: last, or first
-  when the unnamed condition is the primary.
+  when the unnamed condition is the primary. A phenotype label no one's condition carries is not in the array and takes
+  no index.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
@@ -143,10 +144,11 @@ The groups, and what each promises:
   Each entry is its own `key-entry` group with id `key-{status}-{index}` (status `affected`, `carrier` or
   `presymptomatic`; `key-carrier-dot-{index}`, class `key-entry dot`, for the X-linked dot of the inheritance-glyph
   style) naming its condition index and status as data attributes, holding a swatch painted with the same pattern the
-  symbols use and a text label. In a divided pedigree the swatch is a small symbol: a `swatch-backing`, its clip path,
-  the `swatch` section in the entry's fill, that section's `divider` borders and a `swatch-outline`. A consumer
-  relocates the key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its
-  own from the pedigree's condition array.
+  symbols use and a text label. A fill drawn whole has a whole `swatch` (a filled square); one drawn in a section has a
+  section swatch, a small symbol of a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, that
+  section's `divider` borders and a `swatch-outline`; a fill drawn both ways has both, whole first. A consumer relocates
+  the key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its own from
+  the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data

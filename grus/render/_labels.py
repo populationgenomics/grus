@@ -105,7 +105,8 @@ def data_legend(p: pb.Pedigree) -> list[str]:
 
     The **primary** condition comes first, so it draws in the most distinct fill: the proband's affected condition
     when the proband is affected, else the condition with the most affected individuals — named or unnamed alike. After
-    it, and breaking ties, the base order: phenotype legend labels (their drawn order), then any remaining condition
+    it, and breaking ties, the base order: the phenotype labels that some condition carries (their drawn order; a label
+    no condition carries is not a condition and takes no index), then any remaining condition
     names by first appearance, walking individuals in ``Position`` order (never input order, so the legend and every
     fill are independent of how the IR lists its individuals), then ``""`` for the unnamed condition when any
     individual has one. So ``""`` is last unless the unnamed condition is the primary, when it is first. A
@@ -113,8 +114,11 @@ def data_legend(p: pb.Pedigree) -> list[str]:
     """
     order: list[str] = []
     seen: set[str] = set()
+    named = {c.name for ind in p.individuals for c in ind.conditions if c.name}
     for label in p.labels:
-        if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text and label.text not in seen:
+        # A phenotype label orders the conditions it names; one no one's condition carries (a family's name, say)
+        # takes no index, so it never makes a section or a key entry.
+        if label.kind == pb.LABEL_KIND_PHENOTYPE and label.text in named and label.text not in seen:
             seen.add(label.text)
             order.append(label.text)
     people = sorted(p.individuals, key=lambda ind: (ind.generation, ind.index))

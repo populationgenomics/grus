@@ -117,9 +117,11 @@ often beside named carrier-only conditions) is eligible like any other. The rest
 labels first, then by first appearance in `Position` order, then the unnamed condition — which also breaks ties. The
 primary is the one a reader looks for first, so it gets the fill that survives every size and printer. The index picks
 both the condition's fills and its section, pedigree-wide, so a condition looks the same and sits in the same place on
-every symbol that shows it. Every legend entry holds its index whether or not any symbol is filled for it — a phenotype
-label nobody is shaded for still takes a section and counts towards the section count and the six-condition limit — so
-the drawing of one individual never depends on another's status.
+every symbol that shows it. The legend holds the conditions someone in the pedigree carries, under any status. A
+phenotype label orders the conditions it names, but one that names no one's condition (a family's name, "DUH family"
+beside the condition "DUH") is not a condition: it takes no index, makes no section and has no key entry, so it cannot
+turn a one-condition pedigree into halves. A condition that occurs only as unaffected still holds its index, so the
+drawing of one individual never depends on another's status.
 
 **Fills: the tone says the condition, the texture the status.**
 
@@ -222,18 +224,20 @@ carried by its colour as well as its position, which is what greys cannot do for
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
-status) drawn, ordered by index with affected first, then carrier, then presymptomatic: a swatch and a label. In a
-divided pedigree the swatch is a small square symbol (three quarters of the symbol size) filled in that entry's section
-only, with that section's borders, so the key shows where a condition sits as well as its fill; this applies to halves
-and quadrants as to sixths, so a divided pedigree's key always reads the same way. An undivided pedigree has no
-positions to show, and its swatch is a plain square the size of a quadrant filled all over. Then the label — the
-condition's name when affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot),
-`Presymptomatic: <name>` (a swatch with the presymptomatic bar) for each condition someone is presymptomatic for — the
-standard asks for the condition in the legend — and `Affected` / `Carrier` / `Presymptomatic` for an unnamed condition.
-Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP`
-below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no
-fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per
-pedigree.
+status) drawn, ordered by index with affected first, then carrier, then presymptomatic: its swatches and a label. The
+swatches look like the symbols. A fill the symbols only ever draw whole (a person affected with that condition alone)
+has a whole swatch, a plain square filled all over; a fill drawn in a section has a section swatch, a small square
+filled in that section only, with its borders, so the key shows where the condition sits. A fill drawn both ways —
+condition A whole on a person with only A, and in its section on a person with A and B — has both, whole first, so every
+symbol has its form in the key. In sixths a lone condition keeps its wedge, so their swatches are sections. In a divided
+pedigree the swatches are three quarters of the symbol size, so a section reads; in an undivided one, a quadrant's size.
+Then the label — the condition's name when affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the
+dot), `Presymptomatic: <name>` (a swatch with the presymptomatic bar) for each condition someone is presymptomatic for —
+the standard asks for the condition in the legend — and `Affected` / `Carrier` / `Presymptomatic` for an unnamed
+condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits
+`KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree
+with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices
+are per pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree
