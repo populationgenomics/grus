@@ -222,7 +222,8 @@ _INDIVIDUAL_FIELDS = (
     "external_id",
     "annotations",
 )
-_CONDITION_FIELDS = ("condition.status", "condition.name", "condition.inheritance", "condition.onset_age")
+SUPPORT_CONDITION_PREFIX = "condition."  # a path with it names a Condition field and needs Support.condition
+_CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status", "name", "inheritance", "onset_age"))
 _MATING_FIELDS = ("consanguineous", "status", "childlessness", "annotations")
 _OFFSPRING_FIELDS = ("twin_group", "twin_type", "parentage", "adoption")
 # Path -> the kinds of thing it may describe. ``annotations`` is both an individual's and a mating's; the support's
@@ -291,7 +292,7 @@ def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
                 if key not in children:
                     raise IntegrityError(f"{where}: {key} is no one's child; an offspring field scopes the child")
         if (kind == "condition") != s.HasField("condition"):
-            raise IntegrityError(f"{where}: names a condition iff the field is condition.*")
+            raise IntegrityError(f"{where}: names a condition iff the field is {SUPPORT_CONDITION_PREFIX}*")
         if kind == "condition":
             scope = [by_key[key] for key in people] or list(p.individuals)
             if not any(c.name == s.condition for ind in scope for c in ind.conditions):

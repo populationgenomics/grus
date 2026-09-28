@@ -193,11 +193,11 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   imported cohort data has them). Citations, when present, are checked the same way (`validate_set`): each is
   well-formed (a non-empty id, exactly one anchor, a region with page ≥ 0 and x1 > x0, y1 > y0 — protovalidate), ids are
   unique across the set, every evidence and support id resolves, a support's `field` is on the closed path list
-  (`grus.ir._validate.SUPPORT_FIELDS`), it names a `condition` iff the field is `condition.*` and someone in scope has
-  it, every person and couple in scope is in the pedigree, an offspring field is scoped by the child, and a mating field
-  by couples. Each failure names the pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain
-  values; rare axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is
-  never emitted.
+  (`grus.ir.SUPPORT_FIELDS`, exported with `grus.ir.SUPPORT_CONDITION_PREFIX` so a prompt can list the valid paths), it
+  names a `condition` iff the field is `condition.*` and someone in scope has it, every person and couple in scope is in
+  the pedigree, an offspring field is scoped by the child, and a mating field by couples. Each failure names the
+  pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are `optional` (absent
+  = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never emitted.
 
 ## Alternatives considered
 

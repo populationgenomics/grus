@@ -115,6 +115,8 @@ def test_support_fields_name_real_schema_fields() -> None:
             assert (kind == "condition") == path.startswith("condition.")
             assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
     assert _validate.SUPPORT_FIELDS["annotations"] == {"individual", "mating"}
+    assert ir.SUPPORT_FIELDS is _validate.SUPPORT_FIELDS, "exported for callers listing the valid paths"
+    assert all(p.startswith(ir.SUPPORT_CONDITION_PREFIX) for p, k in ir.SUPPORT_FIELDS.items() if "condition" in k)
 
 
 # --- loud ---------------------------------------------------------------------------------------------------------
