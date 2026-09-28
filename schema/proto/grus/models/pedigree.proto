@@ -8,6 +8,8 @@
 // Referential integrity (loader-enforced, cross-message; protovalidate covers only field-local rules):
 // every referenced Position exists among some Pedigree's individuals; (generation,index) is unique
 // within a Pedigree; a mating's two partners are distinct; offspring exist; acyclic for tier-1 render.
+// Citations (optional provenance) are checked there too: unique ids, every reference resolves, a Support's
+// field on the closed path list, its scope in the pedigree.
 
 syntax = "proto3";
 package grus.models.pedigree;
@@ -195,10 +197,54 @@ message Pedigree {
   repeated Individual individuals = 3 [(buf.validate.field).repeated.min_items = 1];
   repeated Mating matings = 4;
   optional Provenance provenance = 5;
+  repeated string evidence = 6;                           // Citation ids: the panel this pedigree is drawn in
+  repeated Support supports = 7;                          // which facts came from where, when that matters
 }
 message PedigreeSet {
   repeated Pedigree pedigrees = 1;
   optional Provenance provenance = 2;
+  repeated Citation citations = 3;                        // the normalised list evidence and supports refer to
+  repeated string evidence = 4;                           // Citation ids: the figure as a whole, its caption
+}
+
+// ── Citations: where the record came from (docs/design/ir.md) ───────────────────────────────────
+// Optional provenance, not meaning: the renderer and the structural diff ignore every message below. Ids are
+// local to the set and referenced by id (the case-record pattern); the loader checks that each resolves, that
+// a Support's field is on its closed path list, and that its scope exists.
+message Citation {
+  string id = 1 [(buf.validate.field).string.min_len = 1];  // local ("c1"), unique in the set
+  string document_id = 2;     // the caller's id for the source document (e.g. a corpus paper id). Never
+                              // model-written: empty in an emitted IR; the extraction harness stamps it
+  oneof anchor {
+    option (buf.validate.oneof).required = true;
+    string quote = 3 [(buf.validate.field).string.min_len = 1];  // verbatim text that appears in the document
+    Region region = 4;                                           // an area of one page
+  }
+}
+// An area of one page of the SOURCE (never of a rendering): page units, origin top left — PDF points on a PDF
+// page, pixels on a bare image.
+message Region {
+  option (buf.validate.message).cel = {
+    id: "region.positive_extent", message: "a region needs x1 > x0 and y1 > y0",
+    expression: "this.x1 > this.x0 && this.y1 > this.y0"
+  };
+  int32 page = 1 [(buf.validate.field).int32.gte = 0];  // 0-based
+  float x0 = 2;
+  float y0 = 3;
+  float x1 = 4;
+  float y1 = 5;
+}
+// One kind of fact about some people, couples or the whole pedigree, and the citations that back it.
+message Support {
+  repeated string citations = 1 [(buf.validate.field).repeated.min_items = 1];  // Citation ids
+  string field = 2 [(buf.validate.field).string.min_len = 1];  // a path into the IR, from the loader's closed list
+  optional string condition = 3;      // the condition's name ("" = the unnamed one), iff `field` starts "condition."
+  repeated Position individuals = 4;  // scope; neither individuals nor matings = the whole pedigree
+  repeated MatingRef matings = 5;     // a couple (or lone parent), by its partners' positions
+}
+message MatingRef {
+  optional Position partner_a = 1;
+  optional Position partner_b = 2;
 }
 message Provenance {   // harness metadata, never model-emitted (panel moved to Label)
   optional string figure_uri = 1;
