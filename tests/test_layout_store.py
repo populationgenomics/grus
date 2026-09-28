@@ -386,3 +386,16 @@ def test_every_geometry_field_the_layout_reads_is_in_the_key() -> None:
     key = {f.name for f in lpb.LayoutGeometry.DESCRIPTOR.fields}
     assert set(_KEY_FIELDS) == key, "the staleness test must cover every key field"
     assert read <= key, f"layout reads geometry not in the stored-layout key: {sorted(read - key)}"
+
+
+def test_citation_supports_leave_a_stored_layout_valid() -> None:
+    # Evidence and supports are provenance the layout never reads: adding them keeps the digest, so a layout stored
+    # before they were added draws without a relayout.
+    p = test_render._load("trio")
+    stored = render.store_layout(p)
+    cited = pb.Pedigree()
+    cited.CopyFrom(p)
+    cited.evidence.append("panel-a")
+    cited.supports.add(citations=["cap"], field="proband", individuals=[pb.Position(generation=2, index=1)])
+    assert _store.pedigree_digest(cited) == _store.pedigree_digest(p)
+    assert render.render_svg(cited, stored_layout=stored) == render.render_svg(p)

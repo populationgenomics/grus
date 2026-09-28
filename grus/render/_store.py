@@ -46,10 +46,14 @@ def pedigree_digest(p: pb.Pedigree) -> bytes:
     """SHA-256 of ``p``'s canonical serialization: independent of the order of its individuals and matings.
 
     Individuals sort by ``Position``, matings by their own serialized bytes; everything else, offspring (birth) order
-    included, is kept as is. The whole pedigree is covered, not only what the layout reads today.
+    included, is kept as is. The whole pedigree is covered, not only what the layout reads today, except its
+    citations' evidence and supports: provenance the layout never reads, so adding or editing them leaves a stored
+    layout valid.
     """
     canon = pb.Pedigree()
     canon.CopyFrom(p)
+    canon.ClearField("evidence")
+    canon.ClearField("supports")
     individuals = sorted(p.individuals, key=lambda ind: (ind.generation, ind.index))
     matings = sorted(p.matings, key=lambda m: m.SerializeToString(deterministic=True))
     del canon.individuals[:]

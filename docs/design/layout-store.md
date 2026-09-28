@@ -100,7 +100,10 @@ input to the layout:
   the IR gives meaning (birth order), is kept. The digest covers the whole pedigree, not only the fields the layout
   reads today: annotations change label widths, which change spacing, and tracking which fields matter would be one more
   thing every layout change must keep in step. A change to a title then invalidates a layout it did not affect; that
-  costs one recomputation and never a wrong drawing.
+  costs one recomputation and never a wrong drawing. The one exclusion is a pedigree's citation `evidence` and
+  `supports` (`ir.md`, Citations): provenance, never read by layout or drawing, which a harness adds or edits after the
+  fact, so they must not mark a stored layout stale. The set-level citation list is outside the pedigree and so outside
+  the digest already.
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
