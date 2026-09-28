@@ -69,6 +69,7 @@ def validate(p: pb.Pedigree) -> None:
     _check_references(p, positions)
     _check_reproductive_outcome_terminal(p)
     _check_generation_order(p)
+    _check_supports(p, positions)
 
 
 def validate_set(ps: pb.PedigreeSet) -> None:
@@ -79,16 +80,28 @@ def validate_set(ps: pb.PedigreeSet) -> None:
     never collide. A per-pedigree failure is re-raised as an ``IntegrityError`` naming the offending pedigree
     (its index and labels), chaining the original error.
 
+    Citations are set-level: their ids are unique across the set, and every evidence or support id — the set's
+    and each pedigree's — resolves to one (docs/design/ir.md, "Citations").
+
     Raises:
-        IntegrityError: some ``Pedigree`` in the set failed field-local or graph validation.
+        IntegrityError: some ``Pedigree`` in the set failed field-local or graph validation, or a citation is
+            malformed, duplicated or dangling.
     """
+    ids = _check_citations(ps)
     for i, p in enumerate(ps.pedigrees):
+        labels = [label.text for label in p.labels]
+        tag = f"pedigrees[{i}]" + (f" (labels={labels})" if labels else "")
         try:
             validate(p)
         except (protovalidate.ValidationError, IntegrityError) as e:
-            labels = [label.text for label in p.labels]
-            tag = f" (labels={labels})" if labels else ""
-            raise IntegrityError(f"pedigrees[{i}]{tag} is not a valid pedigree: {e}") from e
+            raise IntegrityError(f"{tag} is not a valid pedigree: {e}") from e
+        for ref in p.evidence:
+            if ref not in ids:
+                raise IntegrityError(f"{tag}: evidence cites unknown citation {ref!r}")
+        for j, support in enumerate(p.supports):
+            for ref in support.citations:
+                if ref not in ids:
+                    raise IntegrityError(f"{tag}: supports[{j}] ({support.field}) cites unknown citation {ref!r}")
 
 
 def _check_mating_shape(p: pb.Pedigree) -> None:
@@ -189,3 +202,87 @@ def _check_generation_order(p: pb.Pedigree) -> None:
                         f"matings[{i}] offspring {_key(off.child)} is not below its parent {role} {_key(ref)}; "
                         "a child's generation must exceed each parent's"
                     )
+
+
+# The closed list of paths a ``Support.field`` may name (docs/design/ir.md, "Citations"), by what it scopes:
+# an individual's fields and a condition's (``condition.*``, naming the condition) scope people; a mating's fields
+# scope couples; an offspring edge's fields scope the child; ``labels`` is the whole pedigree's. The one place the
+# list lives; a test checks each path against the schema.
+SUPPORT_FIELDS: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "gender",
+            "deceased",
+            "proband",
+            "consultand",
+            "reproductive_outcome",
+            "reproductive_role",
+            "count",
+            "sex_assigned_at_birth",
+            "external_id",
+            "annotations",
+        ),
+        "individual",
+    ),
+    **dict.fromkeys(
+        ("condition.status", "condition.name", "condition.inheritance", "condition.onset_age"), "condition"
+    ),
+    **dict.fromkeys(("consanguineous", "status", "childlessness"), "mating"),
+    **dict.fromkeys(("twin_group", "twin_type", "parentage", "adoption"), "offspring"),
+    "labels": "pedigree",
+}
+
+
+def _check_citations(ps: pb.PedigreeSet) -> set[str]:
+    """The set's citation ids, once each citation is well-formed, the ids are unique and the set's evidence resolves."""
+    ids: set[str] = set()
+    for i, c in enumerate(ps.citations):
+        try:
+            protovalidate.validate(c)
+        except protovalidate.ValidationError as e:
+            raise IntegrityError(f"citations[{i}] ({c.id!r}) is malformed: {e}") from e
+        if c.id in ids:
+            raise IntegrityError(f"citations[{i}]: citation id {c.id!r} is used twice; ids are unique in the set")
+        ids.add(c.id)
+    for ref in ps.evidence:
+        if ref not in ids:
+            raise IntegrityError(f"set evidence cites unknown citation {ref!r}")
+    return ids
+
+
+def _mating_ref_key(m: pb.Mating | pb.MatingRef) -> frozenset[Key]:
+    """A couple (or lone parent) as its partners' positions, unordered: how a ``MatingRef`` names a ``Mating``."""
+    return frozenset(_key(getattr(m, role)) for role in ("partner_a", "partner_b") if m.HasField(role))
+
+
+def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
+    """Each support names a listed field, a scope that exists and suits it, and a condition iff it needs one."""
+    matings = {_mating_ref_key(m) for m in p.matings}
+    children = {_key(off.child) for m in p.matings for off in m.offspring}
+    by_key = {(ind.generation, ind.index): ind for ind in p.individuals}
+    for j, s in enumerate(p.supports):
+        where = f"supports[{j}] ({s.field!r})"
+        kind = SUPPORT_FIELDS.get(s.field)
+        if kind is None:
+            raise IntegrityError(f"{where}: unknown field; a support names one of {sorted(SUPPORT_FIELDS)}")
+        people = [_key(pos) for pos in s.individuals]
+        for key in people:
+            if key not in positions:
+                raise IntegrityError(f"{where}: individual {key} is not in the pedigree")
+        for ref in s.matings:
+            if _mating_ref_key(ref) not in matings:
+                raise IntegrityError(f"{where}: no mating of {sorted(_mating_ref_key(ref))} in the pedigree")
+        if s.matings and kind != "mating":
+            raise IntegrityError(f"{where}: scopes matings, but {s.field} is not a mating field")
+        if people and kind in ("mating", "pedigree"):
+            raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {kind} field")
+        if kind == "offspring":
+            for key in people:
+                if key not in children:
+                    raise IntegrityError(f"{where}: {key} is no one's child; an offspring field scopes the child")
+        if (kind == "condition") != s.HasField("condition"):
+            raise IntegrityError(f"{where}: names a condition iff the field is condition.*")
+        if kind == "condition":
+            scope = [by_key[key] for key in people] or list(p.individuals)
+            if not any(c.name == s.condition for ind in scope for c in ind.conditions):
+                raise IntegrityError(f"{where}: no one in scope has condition {s.condition!r}")
