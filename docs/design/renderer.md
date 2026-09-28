@@ -111,15 +111,15 @@ fixed frame explicit, but a four- or six-spoke star on every empty symbol is noi
 another symbol. An unfilled symbol is its outline alone, as the standard draws it.
 
 **Condition index.** A condition's index is its place in the pedigree's condition legend. Index 0, which draws in the
-most distinct fill (black), goes to the **primary** condition: the proband's affected condition when a proband is
-affected with a named one, else the condition with the most affected individuals. The rest follow in the base order —
-phenotype labels first, then by first appearance in `Position` order — which also breaks ties; an unnamed condition (the
-figure's sole, unlabelled one) takes the last index. The primary is the one a reader looks for first, so it gets the
-fill that survives every size and printer. The index picks both the condition's fills and its section, pedigree-wide, so
-a condition looks the same and sits in the same place on every symbol that shows it. Every legend entry holds its index
-whether or not any symbol is filled for it — a phenotype label nobody is shaded for still takes a section and counts
-towards the section count and the six-condition limit — so the drawing of one individual never depends on another's
-status.
+most distinct fill (black), goes to the **primary** condition: the proband's affected condition when the proband is
+affected, else the condition with the most affected individuals. An unnamed condition (the figure's plain "affected",
+often beside named carrier-only conditions) is eligible like any other. The rest follow in the base order — phenotype
+labels first, then by first appearance in `Position` order, then the unnamed condition — which also breaks ties. The
+primary is the one a reader looks for first, so it gets the fill that survives every size and printer. The index picks
+both the condition's fills and its section, pedigree-wide, so a condition looks the same and sits in the same place on
+every symbol that shows it. Every legend entry holds its index whether or not any symbol is filled for it — a phenotype
+label nobody is shaded for still takes a section and counts towards the section count and the six-condition limit — so
+the drawing of one individual never depends on another's status.
 
 **Fills: the tone says the condition, the texture the status.**
 
@@ -157,9 +157,12 @@ fill is therefore drawn in its symbol's own frame and moved into place, so each 
 lines lie on a diagonal lattice whose cell is a quarter of the symbol size. The diagonals run parallel to a diamond's
 edges, so a square or diamond is placed with its centre on the lattice's midpoint, putting a diamond's edges midway
 between two lines; a circle is placed with a lattice line through its centre, so that no line is a near-tangent chord
-hugging its outline. A key swatch is placed like a square. No line runs along a section edge, a divider or an outline;
-lines cross them. There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a
-placeholder, never a reused fill), with a message naming the supported range.
+hugging its outline. A key swatch is placed like a square. Each pattern is one tile, forty cells across and centred on
+the frame origin, so every fill part lies inside a single tile: a PDF renderer draws the seams between tiles as a faint
+grid (seen through rsvg-convert's PDF in MuPDF), and a fill that never crosses a seam cannot show one. The hatch lines
+therefore run unbroken across the tile. No line runs along a section edge, a divider or an outline; lines cross them.
+There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a placeholder, never a
+reused fill), with a message naming the supported range.
 
 **Sections, dividers and sector edges.** A pedigree with two conditions in its legend divides every symbol into halves
 (index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right); with five
@@ -181,7 +184,9 @@ A section is a rectangle (in sixths a wedge) clipped to the shape by a per-symbo
 outline; inside the symbol it gets a **border**, a line from the centre along each boundary it shares with the rest of
 the symbol or with another filled section, at half the outline's stroke width. A boundary between two empty sections has
 no line, a wholly filled symbol none, and no border is stroked twice. A lone carrier's half thus has the thin line down
-the centre; a carrier's single quadrant, its two radii.
+the centre; a carrier's single quadrant, its two radii. A symbol's borders are one path, out from the centre along each
+ray and back, with round joins: separate butt-capped lines left notches where rays meet at the centre, and a mitre join
+spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke, so it needs no join there.
 
 **What a symbol shows.**
 
@@ -192,8 +197,12 @@ the centre; a carrier's single quadrant, its two radii.
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
   and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
   individual (same-named entries) draws as affected.
-- The **presymptomatic** line is drawn at the outline's full stroke width and runs one stroke width past the outline at
-  top and bottom, everywhere, so it never reads as the thinner vertical border of a filled half it lies on.
+- The **presymptomatic** line is a heavy vertical bar: twice the outline's width, with round caps, over a white halo,
+  inset from the outline at top and bottom. The weight parts it from a filled half's thin border it may lie on, the halo
+  from any fill beneath it (a black whole fill, a dark tone, a hatch) and from a coincident border, and the inset from
+  the child's stub arriving at the top, which would otherwise run on into it and read as a descent line through the
+  symbol. The inset leaves the halo clear of the outline even at a diamond's narrow vertex. The line does not say which
+  condition is presymptomatic, so the key does, with a swatch carrying the same bar (below).
 - Unknown (`?`), deceased and proband marks are unchanged, drawn over the fills; on a symbol with borders the `?` has a
   white halo so it reads over them.
 
@@ -213,16 +222,18 @@ carried by its colour as well as its position, which is what greys cannot do for
 
 **The key.** Whenever a pedigree draws a fill, a key below the drawing defines each fill drawn — the standard requires
 it, and without it a tone or a hatch means nothing to a reader who does not hold the IR. It has one entry per (index,
-status) drawn, ordered by index with affected first: a swatch and a label. In a divided pedigree the swatch is a small
-square symbol (three quarters of the symbol size) filled in that entry's section only, with that section's borders, so
-the key shows where a condition sits as well as its fill; this applies to halves and quadrants as to sixths, so a
-divided pedigree's key always reads the same way. An undivided pedigree has no positions to show, and its swatch is a
-plain square the size of a quadrant filled all over. Then the label — the condition's name when affected,
-`Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot), and `Affected` / `Carrier` for an unnamed
-condition. Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits
-`KEY_GAP` below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree
-with no fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices
-are per pedigree.
+status) drawn, ordered by index with affected first, then carrier, then presymptomatic: a swatch and a label. In a
+divided pedigree the swatch is a small square symbol (three quarters of the symbol size) filled in that entry's section
+only, with that section's borders, so the key shows where a condition sits as well as its fill; this applies to halves
+and quadrants as to sixths, so a divided pedigree's key always reads the same way. An undivided pedigree has no
+positions to show, and its swatch is a plain square the size of a quadrant filled all over. Then the label — the
+condition's name when affected, `Carrier: <name>` when carried (`X-linked carrier: <name>` for the dot),
+`Presymptomatic: <name>` (a swatch with the presymptomatic bar) for each condition someone is presymptomatic for — the
+standard asks for the condition in the legend — and `Affected` / `Carrier` / `Presymptomatic` for an unnamed condition.
+Entries run left to right and wrap at the drawing's width (or the widest entry's, if wider). The key sits `KEY_GAP`
+below the lowest label or arrow and the canvas grows to hold it, so it never overlaps the drawing; a pedigree with no
+fills has no key and an unchanged canvas. A composed figure keys each pedigree tile on its own, since indices are per
+pedigree.
 
 **Label stack.** Under each symbol, a centred vertical stack of text lines, built per individual as an ordered
 `[local_id, *annotation_texts]` with empties **and duplicates** dropped (first occurrence wins): line 1 is the pedigree

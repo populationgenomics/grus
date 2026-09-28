@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="424" height="281" viewBox="0 0 424 281" class="pedigree" data-title="Count-collapsed siblings: a number or n inside the symbol, white on an affected one" data-conditions="[&quot;&quot;]">
 <defs>
-<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#000000"/></pattern>
 </defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>

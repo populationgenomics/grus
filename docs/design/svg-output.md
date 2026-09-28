@@ -92,15 +92,15 @@ not depend on styling:
    Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
    named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
    status paint.
-1. **`divider`** — the borders of filled sections inside the symbol: thin lines from the centre along each section
-   boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline, so the
-   outline stays whole.
+1. **`divider`** — the borders of filled sections inside the symbol: one path of thin rays from the centre along each
+   section boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline,
+   so the outline stays whole.
 1. **`symbol`** — the same shape again, stroke only, no fill. Drawn *over* the fill so the outline is whole: a fill
    drawn last would cover the inner half of the stroke, invisible while both are black and visibly uneven the moment a
    consumer colours the stroke.
-1. **`mark`** — count, slash, presymptomatic line, question mark, arrow: over the outline, as they cross or leave it.
-   The count is `mark count`, or `mark count outside` when it sits beside the symbol because another mark runs through
-   the centre.
+1. **`mark`** — count, slash, presymptomatic line (a `mark presymptomatic` group: a white `halo` line, then the bar),
+   question mark, arrow: over the outline, as they cross or leave it. The count is `mark count`, or `mark count outside`
+   when it sits beside the symbol because another mark runs through the centre.
 1. **`label`** — the text lines.
 1. **`hit`** — a rectangle covering the symbol, the reserved label box and, for a proband or consultand, the arrow; no
    fill, `pointer-events="all"`, drawn last. It is the one element a consumer needs for hover and click: it catches the
@@ -118,7 +118,8 @@ The groups, and what each promises:
   legend**: the same order the drawer uses to pick each condition's fills and its section of a divided symbol
   (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
   condition `data-condition-i` names on every individual below it. When any individual has an unnamed condition (the
-  figure's sole, unlabelled one) the array ends with an empty string, so every condition has an index.
+  figure's sole, unlabelled one) the array holds an empty string for it, so every condition has an index: last, or first
+  when the unnamed condition is the primary.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
@@ -139,20 +140,22 @@ The groups, and what each promises:
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
 - **`generation`** — each Roman-numeral marker, naming its row by IR generation.
 - **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
-  Each entry is its own `key-entry` group with id `key-{status}-{index}` (`key-carrier-dot-{index}`, class
-  `key-entry dot`, for the X-linked dot of the inheritance-glyph style) naming its condition index and status as data
-  attributes, holding a swatch painted with the same pattern the symbols use and a text label. In a divided pedigree the
-  swatch is a small symbol: a `swatch-backing`, its clip path, the `swatch` section in the entry's fill, that section's
-  `divider` borders and a `swatch-outline`. A consumer relocates the key with a transform on the one group, restyles or
-  hides an entry by id, or drops the key and builds its own from the pedigree's condition array.
+  Each entry is its own `key-entry` group with id `key-{status}-{index}` (status `affected`, `carrier` or
+  `presymptomatic`; `key-carrier-dot-{index}`, class `key-entry dot`, for the X-linked dot of the inheritance-glyph
+  style) naming its condition index and status as data attributes, holding a swatch painted with the same pattern the
+  symbols use and a text label. In a divided pedigree the swatch is a small symbol: a `swatch-backing`, its clip path,
+  the `swatch` section in the entry's fill, that section's `divider` borders and a `swatch-outline`. A consumer
+  relocates the key with a transform on the one group, restyles or hides an entry by id, or drops the key and builds its
+  own from the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
 with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
-attributes. An affected pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a `hatch` path. Every
-fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none repeats the paint.
-Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre, or for a circle half a hatch
-cell right of it) and placed with a `transform`, so a pattern falls at the same phase on each (`renderer.md`, Fills); a
-consumer reading their geometry applies the transform.
+attributes. An affected pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a `hatch` path. Each
+is a single tile centred on its fill part's frame, larger than any symbol, so a restyle need not worry about tiling.
+Every fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none repeats the
+paint. Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre, or for a circle half
+a hatch cell right of it) and placed with a `transform`, so a pattern falls at the same phase on each (`renderer.md`,
+Fills); a consumer reading their geometry applies the transform.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's

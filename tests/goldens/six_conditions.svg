@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="578" height="461" viewBox="0 0 578 461" class="pedigree" data-title="Six conditions: sixth sections, one fixed wedge per condition" data-conditions="[&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;]">
+<svg xmlns="http://www.w3.org/2000/svg" width="578" height="501.5" viewBox="0 0 578 501.5" class="pedigree" data-title="Six conditions: sixth sections, one fixed wedge per condition" data-conditions="[&quot;A&quot;, &quot;B&quot;, &quot;C&quot;, &quot;D&quot;, &quot;E&quot;, &quot;F&quot;]">
 <defs>
-<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#000000"/></pattern>
-<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#000000"/><path class="hatch" d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
-<pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#484848"/></pattern>
-<pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#484848"/><path class="hatch" d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
-<pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#9c9c9c"/></pattern>
-<pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#9c9c9c"/><path class="hatch" d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
-<pattern id="fill-affected-3" class="fill-pattern" data-condition="3" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#dbdbdb"/></pattern>
-<pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#dbdbdb"/><path class="hatch" d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
-<pattern id="fill-affected-4" class="fill-pattern" data-condition="4" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#262626"/></pattern>
-<pattern id="fill-carrier-4" class="fill-pattern" data-condition="4" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#262626"/><path class="hatch" d="M-1.125,5.625L5.625,-1.125M3.375,10.125L10.125,3.375" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
-<pattern id="fill-affected-5" class="fill-pattern" data-condition="5" data-status="affected" width="8" height="8" patternUnits="userSpaceOnUse"><rect class="tone" width="8" height="8" fill="#b8b8b8"/></pattern>
-<pattern id="fill-carrier-5" class="fill-pattern" data-condition="5" data-status="carrier" width="9" height="9" patternUnits="userSpaceOnUse"><rect class="tone" width="9" height="9" fill="#b8b8b8"/><path class="hatch" d="M3.375,-1.125L10.125,5.625M-1.125,3.375L5.625,10.125" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#000000"/></pattern>
+<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#000000"/><path class="hatch" d="M0,4.5L4.5,0M0,13.5L13.5,0M0,22.5L22.5,0M0,31.5L31.5,0M0,40.5L40.5,0M0,49.5L49.5,0M0,58.5L58.5,0M0,67.5L67.5,0M0,76.5L76.5,0M0,85.5L85.5,0M0,94.5L94.5,0M0,103.5L103.5,0M0,112.5L112.5,0M0,121.5L121.5,0M0,130.5L130.5,0M0,139.5L139.5,0M0,148.5L148.5,0M0,157.5L157.5,0M0,166.5L166.5,0M0,175.5L175.5,0M0,184.5L184.5,0M0,193.5L193.5,0M0,202.5L202.5,0M0,211.5L211.5,0M0,220.5L220.5,0M0,229.5L229.5,0M0,238.5L238.5,0M0,247.5L247.5,0M0,256.5L256.5,0M0,265.5L265.5,0M0,274.5L274.5,0M0,283.5L283.5,0M0,292.5L292.5,0M0,301.5L301.5,0M0,310.5L310.5,0M0,319.5L319.5,0M0,328.5L328.5,0M0,337.5L337.5,0M0,346.5L346.5,0M0,355.5L355.5,0M4.5,360L360,4.5M13.5,360L360,13.5M22.5,360L360,22.5M31.5,360L360,31.5M40.5,360L360,40.5M49.5,360L360,49.5M58.5,360L360,58.5M67.5,360L360,67.5M76.5,360L360,76.5M85.5,360L360,85.5M94.5,360L360,94.5M103.5,360L360,103.5M112.5,360L360,112.5M121.5,360L360,121.5M130.5,360L360,130.5M139.5,360L360,139.5M148.5,360L360,148.5M157.5,360L360,157.5M166.5,360L360,166.5M175.5,360L360,175.5M184.5,360L360,184.5M193.5,360L360,193.5M202.5,360L360,202.5M211.5,360L360,211.5M220.5,360L360,220.5M229.5,360L360,229.5M238.5,360L360,238.5M247.5,360L360,247.5M256.5,360L360,256.5M265.5,360L360,265.5M274.5,360L360,274.5M283.5,360L360,283.5M292.5,360L360,292.5M301.5,360L360,301.5M310.5,360L360,310.5M319.5,360L360,319.5M328.5,360L360,328.5M337.5,360L360,337.5M346.5,360L360,346.5M355.5,360L360,355.5" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-1" class="fill-pattern" data-condition="1" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#484848"/></pattern>
+<pattern id="fill-carrier-1" class="fill-pattern" data-condition="1" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#484848"/><path class="hatch" d="M0,355.5L4.5,360M0,346.5L13.5,360M0,337.5L22.5,360M0,328.5L31.5,360M0,319.5L40.5,360M0,310.5L49.5,360M0,301.5L58.5,360M0,292.5L67.5,360M0,283.5L76.5,360M0,274.5L85.5,360M0,265.5L94.5,360M0,256.5L103.5,360M0,247.5L112.5,360M0,238.5L121.5,360M0,229.5L130.5,360M0,220.5L139.5,360M0,211.5L148.5,360M0,202.5L157.5,360M0,193.5L166.5,360M0,184.5L175.5,360M0,175.5L184.5,360M0,166.5L193.5,360M0,157.5L202.5,360M0,148.5L211.5,360M0,139.5L220.5,360M0,130.5L229.5,360M0,121.5L238.5,360M0,112.5L247.5,360M0,103.5L256.5,360M0,94.5L265.5,360M0,85.5L274.5,360M0,76.5L283.5,360M0,67.5L292.5,360M0,58.5L301.5,360M0,49.5L310.5,360M0,40.5L319.5,360M0,31.5L328.5,360M0,22.5L337.5,360M0,13.5L346.5,360M0,4.5L355.5,360M4.5,0L360,355.5M13.5,0L360,346.5M22.5,0L360,337.5M31.5,0L360,328.5M40.5,0L360,319.5M49.5,0L360,310.5M58.5,0L360,301.5M67.5,0L360,292.5M76.5,0L360,283.5M85.5,0L360,274.5M94.5,0L360,265.5M103.5,0L360,256.5M112.5,0L360,247.5M121.5,0L360,238.5M130.5,0L360,229.5M139.5,0L360,220.5M148.5,0L360,211.5M157.5,0L360,202.5M166.5,0L360,193.5M175.5,0L360,184.5M184.5,0L360,175.5M193.5,0L360,166.5M202.5,0L360,157.5M211.5,0L360,148.5M220.5,0L360,139.5M229.5,0L360,130.5M238.5,0L360,121.5M247.5,0L360,112.5M256.5,0L360,103.5M265.5,0L360,94.5M274.5,0L360,85.5M283.5,0L360,76.5M292.5,0L360,67.5M301.5,0L360,58.5M310.5,0L360,49.5M319.5,0L360,40.5M328.5,0L360,31.5M337.5,0L360,22.5M346.5,0L360,13.5M355.5,0L360,4.5" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-2" class="fill-pattern" data-condition="2" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#9c9c9c"/></pattern>
+<pattern id="fill-carrier-2" class="fill-pattern" data-condition="2" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#9c9c9c"/><path class="hatch" d="M0,4.5L4.5,0M0,13.5L13.5,0M0,22.5L22.5,0M0,31.5L31.5,0M0,40.5L40.5,0M0,49.5L49.5,0M0,58.5L58.5,0M0,67.5L67.5,0M0,76.5L76.5,0M0,85.5L85.5,0M0,94.5L94.5,0M0,103.5L103.5,0M0,112.5L112.5,0M0,121.5L121.5,0M0,130.5L130.5,0M0,139.5L139.5,0M0,148.5L148.5,0M0,157.5L157.5,0M0,166.5L166.5,0M0,175.5L175.5,0M0,184.5L184.5,0M0,193.5L193.5,0M0,202.5L202.5,0M0,211.5L211.5,0M0,220.5L220.5,0M0,229.5L229.5,0M0,238.5L238.5,0M0,247.5L247.5,0M0,256.5L256.5,0M0,265.5L265.5,0M0,274.5L274.5,0M0,283.5L283.5,0M0,292.5L292.5,0M0,301.5L301.5,0M0,310.5L310.5,0M0,319.5L319.5,0M0,328.5L328.5,0M0,337.5L337.5,0M0,346.5L346.5,0M0,355.5L355.5,0M4.5,360L360,4.5M13.5,360L360,13.5M22.5,360L360,22.5M31.5,360L360,31.5M40.5,360L360,40.5M49.5,360L360,49.5M58.5,360L360,58.5M67.5,360L360,67.5M76.5,360L360,76.5M85.5,360L360,85.5M94.5,360L360,94.5M103.5,360L360,103.5M112.5,360L360,112.5M121.5,360L360,121.5M130.5,360L360,130.5M139.5,360L360,139.5M148.5,360L360,148.5M157.5,360L360,157.5M166.5,360L360,166.5M175.5,360L360,175.5M184.5,360L360,184.5M193.5,360L360,193.5M202.5,360L360,202.5M211.5,360L360,211.5M220.5,360L360,220.5M229.5,360L360,229.5M238.5,360L360,238.5M247.5,360L360,247.5M256.5,360L360,256.5M265.5,360L360,265.5M274.5,360L360,274.5M283.5,360L360,283.5M292.5,360L360,292.5M301.5,360L360,301.5M310.5,360L360,310.5M319.5,360L360,319.5M328.5,360L360,328.5M337.5,360L360,337.5M346.5,360L360,346.5M355.5,360L360,355.5" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-3" class="fill-pattern" data-condition="3" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#dbdbdb"/></pattern>
+<pattern id="fill-carrier-3" class="fill-pattern" data-condition="3" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#dbdbdb"/><path class="hatch" d="M0,355.5L4.5,360M0,346.5L13.5,360M0,337.5L22.5,360M0,328.5L31.5,360M0,319.5L40.5,360M0,310.5L49.5,360M0,301.5L58.5,360M0,292.5L67.5,360M0,283.5L76.5,360M0,274.5L85.5,360M0,265.5L94.5,360M0,256.5L103.5,360M0,247.5L112.5,360M0,238.5L121.5,360M0,229.5L130.5,360M0,220.5L139.5,360M0,211.5L148.5,360M0,202.5L157.5,360M0,193.5L166.5,360M0,184.5L175.5,360M0,175.5L184.5,360M0,166.5L193.5,360M0,157.5L202.5,360M0,148.5L211.5,360M0,139.5L220.5,360M0,130.5L229.5,360M0,121.5L238.5,360M0,112.5L247.5,360M0,103.5L256.5,360M0,94.5L265.5,360M0,85.5L274.5,360M0,76.5L283.5,360M0,67.5L292.5,360M0,58.5L301.5,360M0,49.5L310.5,360M0,40.5L319.5,360M0,31.5L328.5,360M0,22.5L337.5,360M0,13.5L346.5,360M0,4.5L355.5,360M4.5,0L360,355.5M13.5,0L360,346.5M22.5,0L360,337.5M31.5,0L360,328.5M40.5,0L360,319.5M49.5,0L360,310.5M58.5,0L360,301.5M67.5,0L360,292.5M76.5,0L360,283.5M85.5,0L360,274.5M94.5,0L360,265.5M103.5,0L360,256.5M112.5,0L360,247.5M121.5,0L360,238.5M130.5,0L360,229.5M139.5,0L360,220.5M148.5,0L360,211.5M157.5,0L360,202.5M166.5,0L360,193.5M175.5,0L360,184.5M184.5,0L360,175.5M193.5,0L360,166.5M202.5,0L360,157.5M211.5,0L360,148.5M220.5,0L360,139.5M229.5,0L360,130.5M238.5,0L360,121.5M247.5,0L360,112.5M256.5,0L360,103.5M265.5,0L360,94.5M274.5,0L360,85.5M283.5,0L360,76.5M292.5,0L360,67.5M301.5,0L360,58.5M310.5,0L360,49.5M319.5,0L360,40.5M328.5,0L360,31.5M337.5,0L360,22.5M346.5,0L360,13.5M355.5,0L360,4.5" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-4" class="fill-pattern" data-condition="4" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#262626"/></pattern>
+<pattern id="fill-carrier-4" class="fill-pattern" data-condition="4" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#262626"/><path class="hatch" d="M0,4.5L4.5,0M0,13.5L13.5,0M0,22.5L22.5,0M0,31.5L31.5,0M0,40.5L40.5,0M0,49.5L49.5,0M0,58.5L58.5,0M0,67.5L67.5,0M0,76.5L76.5,0M0,85.5L85.5,0M0,94.5L94.5,0M0,103.5L103.5,0M0,112.5L112.5,0M0,121.5L121.5,0M0,130.5L130.5,0M0,139.5L139.5,0M0,148.5L148.5,0M0,157.5L157.5,0M0,166.5L166.5,0M0,175.5L175.5,0M0,184.5L184.5,0M0,193.5L193.5,0M0,202.5L202.5,0M0,211.5L211.5,0M0,220.5L220.5,0M0,229.5L229.5,0M0,238.5L238.5,0M0,247.5L247.5,0M0,256.5L256.5,0M0,265.5L265.5,0M0,274.5L274.5,0M0,283.5L283.5,0M0,292.5L292.5,0M0,301.5L301.5,0M0,310.5L310.5,0M0,319.5L319.5,0M0,328.5L328.5,0M0,337.5L337.5,0M0,346.5L346.5,0M0,355.5L355.5,0M4.5,360L360,4.5M13.5,360L360,13.5M22.5,360L360,22.5M31.5,360L360,31.5M40.5,360L360,40.5M49.5,360L360,49.5M58.5,360L360,58.5M67.5,360L360,67.5M76.5,360L360,76.5M85.5,360L360,85.5M94.5,360L360,94.5M103.5,360L360,103.5M112.5,360L360,112.5M121.5,360L360,121.5M130.5,360L360,130.5M139.5,360L360,139.5M148.5,360L360,148.5M157.5,360L360,157.5M166.5,360L360,166.5M175.5,360L360,175.5M184.5,360L360,184.5M193.5,360L360,193.5M202.5,360L360,202.5M211.5,360L360,211.5M220.5,360L360,220.5M229.5,360L360,229.5M238.5,360L360,238.5M247.5,360L360,247.5M256.5,360L360,256.5M265.5,360L360,265.5M274.5,360L360,274.5M283.5,360L360,283.5M292.5,360L360,292.5M301.5,360L360,301.5M310.5,360L360,310.5M319.5,360L360,319.5M328.5,360L360,328.5M337.5,360L360,337.5M346.5,360L360,346.5M355.5,360L360,355.5" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-affected-5" class="fill-pattern" data-condition="5" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#b8b8b8"/></pattern>
+<pattern id="fill-carrier-5" class="fill-pattern" data-condition="5" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#b8b8b8"/><path class="hatch" d="M0,355.5L4.5,360M0,346.5L13.5,360M0,337.5L22.5,360M0,328.5L31.5,360M0,319.5L40.5,360M0,310.5L49.5,360M0,301.5L58.5,360M0,292.5L67.5,360M0,283.5L76.5,360M0,274.5L85.5,360M0,265.5L94.5,360M0,256.5L103.5,360M0,247.5L112.5,360M0,238.5L121.5,360M0,229.5L130.5,360M0,220.5L139.5,360M0,211.5L148.5,360M0,202.5L157.5,360M0,193.5L166.5,360M0,184.5L175.5,360M0,175.5L184.5,360M0,166.5L193.5,360M0,157.5L202.5,360M0,148.5L211.5,360M0,139.5L220.5,360M0,130.5L229.5,360M0,121.5L238.5,360M0,112.5L247.5,360M0,103.5L256.5,360M0,94.5L265.5,360M0,85.5L274.5,360M0,76.5L283.5,360M0,67.5L292.5,360M0,58.5L301.5,360M0,49.5L310.5,360M0,40.5L319.5,360M0,31.5L328.5,360M0,22.5L337.5,360M0,13.5L346.5,360M0,4.5L355.5,360M4.5,0L360,355.5M13.5,0L360,346.5M22.5,0L360,337.5M31.5,0L360,328.5M40.5,0L360,319.5M49.5,0L360,310.5M58.5,0L360,301.5M67.5,0L360,292.5M76.5,0L360,283.5M85.5,0L360,274.5M94.5,0L360,265.5M103.5,0L360,256.5M112.5,0L360,247.5M121.5,0L360,238.5M130.5,0L360,229.5M139.5,0L360,220.5M148.5,0L360,211.5M157.5,0L360,202.5M166.5,0L360,193.5M175.5,0L360,184.5M184.5,0L360,175.5M193.5,0L360,166.5M202.5,0L360,157.5M211.5,0L360,148.5M220.5,0L360,139.5M229.5,0L360,130.5M238.5,0L360,121.5M247.5,0L360,112.5M256.5,0L360,103.5M265.5,0L360,94.5M274.5,0L360,85.5M283.5,0L360,76.5M292.5,0L360,67.5M301.5,0L360,58.5M310.5,0L360,49.5M319.5,0L360,40.5M328.5,0L360,31.5M337.5,0L360,22.5M346.5,0L360,13.5M355.5,0L360,4.5" fill="none" stroke="#000000" stroke-width="1.5"/></pattern>
 </defs>
 <g class="generation" data-generation="1">
 <text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
@@ -47,8 +47,7 @@
 <rect class="backing" x="195.333" y="48" width="36" height="36" fill="#ffffff"/>
 <clipPath id="clip-I-1"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
 <polygon class="fill" data-condition="0" data-status="affected" points="0,0 -54,0 -46.765,-27 -27,-46.765" transform="translate(213.333 66)" fill="url(#fill-affected-0)" clip-path="url(#clip-I-1)"/>
-<line class="divider" x1="213.333" y1="66" x2="202.941" y2="48" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="213.333" y1="66" x2="195.333" y2="66" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M195.333,66L213.333,66L202.941,48L213.333,66" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="symbol" x="195.333" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="213.333" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
 <rect class="hit" x="195.333" y="48" width="36" height="53" fill="none" pointer-events="all"/>
@@ -58,9 +57,7 @@
 <clipPath id="clip-I-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
 <polygon class="fill" data-condition="4" data-status="carrier" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(273.833 66)" fill="url(#fill-carrier-4)" clip-path="url(#clip-I-2)"/>
 <polygon class="fill" data-condition="5" data-status="carrier" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(273.833 66)" fill="url(#fill-carrier-5)" clip-path="url(#clip-I-2)"/>
-<line class="divider" x1="269.333" y1="66" x2="287.333" y2="66" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="269.333" y1="66" x2="278.333" y2="81.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="269.333" y1="66" x2="260.333" y2="81.588" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M287.333,66L269.333,66L278.333,81.588L269.333,66L260.333,81.588L269.333,66" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="269.333" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="269.333" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="251.333" y="48" width="36" height="53" fill="none" pointer-events="all"/>
@@ -69,8 +66,7 @@
 <rect class="backing" x="102" y="138" width="36" height="36" fill="#ffffff"/>
 <clipPath id="clip-II-1"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
 <polygon class="fill" data-condition="1" data-status="affected" points="0,0 -27,-46.765 0,-54 27,-46.765" transform="translate(120 156)" fill="url(#fill-affected-1)" clip-path="url(#clip-II-1)"/>
-<line class="divider" x1="120" y1="156" x2="109.608" y2="138" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="120" y1="156" x2="130.392" y2="138" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M130.392,138L120,156L109.608,138L120,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="symbol" x="102" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="120" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
 <rect class="hit" x="102" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -80,10 +76,7 @@
 <clipPath id="clip-II-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
 <polygon class="fill" data-condition="2" data-status="affected" points="-4.5,0 22.5,-46.765 42.265,-27 49.5,0" transform="translate(180.5 156)" fill="url(#fill-affected-2)" clip-path="url(#clip-II-2)"/>
 <polygon class="fill" data-condition="4" data-status="carrier" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(180.5 156)" fill="url(#fill-carrier-4)" clip-path="url(#clip-II-2)"/>
-<line class="divider" x1="176" y1="156" x2="185" y2="140.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="176" y1="156" x2="194" y2="156" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="176" y1="156" x2="185" y2="171.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="176" y1="156" x2="167" y2="171.588" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M185,140.412L176,156L194,156L176,156L185,171.588L176,156L167,171.588L176,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="176" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="176" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
 <rect class="hit" x="158" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -93,10 +86,7 @@
 <clipPath id="clip-II-3"><polygon points="0,-18 18,0 0,18 -18,0" fill="none"/></clipPath>
 <polygon class="fill" data-condition="3" data-status="affected" points="0,0 -27,46.765 -46.765,27 -54,0" transform="translate(260 156)" fill="url(#fill-affected-3)" clip-path="url(#clip-II-3)"/>
 <polygon class="fill" data-condition="5" data-status="affected" points="0,0 54,0 46.765,27 27,46.765" transform="translate(260 156)" fill="url(#fill-affected-5)" clip-path="url(#clip-II-3)"/>
-<line class="divider" x1="260" y1="156" x2="278" y2="156" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="260" y1="156" x2="266.588" y2="167.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="260" y1="156" x2="253.412" y2="167.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="260" y1="156" x2="242" y2="156" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M278,156L260,156L266.588,167.412L260,156L253.412,167.412L260,156L242,156L260,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <polygon class="symbol" points="260,138 278,156 260,174 242,156" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="260" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-3</text>
 <rect class="hit" x="242" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -105,10 +95,12 @@
 <circle class="backing" cx="344" cy="156" r="18" fill="#ffffff"/>
 <clipPath id="clip-II-5"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
 <polygon class="fill" data-condition="5" data-status="carrier" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(348.5 156)" fill="url(#fill-carrier-5)" clip-path="url(#clip-II-5)"/>
-<line class="divider" x1="344" y1="156" x2="362" y2="156" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="344" y1="156" x2="353" y2="171.588" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M362,156L344,156L353,171.588L344,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="344" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
-<line class="mark presymptomatic" x1="344" y1="136" x2="344" y2="176" stroke="#000000" stroke-width="2"/>
+<g class="mark presymptomatic">
+<line class="halo" x1="344" y1="145" x2="344" y2="167" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+<line x1="344" y1="145" x2="344" y2="167" stroke="#000000" stroke-width="4" stroke-linecap="round"/>
+</g>
 <text class="label" x="344" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-5</text>
 <rect class="hit" x="326" y="138" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
@@ -116,8 +108,7 @@
 <rect class="backing" x="410" y="138" width="36" height="36" fill="#ffffff"/>
 <clipPath id="clip-II-4"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
 <polygon class="fill" data-condition="4" data-status="affected" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(428 156)" fill="url(#fill-affected-4)" clip-path="url(#clip-II-4)"/>
-<line class="divider" x1="428" y1="156" x2="438.392" y2="174" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="428" y1="156" x2="417.608" y2="174" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M438.392,174L428,156L417.608,174L428,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="symbol" x="410" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="428" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-4</text>
 <rect class="hit" x="410" y="138" width="36" height="53" fill="none" pointer-events="all"/>
@@ -137,12 +128,7 @@
 <polygon class="fill" data-condition="3" data-status="carrier" points="0,0 -27,46.765 -46.765,27 -54,0" transform="translate(106 246)" fill="url(#fill-carrier-3)" clip-path="url(#clip-III-1)"/>
 <polygon class="fill" data-condition="4" data-status="carrier" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(106 246)" fill="url(#fill-carrier-4)" clip-path="url(#clip-III-1)"/>
 <polygon class="fill" data-condition="5" data-status="carrier" points="0,0 54,0 46.765,27 27,46.765" transform="translate(106 246)" fill="url(#fill-carrier-5)" clip-path="url(#clip-III-1)"/>
-<line class="divider" x1="106" y1="246" x2="95.608" y2="228" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="106" y1="246" x2="116.392" y2="228" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="106" y1="246" x2="124" y2="246" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="106" y1="246" x2="116.392" y2="264" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="106" y1="246" x2="95.608" y2="264" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="106" y1="246" x2="88" y2="246" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M116.392,228L106,246L124,246L106,246L116.392,264L106,246L95.608,264L106,246L88,246L106,246L95.608,228L106,246" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="symbol" x="88" y="228" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="106" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-1</text>
 <rect class="hit" x="88" y="228" width="36" height="53" fill="none" pointer-events="all"/>
@@ -156,12 +142,7 @@
 <polygon class="fill" data-condition="3" data-status="affected" points="-4.5,0 -31.5,46.765 -51.265,27 -58.5,0" transform="translate(194.5 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-2)"/>
 <polygon class="fill" data-condition="4" data-status="affected" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(194.5 246)" fill="url(#fill-affected-4)" clip-path="url(#clip-III-2)"/>
 <polygon class="fill" data-condition="5" data-status="affected" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(194.5 246)" fill="url(#fill-affected-5)" clip-path="url(#clip-III-2)"/>
-<line class="divider" x1="190" y1="246" x2="181" y2="230.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="190" y1="246" x2="199" y2="230.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="190" y1="246" x2="208" y2="246" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="190" y1="246" x2="199" y2="261.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="190" y1="246" x2="181" y2="261.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="190" y1="246" x2="172" y2="246" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M199,230.412L190,246L208,246L190,246L199,261.588L190,246L181,261.588L190,246L172,246L190,246L181,230.412L190,246" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="190" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-2</text>
 <rect class="hit" x="172" y="228" width="36" height="53" fill="none" pointer-events="all"/>
@@ -175,12 +156,7 @@
 <polygon class="fill" data-condition="3" data-status="carrier" points="0,0 -27,46.765 -46.765,27 -54,0" transform="translate(274 246)" fill="url(#fill-carrier-3)" clip-path="url(#clip-III-3)"/>
 <polygon class="fill" data-condition="4" data-status="carrier" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(274 246)" fill="url(#fill-carrier-4)" clip-path="url(#clip-III-3)"/>
 <polygon class="fill" data-condition="5" data-status="carrier" points="0,0 54,0 46.765,27 27,46.765" transform="translate(274 246)" fill="url(#fill-carrier-5)" clip-path="url(#clip-III-3)"/>
-<line class="divider" x1="274" y1="246" x2="267.412" y2="234.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="274" y1="246" x2="280.588" y2="234.588" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="274" y1="246" x2="292" y2="246" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="274" y1="246" x2="280.588" y2="257.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="274" y1="246" x2="267.412" y2="257.412" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="274" y1="246" x2="256" y2="246" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M280.588,234.588L274,246L292,246L274,246L280.588,257.412L274,246L267.412,257.412L274,246L256,246L274,246L267.412,234.588L274,246" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <polygon class="symbol" points="274,228 292,246 274,264 256,246" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="274" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-3</text>
 <rect class="hit" x="256" y="228" width="36" height="53" fill="none" pointer-events="all"/>
@@ -190,8 +166,7 @@
 <rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 318.5)" fill="#ffffff"/>
 <clipPath id="key-clip-affected-0"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
 <polygon class="swatch" data-condition="0" data-status="affected" points="0,0 -40.5,0 -35.074,-20.25 -20.25,-35.074" transform="translate(101.5 318.5)" fill="url(#fill-affected-0)" clip-path="url(#key-clip-affected-0)"/>
-<line class="divider" x1="101.5" y1="318.5" x2="93.706" y2="305" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="101.5" y1="318.5" x2="88" y2="318.5" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M88,318.5L101.5,318.5L93.706,305L101.5,318.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
 <text class="key-label" x="121" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">A</text>
 </g>
@@ -199,100 +174,98 @@
 <rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(159.1 318.5)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-0"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
 <polygon class="swatch" data-condition="0" data-status="carrier" points="0,0 -40.5,0 -35.074,-20.25 -20.25,-35.074" transform="translate(159.1 318.5)" fill="url(#fill-carrier-0)" clip-path="url(#key-clip-carrier-0)"/>
-<line class="divider" x1="159.1" y1="318.5" x2="151.306" y2="305" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="159.1" y1="318.5" x2="145.6" y2="318.5" stroke="#000000" stroke-width="1"/>
+<path class="divider" d="M145.6,318.5L159.1,318.5L151.306,305L159.1,318.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(159.1 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
 <text class="key-label" x="178.6" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: A</text>
 </g>
-<g id="key-affected-1" class="key-entry" data-condition="1" data-status="affected">
+<g id="key-presymptomatic-0" class="key-entry" data-condition="0" data-status="presymptomatic">
 <rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 318.5)" fill="#ffffff"/>
-<clipPath id="key-clip-affected-1"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="1" data-status="affected" points="0,0 -20.25,-35.074 0,-40.5 20.25,-35.074" transform="translate(276.1 318.5)" fill="url(#fill-affected-1)" clip-path="url(#key-clip-affected-1)"/>
-<line class="divider" x1="276.1" y1="318.5" x2="268.306" y2="305" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="276.1" y1="318.5" x2="283.894" y2="305" stroke="#000000" stroke-width="1"/>
 <rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="295.6" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">B</text>
+<g class="swatch presymptomatic">
+<line class="halo" x1="276.1" y1="310" x2="276.1" y2="327" stroke="#ffffff" stroke-width="7" stroke-linecap="round"/>
+<line x1="276.1" y1="310" x2="276.1" y2="327" stroke="#000000" stroke-width="4" stroke-linecap="round"/>
+</g>
+<text class="key-label" x="295.6" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Presymptomatic: A</text>
+</g>
+<g id="key-affected-1" class="key-entry" data-condition="1" data-status="affected">
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(439.3 318.5)" fill="#ffffff"/>
+<clipPath id="key-clip-affected-1"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
+<polygon class="swatch" data-condition="1" data-status="affected" points="0,0 -20.25,-35.074 0,-40.5 20.25,-35.074" transform="translate(439.3 318.5)" fill="url(#fill-affected-1)" clip-path="url(#key-clip-affected-1)"/>
+<path class="divider" d="M447.094,305L439.3,318.5L431.506,305L439.3,318.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(439.3 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="458.8" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">B</text>
 </g>
 <g id="key-carrier-1" class="key-entry" data-condition="1" data-status="carrier">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(333.7 318.5)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 359)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-1"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="1" data-status="carrier" points="0,0 -20.25,-35.074 0,-40.5 20.25,-35.074" transform="translate(333.7 318.5)" fill="url(#fill-carrier-1)" clip-path="url(#key-clip-carrier-1)"/>
-<line class="divider" x1="333.7" y1="318.5" x2="325.906" y2="305" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="333.7" y1="318.5" x2="341.494" y2="305" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(333.7 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="353.2" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: B</text>
+<polygon class="swatch" data-condition="1" data-status="carrier" points="0,0 -20.25,-35.074 0,-40.5 20.25,-35.074" transform="translate(101.5 359)" fill="url(#fill-carrier-1)" clip-path="url(#key-clip-carrier-1)"/>
+<path class="divider" d="M109.294,345.5L101.5,359L93.706,345.5L101.5,359" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 359)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="121" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: B</text>
 </g>
 <g id="key-affected-2" class="key-entry" data-condition="2" data-status="affected">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(450.7 318.5)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 359)" fill="#ffffff"/>
 <clipPath id="key-clip-affected-2"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="2" data-status="affected" points="0,0 20.25,-35.074 35.074,-20.25 40.5,0" transform="translate(450.7 318.5)" fill="url(#fill-affected-2)" clip-path="url(#key-clip-affected-2)"/>
-<line class="divider" x1="450.7" y1="318.5" x2="458.494" y2="305" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="450.7" y1="318.5" x2="464.2" y2="318.5" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(450.7 318.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="470.2" y="318.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">C</text>
+<polygon class="swatch" data-condition="2" data-status="affected" points="0,0 20.25,-35.074 35.074,-20.25 40.5,0" transform="translate(218.5 359)" fill="url(#fill-affected-2)" clip-path="url(#key-clip-affected-2)"/>
+<path class="divider" d="M226.294,345.5L218.5,359L232,359L218.5,359" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 359)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="238" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">C</text>
 </g>
 <g id="key-carrier-2" class="key-entry" data-condition="2" data-status="carrier">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 359)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 359)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-2"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="2" data-status="carrier" points="0,0 20.25,-35.074 35.074,-20.25 40.5,0" transform="translate(101.5 359)" fill="url(#fill-carrier-2)" clip-path="url(#key-clip-carrier-2)"/>
-<line class="divider" x1="101.5" y1="359" x2="109.294" y2="345.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="101.5" y1="359" x2="115" y2="359" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 359)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="121" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: C</text>
+<polygon class="swatch" data-condition="2" data-status="carrier" points="0,0 20.25,-35.074 35.074,-20.25 40.5,0" transform="translate(276.1 359)" fill="url(#fill-carrier-2)" clip-path="url(#key-clip-carrier-2)"/>
+<path class="divider" d="M283.894,345.5L276.1,359L289.6,359L276.1,359" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 359)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="295.6" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: C</text>
 </g>
 <g id="key-affected-3" class="key-entry" data-condition="3" data-status="affected">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 359)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 359)" fill="#ffffff"/>
 <clipPath id="key-clip-affected-3"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="3" data-status="affected" points="0,0 -20.25,35.074 -35.074,20.25 -40.5,0" transform="translate(218.5 359)" fill="url(#fill-affected-3)" clip-path="url(#key-clip-affected-3)"/>
-<line class="divider" x1="218.5" y1="359" x2="210.706" y2="372.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="218.5" y1="359" x2="205" y2="359" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 359)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="238" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">D</text>
+<polygon class="swatch" data-condition="3" data-status="affected" points="0,0 -20.25,35.074 -35.074,20.25 -40.5,0" transform="translate(393.1 359)" fill="url(#fill-affected-3)" clip-path="url(#key-clip-affected-3)"/>
+<path class="divider" d="M385.306,372.5L393.1,359L379.6,359L393.1,359" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 359)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="412.6" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">D</text>
 </g>
 <g id="key-carrier-3" class="key-entry" data-condition="3" data-status="carrier">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 359)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 399.5)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-3"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="3" data-status="carrier" points="0,0 -20.25,35.074 -35.074,20.25 -40.5,0" transform="translate(276.1 359)" fill="url(#fill-carrier-3)" clip-path="url(#key-clip-carrier-3)"/>
-<line class="divider" x1="276.1" y1="359" x2="268.306" y2="372.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="276.1" y1="359" x2="262.6" y2="359" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 359)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="295.6" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: D</text>
+<polygon class="swatch" data-condition="3" data-status="carrier" points="0,0 -20.25,35.074 -35.074,20.25 -40.5,0" transform="translate(101.5 399.5)" fill="url(#fill-carrier-3)" clip-path="url(#key-clip-carrier-3)"/>
+<path class="divider" d="M93.706,413L101.5,399.5L88,399.5L101.5,399.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="121" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: D</text>
 </g>
 <g id="key-affected-4" class="key-entry" data-condition="4" data-status="affected">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 359)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 399.5)" fill="#ffffff"/>
 <clipPath id="key-clip-affected-4"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="4" data-status="affected" points="0,0 20.25,35.074 0,40.5 -20.25,35.074" transform="translate(393.1 359)" fill="url(#fill-affected-4)" clip-path="url(#key-clip-affected-4)"/>
-<line class="divider" x1="393.1" y1="359" x2="400.894" y2="372.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="393.1" y1="359" x2="385.306" y2="372.5" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 359)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="412.6" y="359" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">E</text>
+<polygon class="swatch" data-condition="4" data-status="affected" points="0,0 20.25,35.074 0,40.5 -20.25,35.074" transform="translate(218.5 399.5)" fill="url(#fill-affected-4)" clip-path="url(#key-clip-affected-4)"/>
+<path class="divider" d="M226.294,413L218.5,399.5L210.706,413L218.5,399.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="238" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">E</text>
 </g>
 <g id="key-carrier-4" class="key-entry" data-condition="4" data-status="carrier">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 399.5)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 399.5)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-4"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="4" data-status="carrier" points="0,0 20.25,35.074 0,40.5 -20.25,35.074" transform="translate(101.5 399.5)" fill="url(#fill-carrier-4)" clip-path="url(#key-clip-carrier-4)"/>
-<line class="divider" x1="101.5" y1="399.5" x2="109.294" y2="413" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="101.5" y1="399.5" x2="93.706" y2="413" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="121" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: E</text>
+<polygon class="swatch" data-condition="4" data-status="carrier" points="0,0 20.25,35.074 0,40.5 -20.25,35.074" transform="translate(276.1 399.5)" fill="url(#fill-carrier-4)" clip-path="url(#key-clip-carrier-4)"/>
+<path class="divider" d="M283.894,413L276.1,399.5L268.306,413L276.1,399.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="295.6" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: E</text>
 </g>
 <g id="key-affected-5" class="key-entry" data-condition="5" data-status="affected">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 399.5)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 399.5)" fill="#ffffff"/>
 <clipPath id="key-clip-affected-5"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="5" data-status="affected" points="0,0 40.5,0 35.074,20.25 20.25,35.074" transform="translate(218.5 399.5)" fill="url(#fill-affected-5)" clip-path="url(#key-clip-affected-5)"/>
-<line class="divider" x1="218.5" y1="399.5" x2="232" y2="399.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="218.5" y1="399.5" x2="226.294" y2="413" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(218.5 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="238" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">F</text>
+<polygon class="swatch" data-condition="5" data-status="affected" points="0,0 40.5,0 35.074,20.25 20.25,35.074" transform="translate(393.1 399.5)" fill="url(#fill-affected-5)" clip-path="url(#key-clip-affected-5)"/>
+<path class="divider" d="M406.6,399.5L393.1,399.5L400.894,413L393.1,399.5" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(393.1 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="412.6" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">F</text>
 </g>
 <g id="key-carrier-5" class="key-entry" data-condition="5" data-status="carrier">
-<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 399.5)" fill="#ffffff"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 440)" fill="#ffffff"/>
 <clipPath id="key-clip-carrier-5"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
-<polygon class="swatch" data-condition="5" data-status="carrier" points="0,0 40.5,0 35.074,20.25 20.25,35.074" transform="translate(276.1 399.5)" fill="url(#fill-carrier-5)" clip-path="url(#key-clip-carrier-5)"/>
-<line class="divider" x1="276.1" y1="399.5" x2="289.6" y2="399.5" stroke="#000000" stroke-width="1"/>
-<line class="divider" x1="276.1" y1="399.5" x2="283.894" y2="413" stroke="#000000" stroke-width="1"/>
-<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(276.1 399.5)" fill="none" stroke="#000000" stroke-width="1"/>
-<text class="key-label" x="295.6" y="399.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: F</text>
+<polygon class="swatch" data-condition="5" data-status="carrier" points="0,0 40.5,0 35.074,20.25 20.25,35.074" transform="translate(101.5 440)" fill="url(#fill-carrier-5)" clip-path="url(#key-clip-carrier-5)"/>
+<path class="divider" d="M115,440L101.5,440L109.294,453.5L101.5,440" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 440)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="121" y="440" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: F</text>
 </g>
 </g>
 </svg>

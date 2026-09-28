@@ -6,7 +6,7 @@ Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinica
 per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
 affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
 a filled section's edges inside a symbol are drawn as thin borders, and nothing else divides it),
-presymptomatic vertical line (outline weight, past the outline), deceased
+presymptomatic bar (twice the outline, round caps, white halo, inset from the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
 drawing defines every fill drawn. Connectors: mating line (doubled for consanguinity; a lone
 single parent has none), descent + sibship bar with per-child stubs, a founder sibship's implied hanger stub
@@ -37,12 +37,12 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   a clipped ``rect``, or in sixths a clipped wedge ``polygon`` — or the X-linked
   ``fill dot`` under ``CarrierStyle.INHERITANCE_GLYPH`` — each with ``data-condition`` and ``data-status`` naming what
   it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (a filled
-  section's borders inside the symbol: rays from the centre along each boundary with a filled section on either
-  side), ``symbol`` (the shape as outline only), ``mark …``
+  section's borders inside the symbol: one round-joined path of rays from the centre along each boundary with a filled
+  section on either side), ``symbol`` (the shape as outline only), ``mark …``
   (``count``, a count-collapsed symbol's number — ``count outside`` when it sits beside the symbol; ``deceased``,
-  ``presymptomatic``, ``unknown``, ``proband`` / ``consultand`` arrow group), ``label`` (one ``<text>`` per line),
-  then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol, its reserved label box and the arrow
-  when one is drawn: the one element a consumer needs for hover and click.
+  ``presymptomatic`` group of a ``halo`` line and the bar, ``unknown``, ``proband`` / ``consultand`` arrow group),
+  ``label`` (one ``<text>`` per line), then ``hit`` — an invisible ``pointer-events="all"`` rectangle over the symbol,
+  its reserved label box and the arrow when one is drawn: the one element a consumer needs for hover and click.
 * ``<g class="mating …" data-partners="I-1 I-2">`` per couple, with ``consanguineous``,
   ``childless-by-choice`` / ``childless-infertility`` as classes; holds the line(s), the childless glyph
   and a wide invisible ``hit`` stroke. ``<g class="sibship" data-parents=… data-children=…>`` per descent
@@ -56,9 +56,10 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   restyling or replacing its pattern.
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
-  ``key-carrier-dot-{i}`` for the X-linked dot), in index order, affected first, holding a ``swatch`` (in a divided
-  pedigree a small divided square: ``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch``
-  section, its ``divider`` borders, ``swatch-outline``) and a
+  ``key-carrier-dot-{i}`` for the X-linked dot, ``key-presymptomatic-{i}`` with ``data-status="presymptomatic"`` and a
+  ``swatch presymptomatic`` line per condition someone is presymptomatic for), in index order, affected first,
+  holding a ``swatch`` (in a divided pedigree a small divided square: ``swatch-backing``, clip path
+  ``{prefix}key-clip-{kind}-{i}``, the ``swatch`` section, its ``divider`` borders, ``swatch-outline``) and a
   ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
   for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
   hold it.
@@ -101,13 +102,20 @@ _TITLE_SIZE = 15.0  # family/panel title above each pedigree tile
 _TITLE_GAP = 6.0  # gap between a title and its pedigree
 _HIT_STROKE = 12.0  # width of the invisible pointer target laid over a mating line
 _HALO = 3.0  # stroke width of the contrasting outline behind a count, so it reads over any fill or line
+# The presymptomatic line: twice the outline's width with round caps, over a white halo that parts it from any fill and
+# from a section border it may lie on. Its cap centres sit this far in from the outline, top and bottom, so the child's
+# stub arriving at the top does not run into it and its halo stays clear of the outline (a diamond's narrow vertex
+# needs the most room); the key's small swatch uses a shorter inset.
+_PRESYMPTOMATIC_WIDTH = 4.0
+_PRESYMPTOMATIC_HALO = 1.5  # white each side of the line
+_PRESYMPTOMATIC_INSET = 7.0
+_PRESYMPTOMATIC_KEY_INSET = 5.0
 # The proband's 'P': font size, and its offset left of and below the arrow tail (_arrow, _arrow_bottom, _hit_rect).
 _ARROW_LABEL_SIZE = 15.0
 _ARROW_LABEL_DX = 8.0
 _ARROW_LABEL_DY = 4.0
 _ID_PREFIX_RE = re.compile(r"^[A-Za-z_][\w.\-]*$")
 _DIVIDER_WIDTH = _WIDTH / 2  # half the outline: a divider is a section line, lighter than any mark
-_PRESYMPTOMATIC_OVERRUN = _WIDTH  # the presymptomatic line runs this far past the outline, top and bottom
 _SWATCH_WIDTH = 1.0  # outline of a key swatch
 _KEY_SYMBOL = 0.75  # a divided pedigree's key symbol, as a fraction of symbol_size
 # NSGC 2022 fills by condition index (docs/design/renderer.md, Clinical status): the tone says the condition, the
@@ -126,7 +134,9 @@ _COLOUR_TONES = ("#000000", "#e69f00", "#0072b2", "#009e73", "#d55e00", "#cc79a7
 # centre and none is a near-tangent chord (tests/test_svg_output.py pins both).
 _CELLS_PER_SYMBOL = 4
 _HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
-_SOLID = 8.0  # tile (px) of a flat tone; its phase does not show
+# One pattern tile, TILE_CELLS hatch cells across and centred on the frame origin, covers any symbol or swatch whole, so
+# no fill is ever drawn from two tiles: tile seams show as a faint grid when an SVG goes through a PDF renderer.
+_TILE_CELLS = 40
 _FILLS = len(_AFFECTED_TONES)
 # Sections of a sixth-divided symbol: wedges from the centre, each named by the clock position it points at, in the
 # reading order of halves and quadrants (top row left to right, then the bottom row). Their boundaries run along 1, 3,
@@ -139,7 +149,7 @@ _BOUNDARIES = {
     4: {12: (0, 1), 3: (1, 3), 6: (3, 2), 9: (2, 0)},
     6: {11: (0, 1), 1: (1, 2), 3: (2, 5), 5: (5, 4), 7: (4, 3), 9: (3, 0)},
 }
-_AFFECTED, _CARRIER = "affected", "carrier"
+_AFFECTED, _CARRIER, _PRESYMPTOMATIC = "affected", "carrier", "presymptomatic"
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
 
 # One stacked pedigree in a figure render: (title, width, height, body-elements, root-attributes).
@@ -512,10 +522,23 @@ class _Draw:
                 used.add((plan.dot, _CARRIER, True))
         return sorted(used, key=lambda u: (u[0], u[1] != _AFFECTED, u[2]))
 
+    def _presymptomatic(self) -> list[int]:
+        """Every condition index some individual is presymptomatic for: the glyph does not say which, the key does."""
+        return sorted(
+            {
+                self._data_legend.index(c.name)
+                for ind in self.p.individuals
+                for c in ind.conditions
+                if c.status == pb.CONDITION_STATUS_PRESYMPTOMATIC
+            }
+        )
+
     def _key_label(self, index: int, status: str, dot: bool) -> str:
         name = self._data_legend[index]
         if status == _AFFECTED:
             return name or "Affected"
+        if status == _PRESYMPTOMATIC:
+            return f"Presymptomatic: {name}" if name else "Presymptomatic"
         word = "X-linked carrier" if dot else "Carrier"  # one condition can be both a dot and a hatched section
         return f"{word}: {name}" if name else word
 
@@ -525,9 +548,11 @@ class _Draw:
         Entry offsets are relative to the key's top-left corner.
         """
         geom = self.geom
+        keyed = [*self._used_fills(), *((i, _PRESYMPTOMATIC, False) for i in self._presymptomatic())]
+        keyed.sort(key=lambda u: (u[0], (_AFFECTED, _CARRIER, _PRESYMPTOMATIC).index(u[1]), u[2]))
         entries = [
             _KeyEntry(index=i, status=status, dot=dot, label=self._key_label(i, status, dot))
-            for i, status, dot in self._used_fills()
+            for i, status, dot in keyed
         ]
         if not entries:
             return [], 0.0, 0.0
@@ -688,20 +713,21 @@ class _Draw:
         head = f'<pattern id="{self._fill_id(index, status)}" class="fill-pattern" data-condition="{index}" '
         head += f'data-status="{status}" '
         tone = self._tones[index]
-        if status == _CARRIER:
-            c = self.geom.symbol_size / _CELLS_PER_SYMBOL
-            return (
-                f'{head}width="{_num(c)}" height="{_num(c)}" patternUnits="userSpaceOnUse">'
-                f'<rect class="tone" width="{_num(c)}" height="{_num(c)}" fill="{tone}"/>'
-                f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c)}" fill="none" '
-                f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
-            )
-        # A user-space tile, like the carrier fills: some rasterizers (cairosvg) fail on an objectBoundingBox
-        # pattern painted more than twice.
-        return (
-            f'{head}width="{_num(_SOLID)}" height="{_num(_SOLID)}" patternUnits="userSpaceOnUse">'
-            f'<rect class="tone" width="{_num(_SOLID)}" height="{_num(_SOLID)}" fill="{tone}"/></pattern>'
+        # A user-space tile (some rasterizers, e.g. cairosvg, fail on an objectBoundingBox pattern painted more than
+        # twice), one tile large enough to hold any fill part whole about its frame origin, so no tile seam falls
+        # inside a symbol.
+        c = self.geom.symbol_size / _CELLS_PER_SYMBOL
+        t = c * _TILE_CELLS
+        tile = (
+            f'x="{_num(-t / 2)}" y="{_num(-t / 2)}" width="{_num(t)}" height="{_num(t)}" patternUnits="userSpaceOnUse"'
         )
+        body = f'<rect class="tone" width="{_num(t)}" height="{_num(t)}" fill="{tone}"/>'
+        if status == _CARRIER:
+            body += (
+                f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c, t)}" fill="none" '
+                f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/>'
+            )
+        return f"{head}{tile}>{body}</pattern>"
 
     def _key_group(self) -> list[str]:
         """The key: one entry per fill drawn, a swatch in that fill and its label, below the drawing."""
@@ -719,7 +745,8 @@ class _Draw:
             if self._divided:
                 out += self._key_symbol(e, x + s / 2, y + s / 2)
             else:
-                paint = "#ffffff" if e.dot else f"url(#{self._fill_id(e.index, e.status)})"
+                plain = e.dot or e.status == _PRESYMPTOMATIC
+                paint = "#ffffff" if plain else f"url(#{self._fill_id(e.index, e.status)})"
                 # Drawn about its own centre, like a square symbol, so its hatch has a square's phase.
                 out.append(
                     f'<rect class="swatch" x="{_num(-s / 2)}" y="{_num(-s / 2)}" width="{_num(s)}" '
@@ -728,6 +755,10 @@ class _Draw:
                 )
             if e.dot:
                 out.append(self._dot(x + s / 2, y + s / 2, e.index, cls="swatch dot", radius=s * 0.13))
+            if e.status == _PRESYMPTOMATIC:
+                out += _presymptomatic_mark(
+                    x + s / 2, y + s / 2, s / 2, _PRESYMPTOMATIC_KEY_INSET, cls="swatch presymptomatic"
+                )
             label_x = x + s + geom.label_gap
             out.append(_text(label_x, y + s / 2, _escape(e.label), geom.label_size, cls="key-label", anchor="start"))
             out.append("</g>")
@@ -743,7 +774,7 @@ class _Draw:
         at = f'transform="translate({_num(cx)} {_num(cy)})"'
         square = f'x="{_num(-h)}" y="{_num(-h)}" width="{_num(2 * h)}" height="{_num(2 * h)}"'
         out = [f'<rect class="swatch-backing" {square} {at} fill="#ffffff"/>']
-        if not e.dot:
+        if not e.dot and e.status != _PRESYMPTOMATIC:
             clip_id = f"{self.id_prefix}key-clip-{e.kind}-{e.index}"
             out.append(f'<clipPath id="{clip_id}"><rect {square}/></clipPath>')
             out.append(self._section(e.index, e.status, clip_id, at, 0.0, h=h, cls="swatch"))
@@ -1212,9 +1243,7 @@ class _Draw:
                 )
             out.append(mark)
         if pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses:
-            # Outline weight and past the outline top and bottom, so it never reads as the lighter vertical divider.
-            reach = self.half + _PRESYMPTOMATIC_OVERRUN
-            out.append(_line(cx, cy - reach, cx, cy + reach, cls="mark presymptomatic"))
+            out += _presymptomatic_mark(cx, cy, self.half, _PRESYMPTOMATIC_INSET, cls="mark presymptomatic")
         if ind.deceased:
             d = self.half * 1.4
             out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
@@ -1304,14 +1333,27 @@ class _Draw:
         return self._borders(gender, cx, cy, self.half, {i for i, _ in plan.sections})
 
     def _borders(self, gender: pb.Gender, cx: float, cy: float, h: float, filled: set[int]) -> list[str]:
-        """The rays from the centre to the outline of a ``gender`` shape of half-size ``h`` that bound ``filled``."""
-        out = []
-        for clock, pair in _BOUNDARIES[self._slots].items():
+        """The rays from the centre to the outline of a ``gender`` shape of half-size ``h`` that bound ``filled``.
+
+        One ``path`` through the centre, out along each ray and back, with round joins, so every ray meets the
+        others cleanly at the centre; each ray's far end lies under the outline's stroke.
+        """
+        ends = []
+        for clock, pair in sorted(_BOUNDARIES[self._slots].items()):
             if filled & set(pair):
                 dx, dy = _clock(clock)
                 t = _reach(gender, dx, dy, h)
-                out.append(_line(cx, cy, cx + t * dx, cy + t * dy, cls="divider", width=_DIVIDER_WIDTH))
-        return out
+                ends.append((cx + t * dx, cy + t * dy))
+        if not ends:
+            return []
+        centre = f"{_num(cx)},{_num(cy)}"
+        d = f"M{_num(ends[0][0])},{_num(ends[0][1])}L{centre}" + "".join(
+            f"L{_num(x)},{_num(y)}L{centre}" for x, y in ends[1:]
+        )
+        return [
+            f'<path class="divider" d="{d}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_DIVIDER_WIDTH)}" '
+            f'stroke-linejoin="round"/>'
+        ]
 
     def _dot(self, cx: float, cy: float, index: int, *, cls: str, radius: float) -> str:
         """The X-linked carrier dot, edged white so it reads over a tone."""
@@ -1405,17 +1447,34 @@ def _reach(gender: pb.Gender, dx: float, dy: float, h: float) -> float:
     return h / (abs(dx) + abs(dy))
 
 
-def _hatch_path(backslash: bool, c: float) -> str:
-    r"""One ``c``-square tile of a diagonal hatch on the lattice x +- y = c/2 (mod c), each line run past the tile.
+def _hatch_path(backslash: bool, c: float, t: float) -> str:
+    r"""A ``t``-square tile of diagonal hatch on the lattice x +- y = c/2 (mod c): each line one segment across it.
 
-    ``/`` lies on x + y = c/2 and 3c/2, ``\`` on x - y = +-c/2; the tile clips the overrun.
+    ``/`` lies on x + y = c/2 + k*c, ``\`` on x - y = c/2 + k*c; ``t`` is a whole number of cells, so the lattice
+    keeps its phase about the frame origin at the tile's centre.
     """
-    h, e = c / 2, c / 8  # half a cell; the overrun past the tile
-    if backslash:
-        runs = [((h - e, -e), (c + e, h + e)), ((-e, h - e), (h + e, c + e))]
-    else:
-        runs = [((-e, h + e), (h + e, -e)), ((h - e, c + e), (c + e, h - e))]
+    runs = []
+    for k in range(round(2 * t / c)):
+        if backslash:
+            d = -t + c / 2 + k * c  # x - y = d
+            runs.append(((max(0.0, d), max(0.0, d) - d), (min(t, t + d), min(t, t + d) - d)))
+        else:
+            sm = c / 2 + k * c  # x + y = sm
+            runs.append(((max(0.0, sm - t), min(sm, t)), (min(sm, t), max(0.0, sm - t))))
     return "".join(f"M{_num(x1)},{_num(y1)}L{_num(x2)},{_num(y2)}" for (x1, y1), (x2, y2) in runs)
+
+
+def _presymptomatic_mark(cx: float, cy: float, h: float, inset: float, *, cls: str) -> list[str]:
+    """The presymptomatic line of a symbol of half-height ``h`` at ``(cx, cy)``: a halo, then the line, one group."""
+    y1, y2 = cy - h + inset, cy + h - inset
+    halo = _PRESYMPTOMATIC_WIDTH + 2 * _PRESYMPTOMATIC_HALO
+    ends = f'x1="{_num(cx)}" y1="{_num(y1)}" x2="{_num(cx)}" y2="{_num(y2)}"'
+    return [
+        f'<g class="{cls}">',
+        f'<line class="halo" {ends} stroke="#ffffff" stroke-width="{_num(halo)}" stroke-linecap="round"/>',
+        f'<line {ends} stroke="{_STROKE}" stroke-width="{_num(_PRESYMPTOMATIC_WIDTH)}" stroke-linecap="round"/>',
+        "</g>",
+    ]
 
 
 def _cls(cls: str) -> str:
