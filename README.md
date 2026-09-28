@@ -7,16 +7,16 @@ pedigree, and **importers** from the pedigree file formats people already have. 
 uv add grus            # or: pip install grus
 grus import family.fam -o family.pbtxt      # PLINK/LINKAGE PED, kinship2 tables, Phenopackets Family, Open Pedigree JSON
 grus validate family.pbtxt
-grus render family.pbtxt -o family.svg      # --png with the `raster` extra (needs libcairo)
+grus render family.pbtxt -o family.svg      # --png with the `raster` extra
 grus layout family.pbtxt -o family.layout.pbtxt   # lay out once; `grus render --layout` then draws from it
 ```
 
 ```python
 from grus import convert, ir, render
 
-ps = convert.import_file("family.fam")            # -> PedigreeSet, validated
-svg = render.render_set_svg(ps)                   # one SVG for the figure; render.render_svg for one pedigree
-text = ir.dump_set_pbtxt(ps)                      # canonical, diffable text form
+ps = convert.import_file("family.fam")  # -> PedigreeSet, validated
+svg = render.render_set_svg(ps)  # one SVG for the figure; render.render_svg for one pedigree
+text = ir.dump_set_pbtxt(ps)  # canonical, diffable text form
 ```
 
 ## What the IR is

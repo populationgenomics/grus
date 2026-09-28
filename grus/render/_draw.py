@@ -696,7 +696,7 @@ class _Draw:
                 f'<path class="hatch" d="{_hatch_path(index % 2 == 1, c)}" fill="none" '
                 f'stroke="{_contrast(tone)}" stroke-width="{_num(_HATCH_LINE)}"/></pattern>'
             )
-        # A user-space tile, like the carrier fills: cairosvg (grus.render.rasterize) fails on an objectBoundingBox
+        # A user-space tile, like the carrier fills: some rasterizers (cairosvg) fail on an objectBoundingBox
         # pattern painted more than twice.
         return (
             f'{head}width="{_num(_SOLID)}" height="{_num(_SOLID)}" patternUnits="userSpaceOnUse">'
