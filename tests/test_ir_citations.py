@@ -56,6 +56,11 @@ pedigrees {
              matings { partner_a { generation: 1 index: 2 } partner_b { generation: 1 index: 1 } } }
   supports { citations: "cap" field: "twin_type" individuals { generation: 2 index: 2 } }
   supports { citations: "cap" field: "labels" }
+  supports { citations: "cap" field: "documented_evaluation" individuals { generation: 2 index: 1 } }
+  supports { citations: "cap" field: "count_unspecified" }
+  supports { citations: "cap" field: "annotations" individuals { generation: 2 index: 3 } }
+  supports { citations: "cap" field: "annotations"
+             matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } } }
 }
 """
 
@@ -104,10 +109,14 @@ def test_support_fields_name_real_schema_fields() -> None:
         "offspring": pb.Offspring,
         "pedigree": pb.Pedigree,
     }
-    for path, kind in _validate.SUPPORT_FIELDS.items():
-        name = path.removeprefix("condition.") if kind == "condition" else path
-        assert (kind == "condition") == path.startswith("condition.")
-        assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
+    for path, kinds in _validate.SUPPORT_FIELDS.items():
+        for kind in kinds:
+            name = path.removeprefix("condition.") if kind == "condition" else path
+            assert (kind == "condition") == path.startswith("condition.")
+            assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
+    assert _validate.SUPPORT_FIELDS["annotations"] == {"individual", "mating"}
+    assert ir.SUPPORT_FIELDS is _validate.SUPPORT_FIELDS, "exported for callers listing the valid paths"
+    assert all(p.startswith(ir.SUPPORT_CONDITION_PREFIX) for p, k in ir.SUPPORT_FIELDS.items() if "condition" in k)
 
 
 # --- loud ---------------------------------------------------------------------------------------------------------
@@ -175,6 +184,16 @@ def _broken(edit: str, old: str) -> str:
 def test_a_bad_citation_or_support_fails_loud(old: str, new: str, match: str) -> None:
     with pytest.raises(ir.IntegrityError, match=match):
         ir.load_set_pbtxt(_broken(new, old))
+
+
+def test_a_support_scopes_people_or_couples_not_both() -> None:
+    bad = _broken(
+        'field: "annotations" individuals { generation: 2 index: 3 } '
+        "matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } } }",
+        'field: "annotations" individuals { generation: 2 index: 3 } }',
+    )
+    with pytest.raises(ir.IntegrityError, match=r"scopes both individuals and matings"):
+        ir.load_set_pbtxt(bad)
 
 
 @pytest.mark.parametrize(

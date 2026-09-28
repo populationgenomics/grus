@@ -148,13 +148,14 @@ Two levels of evidence, and an optional third:
   for II-1 and `condition.status` for II-1..II-3, not one support claiming every field for everyone.
 
 `field` is a path into the IR, checked against a closed list: the `Individual` fields (`gender`, `deceased`, `proband`,
-`consultand`, `reproductive_outcome`, `reproductive_role`, `count`, `sex_assigned_at_birth`, `external_id`,
-`annotations`), the `Condition` fields as `condition.status`, `condition.name`, `condition.inheritance` and
-`condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`, `status`, `childlessness`),
-the `Offspring` fields (`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the
-pedigree. The loader fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition
-no one in scope has, or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked
-where the document text is available (the store), as case records check theirs; the IR alone cannot.
+`consultand`, `documented_evaluation`, `reproductive_outcome`, `reproductive_role`, `count`, `count_unspecified`,
+`sex_assigned_at_birth`, `external_id`, `annotations`), the `Condition` fields as `condition.status`, `condition.name`,
+`condition.inheritance` and `condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`,
+`status`, `childlessness`, `annotations`; a support's scope says whose `annotations` it means), the `Offspring` fields
+(`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the pedigree. The loader
+fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition no one in scope has,
+or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked where the document
+text is available (the store), as case records check theirs; the IR alone cannot.
 
 A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
 a pedigree was read, never where anything sits in a rendering.
@@ -192,11 +193,11 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   imported cohort data has them). Citations, when present, are checked the same way (`validate_set`): each is
   well-formed (a non-empty id, exactly one anchor, a region with page ≥ 0 and x1 > x0, y1 > y0 — protovalidate), ids are
   unique across the set, every evidence and support id resolves, a support's `field` is on the closed path list
-  (`grus.ir._validate.SUPPORT_FIELDS`), it names a `condition` iff the field is `condition.*` and someone in scope has
-  it, every person and couple in scope is in the pedigree, an offspring field is scoped by the child, and a mating field
-  by couples. Each failure names the pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain
-  values; rare axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is
-  never emitted.
+  (`grus.ir.SUPPORT_FIELDS`, exported with `grus.ir.SUPPORT_CONDITION_PREFIX` so a prompt can list the valid paths), it
+  names a `condition` iff the field is `condition.*` and someone in scope has it, every person and couple in scope is in
+  the pedigree, an offspring field is scoped by the child, and a mating field by couples. Each failure names the
+  pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are `optional` (absent
+  = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never emitted.
 
 ## Alternatives considered
 
