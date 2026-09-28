@@ -103,6 +103,62 @@ Families are **separate `Pedigree` messages, never one merged graph**: `Position
 are *per-pedigree* invariants (the `grus.ir` loader runs them per `Pedigree`), so distinct families reusing I-1/II-1
 never collide.
 
+### Citations: where the record came from
+
+A record may say where its content came from: the figure it was read from, the caption, or a sentence elsewhere in the
+paper. Citations are **optional** and **provenance, not meaning**: nothing needs them, the renderer ignores them, and
+`diff_set` ignores them, so a record with and without citations draws and diffs the same. They follow the case-record
+pattern (themis `caserecord`: model-local ids into one normalised list, referenced by id), so a grus record embedded in
+a case record grounds its facts the same way.
+
+```proto
+message Citation {           // in PedigreeSet.citations, the normalised list
+  string id = 1;             // local ("c1"), unique in the set; what evidence and supports refer to
+  string document_id = 2;    // the caller's id for the source document (e.g. a corpus paper id); never model-written
+  oneof anchor {
+    string quote = 3;        // verbatim text that appears in the document
+    Region region = 4;       // an area of one page
+  }
+}
+message Region {             // page units, origin top left: PDF points on a PDF page, pixels on a bare image
+  int32 page = 1;            // 0-based
+  float x0 = 2; float y0 = 3; float x1 = 4; float y1 = 5;
+}
+message Support {            // one kind of fact, about some people or the whole pedigree, and what backs it
+  repeated string citations = 1;
+  string field = 2;          // a path into the IR, from a closed list (below)
+  optional string condition = 3;       // which condition, when `field` starts "condition."
+  repeated Position individuals = 4;   // scope; none of individuals/matings = the whole pedigree
+  repeated MatingRef matings = 5;      // a couple, by its partners' positions
+}
+message MatingRef { optional Position partner_a = 1; optional Position partner_b = 2; }
+
+// PedigreeSet gains: repeated Citation citations; repeated string evidence;
+// Pedigree gains:    repeated string evidence;  repeated Support supports;
+```
+
+Two levels of evidence, and an optional third:
+
+- **`PedigreeSet.evidence`**: the figure as a whole, its region on the page (or the whole image) and its caption. The
+  extraction harness supplies these; it knows where it found the figure and what the caption says.
+- **`Pedigree.evidence`**: the panel this pedigree is drawn in, which only the reader knows in a multi-panel figure.
+- **`Pedigree.supports`**: which facts came from where, when that matters, mainly for a fact the figure does not draw (a
+  stillbirth the caption states, a condition named only in the caption). **One field per support**, and one sentence may
+  back several supports by sharing a citation id: "II-1, the proband, and her affected sibs II-2 and II-3" is `proband`
+  for II-1 and `condition.status` for II-1..II-3, not one support claiming every field for everyone.
+
+`field` is a path into the IR, checked against a closed list: the `Individual` fields (`gender`, `deceased`, `proband`,
+`consultand`, `reproductive_outcome`, `reproductive_role`, `count`, `sex_assigned_at_birth`, `external_id`,
+`annotations`), the `Condition` fields as `condition.status`, `condition.name`, `condition.inheritance` and
+`condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`, `status`, `childlessness`),
+the `Offspring` fields (`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the
+pedigree. The loader fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition
+no one in scope has, or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked
+where the document text is available (the store), as case records check theirs; the IR alone cannot.
+
+A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
+a pedigree was read, never where anything sits in a rendering.
+
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
 The schema represents the **entire** Bennett/NSGC concept space (2008 Figs 1–4 + the 2022 revision), so no figure is
@@ -140,7 +196,9 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 
 - **PED / LINKAGE** — universal but too lean (parent-child graph only; no deceased/proband/carrier/twin/consanguinity).
   Kept as a lossless *export* target, not the IR.
+
 - **CanRisk / BOADICEA** — richer but bloated with cancer risk factors and tied to that tool.
+
 - **Phenopackets v2 `Family` as the IR** — assessed field-by-field against the primary protos
   ([`../research/phenopackets-vs-bespoke-ir.md`](../research/phenopackets-vs-bespoke-ir.md)). Its pedigree core is a
   verbatim PED row plus one family-level `consanguinous_parents` bool: no mating entity (so no founder sibship,
@@ -148,16 +206,31 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   pregnancy outcomes, carrier/presymptomatic, consultand, counts, or as-drawn labels; no extension slot on any core
   message; a required CURIE on every disease and a `MetaData` block per relative. About 60% of this schema's surface
   would have no home. Rejected as the IR; kept as an **importer/exporter target** (`convert.md`).
+
 - **GA4GH Pedigree Standard (Individual + KIN-coded Relationship)** — the edge vocabulary is the best available
   (biological/adoptive/donor/gestational parent, MZ/polyzygotic multiple birth, consanguineous/separated partner) and we
   cite its KIN codes on our enum members for a mechanical future export. Rejected as the IR: its only serializations are
   a draft FHIR IG and a protobuf PR closed unmerged in 2025; edge-only modelling has no sibship entity; `affected` is a
   boolean; "reduced form" is advice, so one pedigree has many encodings (hostile to golden diffs and structured output).
+
 - **FHIR `FamilyMemberHistory`** — heavyweight and relative-to-a-patient rather than a graph; not pursued.
+
 - **A custom DSL / grammar** — nicer to read, but a bespoke parser plus lower first-pass LLM validity. protobuf gives
   structured-output emission and principled evolution instead.
+
 - **A single opaque string id + parse "II-2" at use** — rejected: normalize once (numbers as numbers), don't re-parse.
+
 - **Keep `title` a single string** — rejected: a pedigree's family/panel/gene labels are distinct facts for reasoning.
+
+- **Citations as evidence lists on every entity** (case records' shape: `repeated string evidence` on each message).
+  Rejected for grus: one sentence usually covers several people, so the same quote repeats across entities, and an id on
+  an individual does not say which of its fields it grounds. A `Support` names the field and lists its scope once.
+
+- **A support with several fields.** Rejected: fields times people over-claims ("II-1 is the proband; II-2 and II-3 are
+  affected" would make all three probands). One field per support, sharing citation ids.
+
+- **Figure-level citations only.** Simpler, but it can never say which recorded facts came from outside the drawing,
+  which is what curation of caption-stated facts needs.
 
 ## Open questions
 
