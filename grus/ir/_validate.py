@@ -208,29 +208,35 @@ def _check_generation_order(p: pb.Pedigree) -> None:
 # an individual's fields and a condition's (``condition.*``, naming the condition) scope people; a mating's fields
 # scope couples; an offspring edge's fields scope the child; ``labels`` is the whole pedigree's. The one place the
 # list lives; a test checks each path against the schema.
-SUPPORT_FIELDS: dict[str, str] = {
-    **dict.fromkeys(
-        (
-            "gender",
-            "deceased",
-            "proband",
-            "consultand",
-            "reproductive_outcome",
-            "reproductive_role",
-            "count",
-            "sex_assigned_at_birth",
-            "external_id",
-            "annotations",
-        ),
-        "individual",
-    ),
-    **dict.fromkeys(
-        ("condition.status", "condition.name", "condition.inheritance", "condition.onset_age"), "condition"
-    ),
-    **dict.fromkeys(("consanguineous", "status", "childlessness"), "mating"),
-    **dict.fromkeys(("twin_group", "twin_type", "parentage", "adoption"), "offspring"),
-    "labels": "pedigree",
-}
+_INDIVIDUAL_FIELDS = (
+    "gender",
+    "deceased",
+    "proband",
+    "consultand",
+    "reproductive_outcome",
+    "reproductive_role",
+    "count",
+    "count_unspecified",
+    "documented_evaluation",
+    "sex_assigned_at_birth",
+    "external_id",
+    "annotations",
+)
+_CONDITION_FIELDS = ("condition.status", "condition.name", "condition.inheritance", "condition.onset_age")
+_MATING_FIELDS = ("consanguineous", "status", "childlessness", "annotations")
+_OFFSPRING_FIELDS = ("twin_group", "twin_type", "parentage", "adoption")
+# Path -> the kinds of thing it may describe. ``annotations`` is both an individual's and a mating's; the support's
+# scope says which (couples for a mating's, people for an individual's).
+SUPPORT_FIELDS: dict[str, frozenset[str]] = {}
+for _kind, _paths in (
+    ("individual", _INDIVIDUAL_FIELDS),
+    ("condition", _CONDITION_FIELDS),
+    ("mating", _MATING_FIELDS),
+    ("offspring", _OFFSPRING_FIELDS),
+    ("pedigree", ("labels",)),
+):
+    for _path in _paths:
+        SUPPORT_FIELDS[_path] = SUPPORT_FIELDS.get(_path, frozenset()) | {_kind}
 
 
 def _check_citations(ps: pb.PedigreeSet) -> set[str]:
@@ -262,8 +268,8 @@ def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
     by_key = {(ind.generation, ind.index): ind for ind in p.individuals}
     for j, s in enumerate(p.supports):
         where = f"supports[{j}] ({s.field!r})"
-        kind = SUPPORT_FIELDS.get(s.field)
-        if kind is None:
+        kinds = SUPPORT_FIELDS.get(s.field)
+        if kinds is None:
             raise IntegrityError(f"{where}: unknown field; a support names one of {sorted(SUPPORT_FIELDS)}")
         people = [_key(pos) for pos in s.individuals]
         for key in people:
@@ -272,10 +278,14 @@ def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
         for ref in s.matings:
             if _mating_ref_key(ref) not in matings:
                 raise IntegrityError(f"{where}: no mating of {sorted(_mating_ref_key(ref))} in the pedigree")
-        if s.matings and kind != "mating":
+        if s.matings and people:
+            raise IntegrityError(f"{where}: scopes both individuals and matings; a support scopes one kind")
+        if s.matings and "mating" not in kinds:
             raise IntegrityError(f"{where}: scopes matings, but {s.field} is not a mating field")
-        if people and kind in ("mating", "pedigree"):
-            raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {kind} field")
+        if people and not kinds - {"mating", "pedigree"}:
+            raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {'/'.join(sorted(kinds))} field")
+        # The one kind this support describes: only ``annotations`` has two, and couples in scope make it a mating's.
+        kind = "mating" if s.matings else ("individual" if "individual" in kinds else next(iter(kinds)))
         if kind == "offspring":
             for key in people:
                 if key not in children:

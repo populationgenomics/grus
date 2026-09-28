@@ -148,13 +148,14 @@ Two levels of evidence, and an optional third:
   for II-1 and `condition.status` for II-1..II-3, not one support claiming every field for everyone.
 
 `field` is a path into the IR, checked against a closed list: the `Individual` fields (`gender`, `deceased`, `proband`,
-`consultand`, `reproductive_outcome`, `reproductive_role`, `count`, `sex_assigned_at_birth`, `external_id`,
-`annotations`), the `Condition` fields as `condition.status`, `condition.name`, `condition.inheritance` and
-`condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`, `status`, `childlessness`),
-the `Offspring` fields (`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the
-pedigree. The loader fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition
-no one in scope has, or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked
-where the document text is available (the store), as case records check theirs; the IR alone cannot.
+`consultand`, `documented_evaluation`, `reproductive_outcome`, `reproductive_role`, `count`, `count_unspecified`,
+`sex_assigned_at_birth`, `external_id`, `annotations`), the `Condition` fields as `condition.status`, `condition.name`,
+`condition.inheritance` and `condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`,
+`status`, `childlessness`, `annotations`; a support's scope says whose `annotations` it means), the `Offspring` fields
+(`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the pedigree. The loader
+fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition no one in scope has,
+or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked where the document
+text is available (the store), as case records check theirs; the IR alone cannot.
 
 A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
 a pedigree was read, never where anything sits in a rendering.
