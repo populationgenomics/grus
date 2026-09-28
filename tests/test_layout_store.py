@@ -507,7 +507,7 @@ def test_edits_to_unrendered_fields_leave_the_digest() -> None:
         edited, defs = _sample()
         edit(edited, defs)
         if message == "Annotation":
-            base.individuals[0].annotations.add(text="N/M")  # the same line, typed or not
+            base.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)  # same line, other type
         assert _store.pedigree_digest(edited, defs) == _store.pedigree_digest(base, base_defs), (
             f"{message}.{field} moved the digest"
         )
@@ -566,6 +566,23 @@ def test_edits_to_rendered_fields_move_the_digest() -> None:
         edit(edited, defs)
         assert _store.pedigree_digest(edited, defs) != base, f"{message}.{field} did not move the digest"
 
+
+def test_edits_to_unrendered_fields_leave_the_drawing() -> None:
+    # "Not rendered" checked against the drawer itself, not just the digest: the same one edit per NOT_RENDERED field
+    # must leave the SVG byte-identical, alone and in a set. A field that gains a drawn form fails here until it moves
+    # to RENDERED.
+    for (message, field), edit in _UNRENDERED_EDITS.items():
+        base, base_defs = _sample()
+        if message in ("Mating", "Offspring"):
+            _mating_with_children(base)
+        edited, defs = _sample()
+        edit(edited, defs)
+        if message == "Annotation":
+            base.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
+        drawn = render.render_svg(edited, conditions=defs)
+        assert drawn == render.render_svg(base, conditions=base_defs), f"{message}.{field} changed the drawing"
+        sets = [pb.PedigreeSet(pedigrees=[q], conditions=d) for q, d in ((edited, defs), (base, base_defs))]
+        assert render.render_set_svg(sets[0]) == render.render_set_svg(sets[1]), f"{message}.{field} changed a set"
 
 def test_a_declaration_enters_the_digest_through_its_entries() -> None:
     # legacy_pedigree copies a declaration's name and inheritance onto each entry: those are the declaration's rendered
