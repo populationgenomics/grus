@@ -6,6 +6,7 @@ import pathlib
 import re
 
 import pytest
+import test_render
 
 from grus import cli, ir, render
 from grus.models import pedigree_pb2 as pb
@@ -14,7 +15,11 @@ _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 
 
 def _trio() -> pb.Pedigree:
-    return ir.load_pbtxt((_GOLDENS / "trio.pbtxt").read_text())
+    """The trio golden without its condition entries: a bare ``Pedigree`` has no declarations to reference."""
+    p = test_render._load("trio")
+    for ind in p.individuals:
+        del ind.conditions[:]
+    return p
 
 
 def test_load_ir_bare_pedigree_pbtxt(tmp_path: pathlib.Path) -> None:
@@ -82,26 +87,25 @@ def test_render_set_to_stdout(tmp_path: pathlib.Path, capsys: pytest.CaptureFixt
 
 
 def test_render_carrier_style_option(tmp_path: pathlib.Path) -> None:
-    from grus.render import CarrierStyle, Geometry, render_svg
+    from grus.render import CarrierStyle, Geometry, render_set_svg
 
-    p = ir.load_pbtxt((_GOLDENS / "carrier_inheritance.pbtxt").read_text())
-    src = tmp_path / "c.pbtxt"
-    src.write_text(ir.dump_pbtxt(p))
+    src = _GOLDENS / "carrier_inheritance.pbtxt"  # a one-pedigree set: it has conditions
+    ps = ir.load_set_pbtxt(src.read_text())
     out = tmp_path / "c.svg"
-    assert cli.main(["render", str(src), "-o", str(out), "--carrier-style", "partition_fill"]) == 0
-    assert out.read_text() == render_svg(p, Geometry(carrier_style=CarrierStyle.PARTITION_FILL))
+    assert cli.main(["render", str(src), "-o", str(out), "--carrier-style", "inheritance_glyph"]) == 0
+    assert out.read_text() == render_set_svg(ps, Geometry(carrier_style=CarrierStyle.INHERITANCE_GLYPH))
+    assert 'class="fill dot"' in out.read_text(), "the declared X-linked inheritance reaches the drawing"
 
 
 def test_render_colour_option(tmp_path: pathlib.Path) -> None:
-    from grus.render import Geometry, Palette, render_svg
+    from grus.render import Geometry, Palette, render_set_svg
 
-    p = ir.load_pbtxt((_GOLDENS / "six_conditions.pbtxt").read_text())
-    src = tmp_path / "c.pbtxt"
-    src.write_text(ir.dump_pbtxt(p))
+    src = _GOLDENS / "six_conditions.pbtxt"
+    ps = ir.load_set_pbtxt(src.read_text())
     out = tmp_path / "c.svg"
     assert cli.main(["render", str(src), "-o", str(out), "--colour"]) == 0
-    assert out.read_text() == render_svg(p, Geometry(palette=Palette.COLOUR))
-    assert out.read_text() != render_svg(p), "greyscale stays the default"
+    assert out.read_text() == render_set_svg(ps, Geometry(palette=Palette.COLOUR))
+    assert out.read_text() != render_set_svg(ps), "greyscale stays the default"
 
 
 def test_import_writes_ir_and_roundtrips_through_validate(tmp_path: pathlib.Path) -> None:
@@ -141,7 +145,7 @@ def test_render_rejects_an_unsafe_id_prefix(tmp_path: pathlib.Path, capsys: pyte
 def test_layout_then_render_from_it_matches_a_fresh_render(tmp_path: pathlib.Path, suffix: str) -> None:
     from grus.render import render_svg
 
-    p = ir.load_pbtxt((_GOLDENS / "lone_parent_sibships.pbtxt").read_text())
+    p = ir.load_pbtxt((_GOLDENS / "crossing_descents.pbtxt").read_text())  # a bare pedigree: no conditions
     src = tmp_path / "p.pbtxt"
     src.write_text(ir.dump_pbtxt(p))
     stored = tmp_path / f"p.layout{suffix}"
@@ -154,7 +158,7 @@ def test_layout_then_render_from_it_matches_a_fresh_render(tmp_path: pathlib.Pat
 def test_layout_of_a_set_renders_the_figure(tmp_path: pathlib.Path) -> None:
     from grus.render import render_set_svg
 
-    ps = pb.PedigreeSet(pedigrees=[_trio(), ir.load_pbtxt((_GOLDENS / "twins.pbtxt").read_text())])
+    ps = test_render._set_of("trio", "twins")
     src = tmp_path / "s.pbtxt"
     src.write_text(ir.dump_set_pbtxt(ps))
     stored = tmp_path / "s.layout.pbtxt"
@@ -274,3 +278,41 @@ def test_an_unusable_input_is_reported_in_one_line(
     missing = tmp_path / "missing.pbtxt"
     assert cli.main([command, str(missing)]) == 1
     assert "cannot read it" in capsys.readouterr().err
+
+
+def test_a_bare_pedigree_with_conditions_is_invalid(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # Conditions are declared at set level; a bare pedigree has nowhere to declare them.
+    src = tmp_path / "p.pbtxt"
+    src.write_text(ir.dump_pbtxt(test_render._load("trio")))
+    assert cli.main(["validate", str(src)]) == 1
+    assert "condition_id 'k1' is not declared" in capsys.readouterr().err
+
+
+_PRE_1_0 = """
+individuals { generation: 1 index: 1 gender: GENDER_WOMAN
+              conditions { name: "DMD" status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+individuals { generation: 1 index: 2 gender: GENDER_MAN conditions { name: "DMD" status: CONDITION_STATUS_AFFECTED } }
+"""
+
+
+def test_migrate_rewrites_a_pre_1_0_record(tmp_path: pathlib.Path) -> None:
+    src, out = tmp_path / "old.pbtxt", tmp_path / "new.json"
+    src.write_text(_PRE_1_0)
+    assert cli.main(["migrate", str(src), "-o", str(out), "--to", "json"]) == 0
+    ps = ir.load_set_json(out.read_text())
+    assert [(d.id, d.name, d.inheritance) for d in ps.conditions] == [("k1", "DMD", pb.INHERITANCE_X_LINKED_RECESSIVE)]
+    assert [c.condition_id for ind in ps.pedigrees[0].individuals for c in ind.conditions] == ["k1", "k1"]
+
+
+def test_migrate_fails_loud_on_disagreeing_inheritance(
+    tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "old.pbtxt"
+    src.write_text(
+        _PRE_1_0.replace(
+            "CONDITION_STATUS_AFFECTED }", "CONDITION_STATUS_AFFECTED inheritance: INHERITANCE_AUTOSOMAL_DOMINANT }"
+        )
+    )
+    assert cli.main(["migrate", str(src)]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith(f"grus migrate: error: {src}: cannot migrate: entries of condition 'DMD' disagree")

@@ -34,8 +34,77 @@ _REGEN = os.environ.get("GRUS_REGEN_GOLDENS") == "1"
 _EPS = 1e-9
 
 
+def _golden(name: str) -> tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]:
+    """A golden's pedigree and its set's condition declarations: a bare ``Pedigree`` file, or a set of one pedigree.
+
+    A golden with condition entries is a one-pedigree ``PedigreeSet``, since conditions are declared at set level.
+    """
+    text = (_GOLDENS / f"{name}.pbtxt").read_text()
+    if text.startswith("conditions {"):
+        ps = ir.load_set_pbtxt(text)
+        (p,) = ps.pedigrees
+        return p, tuple(ps.conditions)
+    return ir.load_pbtxt(text), ()
+
+
 def _load(name: str) -> pb.Pedigree:
-    return ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
+    return _golden(name)[0]
+
+
+def _decl(name: str = "", inheritance: pb.Inheritance | None = None) -> pb.ConditionDef:
+    """A test declaration whose id is its name (``unnamed`` for the unnamed condition)."""
+    d = pb.ConditionDef(id=name or "unnamed", name=name)
+    if inheritance is not None:
+        d.inheritance = inheritance
+    return d
+
+
+def _entry(status: pb.ConditionStatus, name: str = "") -> pb.Condition:
+    """An entry referencing ``_decl(name)``."""
+    return pb.Condition(condition_id=name or "unnamed", status=status)
+
+
+def _set_of(*names: str) -> pb.PedigreeSet:
+    """The goldens as one set, their declarations merged by name (each golden's own ids kept where unclaimed)."""
+    ps = pb.PedigreeSet()
+    by_name: dict[str, pb.ConditionDef] = {}
+    for name in names:
+        p, defs = _golden(name)
+        rename: dict[str, str] = {}
+        for d in defs:
+            if d.name not in by_name:
+                taken = {e.id for e in by_name.values()}
+                new = pb.ConditionDef()
+                new.CopyFrom(d)
+                new.id = d.id if d.id not in taken else f"{name}-{d.id}"
+                by_name[d.name] = new
+            assert by_name[d.name].inheritance == d.inheritance, f"{name}: {d.name!r} is declared differently"
+            rename[d.id] = by_name[d.name].id
+        q = ps.pedigrees.add()
+        q.CopyFrom(p)
+        for ind in q.individuals:
+            for c in ind.conditions:
+                c.condition_id = rename[c.condition_id]
+    ps.conditions.extend(by_name.values())
+    return ps
+
+
+def _declared(p: pb.Pedigree) -> list[pb.ConditionDef]:
+    """A ``_decl`` for each condition ``p``'s ``_entry`` entries reference, in order of first appearance."""
+    ids = dict.fromkeys(c.condition_id for ind in p.individuals for c in ind.conditions)
+    return [_decl("" if cid == "unnamed" else cid) for cid in ids]
+
+
+def _svg(name: str, geometry: render.Geometry | None = None, **kwargs: object) -> str:
+    """``render_svg`` of a golden, with its declarations."""
+    p, defs = _golden(name)
+    return render.render_svg(p, geometry, conditions=defs, **kwargs)  # type: ignore[arg-type]
+
+
+def _lay(name: str, geometry: render.Geometry | None = None) -> render.Layout:
+    """``layout`` of a golden, with its declarations."""
+    p, defs = _golden(name)
+    return render.layout(p, geometry, conditions=defs)
 
 
 def _position_id(pos: pb.Position) -> str:
@@ -151,7 +220,7 @@ def test_golden_set_is_non_empty() -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_golden_svg(name: str) -> None:
-    svg = render.render_svg(_load(name))
+    svg = _svg(name)
     path = _GOLDENS / f"{name}.svg"
     if _REGEN:
         path.write_text(svg)
@@ -161,7 +230,7 @@ def test_golden_svg(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_render_is_well_formed_svg(name: str) -> None:
-    svg = render.render_svg(_load(name))
+    svg = _svg(name)
     assert svg.startswith("<svg ")
     assert svg.rstrip().endswith("</svg>")
     assert "viewBox" in svg
@@ -169,9 +238,9 @@ def test_render_is_well_formed_svg(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_render_is_deterministic(name: str) -> None:
-    p = _load(name)
-    assert render.render_svg(p) == render.render_svg(p)
-    assert render.layout(p) == render.layout(p)
+    p, defs = _golden(name)
+    assert render.render_svg(p, conditions=defs) == render.render_svg(p, conditions=defs)
+    assert render.layout(p, conditions=defs) == render.layout(p, conditions=defs)
 
 
 # --- structural invariants (robust to spacing) ----------------------------------------------------
@@ -181,8 +250,8 @@ def test_render_is_deterministic(name: str) -> None:
 def test_rows_are_ir_generations(name: str) -> None:
     # The row is the IR generation (the drawn row), offset so the first generation is level 0 — not a depth
     # computed from the matings, so a detached branch and a child drawn rows below its parents keep theirs.
-    p = _load(name)
-    lay = render.layout(p)
+    p, defs = _golden(name)
+    lay = render.layout(p, conditions=defs)
     at = _coords(lay)
     for i, ind in enumerate(p.individuals):
         assert at[i][0] == ind.generation - lay.first_generation
@@ -190,7 +259,7 @@ def test_rows_are_ir_generations(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_no_two_symbols_overlap(name: str) -> None:
-    lay = render.layout(_load(name))
+    lay = _lay(name)
     for row in lay.pos:
         for a, b in itertools.pairwise(sorted(row)):
             assert b - a >= render.DEFAULT_GEOMETRY.couple_gap - _EPS
@@ -198,8 +267,8 @@ def test_no_two_symbols_overlap(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_couples_are_adjacent(name: str) -> None:
-    p = _load(name)
-    at = _coords(render.layout(p))
+    p, defs = _golden(name)
+    at = _coords(render.layout(p, conditions=defs))
     idx = _index(p)
     for m in p.matings:
         if not m.HasField("partner_b"):
@@ -211,9 +280,9 @@ def test_couples_are_adjacent(name: str) -> None:
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_children_lie_within_parent_span(name: str) -> None:
-    p = _load(name)
-    lay = render.layout(p)
-    svg = render.render_svg(p)
+    p, defs = _golden(name)
+    lay = render.layout(p, conditions=defs)
+    svg = render.render_svg(p, conditions=defs)
     groups = {
         frozenset(kids.split()): body
         for kids, body in re.findall(r'<g class="sibship"[^>]*data-children="([^"]*)">(.*?)</g>', svg, re.S)
@@ -255,7 +324,7 @@ def test_label_lines_do_not_overlap(name: str) -> None:
     # each line's drawn width with the renderer's own heuristic (0.6*label_size px per character) and
     # require the boxes of consecutive lines on a row to clear each other.
     rows: dict[float, list[tuple[float, float, str]]] = {}
-    svg = render.render_svg(_load(name))
+    svg = _svg(name)
     for left, right, y, s in _label_spans(svg):
         rows.setdefault(round(y, 3), []).append((left, right, s))
     assert sum(len(row) for row in rows.values()) == len(_label_lines(svg))
@@ -321,20 +390,22 @@ def test_wide_edge_label_is_not_clipped() -> None:
 def test_childless_couple_draws_the_bennett_glyph() -> None:
     # A childless mating (no offspring) hangs a stub + bar below the couple: one bar for by-choice, two
     # for infertility. The layout records the value on the couple's left column; drawing emits the bars.
-    p = _load("childless")
-    lay = render.layout(p)
+    p, defs = _golden("childless")
+    lay = render.layout(p, conditions=defs)
     drawn = [v for row in lay.childless for v in row if v]
     assert sorted(drawn) == [
         int(pb.CHILDLESSNESS_BY_CHOICE),
         int(pb.CHILDLESSNESS_INFERTILITY),
     ], "both childless couples are recorded on their left column"
     # A fertile couple records nothing.
-    fertile = render.layout(_load("trio")).childless
+    fertile = _lay("trio").childless
     assert not any(v for row in fertile for v in row), "a couple with children draws no childless glyph"
 
 
-def _one(cond: pb.Condition) -> pb.Pedigree:
-    return pb.Pedigree(individuals=[pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN, conditions=[cond])])
+def _one(status: pb.ConditionStatus) -> pb.Pedigree:
+    return pb.Pedigree(
+        individuals=[pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN, conditions=[_entry(status)])]
+    )
 
 
 _GLYPH = dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.CarrierStyle.INHERITANCE_GLYPH)
@@ -345,11 +416,16 @@ def test_carrier_style_controls_the_x_linked_glyph() -> None:
     # retired) every carrier is a hatched section whatever its inheritance; under INHERITANCE_GLYPH an unaffected
     # X-linked carrier is a central dot, and any other carrier is still a section.
     assert render.DEFAULT_GEOMETRY.carrier_style is render.CarrierStyle.PARTITION_FILL
-    xl = _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE))
-    ar = _one(pb.Condition(status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE))
-    for svg in (render.render_svg(xl), render.render_svg(ar), render.render_svg(ar, _GLYPH)):
+    p = _one(pb.CONDITION_STATUS_CARRIER)
+    xl = [_decl(inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)]
+    ar = [_decl(inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)]
+    for svg in (
+        render.render_svg(p, conditions=xl),
+        render.render_svg(p, conditions=ar),
+        render.render_svg(p, _GLYPH, conditions=ar),
+    ):
         assert 'fill="url(#fill-carrier-0)" clip-path="url(#' in svg and 'class="fill dot"' not in svg
-    dotted = render.render_svg(xl, _GLYPH)
+    dotted = render.render_svg(p, _GLYPH, conditions=xl)
     assert 'class="fill dot"' in dotted and "<clipPath" not in dotted and "<pattern" not in dotted
     assert 'id="key-carrier-dot-0"' in dotted, "the dot is a fill, so the key defines it"
 
@@ -357,9 +433,9 @@ def test_carrier_style_controls_the_x_linked_glyph() -> None:
 def test_inheritance_glyph_draws_the_other_carriers_beside_the_dot() -> None:
     # Under INHERITANCE_GLYPH the dot stands for the X-linked carrier only; a second, autosomal carrier is a section.
     ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN)
-    ind.conditions.add(name="DMD", status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)
-    ind.conditions.add(name="CF", status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
-    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
+    ind.conditions.extend([_entry(pb.CONDITION_STATUS_CARRIER, "DMD"), _entry(pb.CONDITION_STATUS_CARRIER, "CF")])
+    defs = [_decl("DMD", pb.INHERITANCE_X_LINKED_RECESSIVE), _decl("CF", pb.INHERITANCE_AUTOSOMAL_RECESSIVE)]
+    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH, conditions=defs)
     assert 'class="fill dot" data-condition="0"' in svg
     assert 'data-condition="1" data-status="carrier"' in svg and 'fill="url(#fill-carrier-1)"' in svg
 
@@ -374,7 +450,7 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
                 generation=1,
                 index=i,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_CARRIER, name=name)],
+                conditions=[_entry(pb.CONDITION_STATUS_CARRIER, name)],
             )
 
         return pb.Pedigree(individuals=[c(1, name_a), c(2, name_b)])
@@ -384,8 +460,8 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
             float(x) for x in re.findall(r'<rect class="fill" data-condition="\d+" [^>]*?x="([-0-9.]+)"', svg)
         )
 
-    different = rect_xs(render.render_svg(two("varA", "varB")))
-    same = rect_xs(render.render_svg(two("varA", "varA")))
+    different = rect_xs(render.render_svg(p := two("varA", "varB"), conditions=_declared(p)))
+    same = rect_xs(render.render_svg(p := two("varA", "varA"), conditions=_declared(p)))
     assert max(different) - max(same) == render.DEFAULT_GEOMETRY.symbol_size / 2, (
         "a carrier of a different variant fills the opposite half"
     )
@@ -1218,7 +1294,7 @@ def test_cousin_marriage_with_siblings_lays_out() -> None:
 
 
 @pytest.mark.parametrize(
-    "p",
+    "case",
     [
         _two_parented_marriage(),
         _two_parented_marriage_with_extra_mate(),
@@ -1232,8 +1308,8 @@ def test_cousin_marriage_with_siblings_lays_out() -> None:
         _avuncular_loop(),
         _double_cousin_loop(),
         _child_marries_multi_mate_founder(),
-        _load("trio"),
-        _load("half_sibs"),
+        _golden("trio"),
+        _golden("half_sibs"),
     ],
     ids=[
         "two_parented",
@@ -1252,12 +1328,13 @@ def test_cousin_marriage_with_siblings_lays_out() -> None:
         "half_sibs",
     ],
 )
-def test_renderer_is_total(p: pb.Pedigree) -> None:
+def test_renderer_is_total(case: pb.Pedigree | tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]) -> None:
     # The renderer's totality contract: for any IR that passes grus.ir.validate, render_svg either
     # returns an SVG document or raises DeferredFeatureError — never a bare KeyError/IndexError. Only
     # DeferredFeatureError is caught here, so any other exception propagates and fails the test.
+    p, defs = case if isinstance(case, tuple) else (case, ())
     try:
-        svg = render.render_svg(p)
+        svg = render.render_svg(p, conditions=defs)
     except render.DeferredFeatureError:
         return
     assert svg.startswith("<svg ") and svg.rstrip().endswith("</svg>")
@@ -1300,14 +1377,14 @@ def test_twin_zygosity_is_marked_and_drawn(twin_type: pb.ZygosityType) -> None:
 def test_founder_sibship_lays_out_with_bar_and_no_parents() -> None:
     # A partnerless mating (founder sibship): three siblings, no drawn parents. They lay out packed in birth
     # order at the top row, carry no fam pointer, and are recorded as a founder sibship for drawing.
-    p = _load("founder_sibship")
-    lay = render.layout(p)
+    p, defs = _golden("founder_sibship")
+    lay = render.layout(p, conditions=defs)
     assert lay.founder_sibships == [(0, (0, 1, 2))]
     assert [f for row in lay.fam for f in row] == [-1, -1, -1], "a founder sibship draws no parent cell"
     at, idx = _coords(lay), _index(p)
     xs = [at[idx[(1, i)]][2] for i in (1, 2, 3)]
     assert xs == sorted(xs), "siblings placed left to right in birth order"
-    svg = render.render_svg(p)
+    svg = render.render_svg(p, conditions=defs)
     assert svg.startswith("<svg ")
     # The implied hanger is a short vertical stub rising above the sib bar to a point with no symbol at its top.
     verticals = [
@@ -1321,8 +1398,8 @@ def test_founder_sibship_lays_out_with_bar_and_no_parents() -> None:
 
 def test_founder_sibship_marriage_lays_out() -> None:
     # The c19 gen-I shape: two founder sibships whose members marry (I-2 x I-3), with a descending generation.
-    p = _load("founder_sibship_marry_in")
-    lay = render.layout(p)
+    p, defs = _golden("founder_sibship_marry_in")
+    lay = render.layout(p, conditions=defs)
     assert len(lay.founder_sibships) == 2, "both parentless sib rows are recorded"
     at, idx = _coords(lay), _index(p)
     a, b = at[idx[(1, 2)]], at[idx[(1, 3)]]
@@ -1330,7 +1407,7 @@ def test_founder_sibship_marriage_lays_out() -> None:
     kids = [at[idx[(2, i)]] for i in (1, 2)]
     assert all(k[0] == a[0] + 1 for k in kids), "gen II hangs one row below the joined couple"
     assert min(a[2], b[2]) - _EPS <= sum(k[2] for k in kids) / 2 <= max(a[2], b[2]) + _EPS
-    assert render.render_svg(p).startswith("<svg ")
+    assert render.render_svg(p, conditions=defs).startswith("<svg ")
 
 
 def test_founder_sibship_marriage_children_head_marry_in_families() -> None:
@@ -1434,7 +1511,7 @@ def test_label_stack_draws_id_then_annotation() -> None:
     # ("II-1", from generation + index) first, the annotation (here the genotype) centred beneath it. trio
     # annotates every individual with a genotype; the bare arabic index rides in the id line, never as its
     # own "1" label line.
-    lines = _label_lines(render.render_svg(_load("trio")))
+    lines = _label_lines(_svg("trio"))
     by_text = {s: (x, y) for x, y, s in lines}
     assert {"I-1", "I-2", "II-1"} <= set(by_text), "the position id is line 1 of every stack"
     assert {"N/N", "N/M", "M/M"} <= set(by_text), "the annotation line is drawn under the id"
@@ -1499,11 +1576,11 @@ def test_label_stack_dedups_id_equal_annotation() -> None:
 def test_wide_labels_widen_node_pitch() -> None:
     # Annotations can be wider than the symbol; the horizontal heuristic raises the column pitch so wide
     # text still clears. A long annotation therefore yields a wider canvas than the short-annotation figure.
-    p = _load("trio")
-    narrow = float(_WIDTH_RE.search(render.render_svg(p)).group(1))  # type: ignore[union-attr]
+    p, defs = _golden("trio")
+    narrow = float(_WIDTH_RE.search(render.render_svg(p, conditions=defs)).group(1))  # type: ignore[union-attr]
     for ind in p.individuals:
         ind.annotations.append(pb.Annotation(text="GENOTYPE-XXL", type=pb.ANNOTATION_TYPE_OTHER))  # 12 chars, wide
-    wide = float(_WIDTH_RE.search(render.render_svg(p)).group(1))  # type: ignore[union-attr]
+    wide = float(_WIDTH_RE.search(render.render_svg(p, conditions=defs)).group(1))  # type: ignore[union-attr]
     assert wide > narrow
 
 
@@ -1539,19 +1616,22 @@ def test_unconnected_individuals_render() -> None:
 
 
 def test_geometry_spacing_changes_layout() -> None:
-    p = _load("sibship")
-    assert render.layout(p, render.Geometry(sib_gap=3.0)) != render.layout(p)
+    p, defs = _golden("sibship")
+    assert render.layout(p, render.Geometry(sib_gap=3.0), conditions=defs) != render.layout(p, conditions=defs)
 
 
 def test_consanguineous_founder_couple_draws_double_line() -> None:
     # The double-line marker follows the explicit Mating.consanguineous flag (never inferred), founders
     # included: the founder couple's spouse cell is 2 and _matings emits two parallel mating lines.
-    p = _load("consanguineous")  # I-1 x I-2 founders, consanguineous: true
-    assert render.layout(p).spouse[0][0] == 2, "the flagged founder couple is marked as a double-line mating"
+    p, defs = _golden("consanguineous")  # I-1 x I-2 founders, consanguineous: true
+    assert render.layout(p, conditions=defs).spouse[0][0] == 2, (
+        "the flagged founder couple is marked as a double-line mating"
+    )
     horiz = sorted(
         (float(y1), float(x1), float(x2))
         for x1, y1, x2, y2 in re.findall(
-            r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"', render.render_svg(p)
+            r'<line x1="([-0-9.]+)" y1="([-0-9.]+)" x2="([-0-9.]+)" y2="([-0-9.]+)"',
+            render.render_svg(p, conditions=defs),
         )
         if y1 == y2
     )
@@ -1564,7 +1644,7 @@ def test_consanguineous_founder_couple_draws_double_line() -> None:
 def test_generation_markers_sit_in_left_gutter() -> None:
     # A three-generation pedigree gets one Roman-numeral marker per row (I, II, III), each centred in
     # the reserved left gutter and on its row's symbols, clear of every symbol and the proband arrow.
-    svg = render.render_svg(_load("three_generation"))
+    svg = _svg("three_generation")
     gutter = render.DEFAULT_GEOMETRY.gen_marker_gutter
     markers = _markers(svg)
     assert {s for *_, s in markers} == {"I", "II", "III"}
@@ -1634,7 +1714,7 @@ def test_offset_single_child_descent_leaves_parents_midpoint() -> None:
     lay = dataclasses.replace(
         placed, pos=[[x + (1.0 if level >= 2 else 0.0) for x in row] for level, row in enumerate(placed.pos)]
     )
-    draw = _Draw(p, lay, render.DEFAULT_GEOMETRY)
+    draw = _Draw(p, lay, render.DEFAULT_GEOMETRY, ir.Conditions())
     at, idx = _coords(lay), _index(p)
     (lvl, k, _cx) = at[idx[(3, 1)]]  # III-1: only child of II-1 x II-2
     ii1, ii2 = at[idx[(2, 1)]], at[idx[(2, 2)]]
@@ -1659,8 +1739,9 @@ def test_inheritance_glyph_draws_a_second_x_linked_carrier_as_a_section() -> Non
     # The dot says one condition; a second X-linked carrier condition is a section and a key entry, never dropped.
     ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN)
     for name in ("DMD", "HEMA"):
-        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)
-    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH)
+        ind.conditions.append(_entry(pb.CONDITION_STATUS_CARRIER, name))
+    defs = [_decl(name, pb.INHERITANCE_X_LINKED_RECESSIVE) for name in ("DMD", "HEMA")]
+    svg = render.render_svg(pb.Pedigree(individuals=[ind]), _GLYPH, conditions=defs)
     assert 'class="fill dot" data-condition="0"' in svg and 'id="key-carrier-dot-0"' in svg
     assert 'fill="url(#fill-carrier-1)"' in svg and 'id="key-carrier-1"' in svg
 
@@ -1668,13 +1749,12 @@ def test_inheritance_glyph_draws_a_second_x_linked_carrier_as_a_section() -> Non
 def test_the_dot_goes_to_the_lowest_index_whatever_the_ir_order() -> None:
     def woman(i: int, names: tuple[str, str]) -> pb.Individual:
         ind = pb.Individual(generation=1, index=i, gender=pb.GENDER_WOMAN)
-        for name in names:
-            ind.conditions.add(
-                name=name, status=pb.CONDITION_STATUS_CARRIER, inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE
-            )
+        ind.conditions.extend(_entry(pb.CONDITION_STATUS_CARRIER, name) for name in names)
         return ind
 
-    svg = render.render_svg(pb.Pedigree(individuals=[woman(1, ("A", "B")), woman(2, ("B", "A"))]), _GLYPH)
+    defs = [_decl(name, pb.INHERITANCE_X_LINKED_RECESSIVE) for name in ("A", "B")]
+    p = pb.Pedigree(individuals=[woman(1, ("A", "B")), woman(2, ("B", "A"))])
+    svg = render.render_svg(p, _GLYPH, conditions=defs)
     assert svg.count('class="fill dot" data-condition="0"') == 2
     assert re.findall(r'id="(key-(?!clip)[^"]+)"', svg) == ["key-carrier-dot-0", "key-carrier-1"]
     assert ">X-linked carrier: A<" in svg

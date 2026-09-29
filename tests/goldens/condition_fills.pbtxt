@@ -1,22 +1,28 @@
-id: "condition-fills"
-labels { text: "Fills by condition index and status" kind: LABEL_KIND_OTHER }
-labels { text: "A" kind: LABEL_KIND_PHENOTYPE }
-labels { text: "B" kind: LABEL_KIND_PHENOTYPE }
-labels { text: "C" kind: LABEL_KIND_PHENOTYPE }
-labels { text: "D" kind: LABEL_KIND_PHENOTYPE }
-individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { name: "B" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 1 index: 3 gender: GENDER_NONBINARY conditions { name: "C" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 1 index: 4 gender: GENDER_MAN conditions { name: "D" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 2 index: 2 gender: GENDER_WOMAN conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 2 index: 3 gender: GENDER_NONBINARY conditions { name: "C" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 2 index: 4 gender: GENDER_MAN conditions { name: "D" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 3 index: 1 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 3 index: 2 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_CARRIER } conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 3 index: 3 gender: GENDER_NONBINARY conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 3 index: 4 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_AFFECTED } conditions { name: "B" status: CONDITION_STATUS_AFFECTED } conditions { name: "C" status: CONDITION_STATUS_AFFECTED } conditions { name: "D" status: CONDITION_STATUS_AFFECTED } }
-individuals { generation: 3 index: 5 gender: GENDER_MAN conditions { name: "C" status: CONDITION_STATUS_CARRIER } conditions { name: "D" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 3 index: 6 gender: GENDER_MAN conditions { name: "A" status: CONDITION_STATUS_PRESYMPTOMATIC } }
-individuals { generation: 3 index: 7 gender: GENDER_WOMAN conditions { name: "A" status: CONDITION_STATUS_PRESYMPTOMATIC } conditions { name: "B" status: CONDITION_STATUS_CARRIER } }
-individuals { generation: 3 index: 8 gender: GENDER_NONBINARY }
+conditions { id: "k1" name: "A" }
+conditions { id: "k2" name: "B" }
+conditions { id: "k3" name: "C" }
+conditions { id: "k4" name: "D" }
+pedigrees {
+  id: "condition-fills"
+  labels { text: "Fills by condition index and status" kind: LABEL_KIND_OTHER }
+  labels { text: "A" kind: LABEL_KIND_PHENOTYPE }
+  labels { text: "B" kind: LABEL_KIND_PHENOTYPE }
+  labels { text: "C" kind: LABEL_KIND_PHENOTYPE }
+  labels { text: "D" kind: LABEL_KIND_PHENOTYPE }
+  individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { condition_id: "k2" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 1 index: 3 gender: GENDER_NONBINARY conditions { condition_id: "k3" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 1 index: 4 gender: GENDER_MAN conditions { condition_id: "k4" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 2 index: 2 gender: GENDER_WOMAN conditions { condition_id: "k2" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 2 index: 3 gender: GENDER_NONBINARY conditions { condition_id: "k3" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 2 index: 4 gender: GENDER_MAN conditions { condition_id: "k4" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 3 index: 1 gender: GENDER_WOMAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } conditions { condition_id: "k2" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 3 index: 2 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_CARRIER } conditions { condition_id: "k2" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 3 index: 3 gender: GENDER_NONBINARY conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } conditions { condition_id: "k3" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 3 index: 4 gender: GENDER_WOMAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } conditions { condition_id: "k2" status: CONDITION_STATUS_AFFECTED } conditions { condition_id: "k3" status: CONDITION_STATUS_AFFECTED } conditions { condition_id: "k4" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 3 index: 5 gender: GENDER_MAN conditions { condition_id: "k3" status: CONDITION_STATUS_CARRIER } conditions { condition_id: "k4" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 3 index: 6 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_PRESYMPTOMATIC } }
+  individuals { generation: 3 index: 7 gender: GENDER_WOMAN conditions { condition_id: "k1" status: CONDITION_STATUS_PRESYMPTOMATIC } conditions { condition_id: "k2" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 3 index: 8 gender: GENDER_NONBINARY }
+}

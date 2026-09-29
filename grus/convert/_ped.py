@@ -31,17 +31,17 @@ def _gender(code: str) -> pb.Gender:
     return pb.GENDER_UNKNOWN
 
 
-def _phenotype(code: str, *, pheno_01: bool) -> tuple[pb.Condition | None, pb.Annotation | None]:
+def _phenotype(code: str, *, pheno_01: bool) -> tuple[_core.Condition | None, pb.Annotation | None]:
     """The single PED phenotype column -> (Condition, quantitative annotation), at most one set."""
     if code in ("A", "a"):
-        return pb.Condition(status=pb.CONDITION_STATUS_AFFECTED), None
+        return _core.Condition(status=pb.CONDITION_STATUS_AFFECTED), None
     if code in ("U", "u"):
-        return pb.Condition(status=pb.CONDITION_STATUS_UNAFFECTED), None
+        return _core.Condition(status=pb.CONDITION_STATUS_UNAFFECTED), None
     affected, unaffected = ("1", "0") if pheno_01 else ("2", "1")
     if code == affected:
-        return pb.Condition(status=pb.CONDITION_STATUS_AFFECTED), None
+        return _core.Condition(status=pb.CONDITION_STATUS_AFFECTED), None
     if code == unaffected:
-        return pb.Condition(status=pb.CONDITION_STATUS_UNAFFECTED), None
+        return _core.Condition(status=pb.CONDITION_STATUS_UNAFFECTED), None
     if code in _MISSING_PHENO:
         return None, None
     try:

@@ -18,6 +18,7 @@ from __future__ import annotations
 import collections
 import dataclasses
 import itertools
+from collections.abc import Sequence
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
@@ -53,7 +54,9 @@ class _Block:
     cols: tuple[int, ...]
 
 
-def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layout.Layout:
+def layout(
+    p: pb.Pedigree, geometry: _geometry.Geometry | None = None, *, conditions: Sequence[pb.ConditionDef] = ()
+) -> _layout.Layout:
     """Lay ``p`` out on the (level, x) grid; return the per-level arrays the drawing step reads.
 
     The v2 constraint model, in four stages: validate and prepare the graph (``_prepare`` — the avuncular
@@ -69,6 +72,8 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
     defers — its one drawn form, a track over the row, read as a sibship (docs/design/layout-v2.md). An avuncular
     cross-generation join draws via the ``ghost`` (a same-row couple on the deeper partner's rank).
 
+    ``conditions`` are the declarations of ``p``'s set (``PedigreeSet.conditions``), which its entries reference.
+
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
         DeferredFeatureError: a topology the model does not draw (see :class:`DeferredFeatureError`) — an
@@ -77,8 +82,9 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
             descent bars would overlap.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    prep = _prepare(p)
+    prep = _prepare(p, conditions)
     g = prep.graph
+    clinical = _labels.Clinical.of(p, ir.Conditions(conditions))
 
     ordering = _ordering.order(g, prep.cross)
     if ordering.routed:
@@ -97,7 +103,11 @@ def layout(p: pb.Pedigree, geometry: _geometry.Geometry | None = None) -> _layou
 
     sibships = _relations(built)
     seps = _row_seps(
-        built, geom.couple_gap, geom.sib_gap, _label_clearance(p, built, geom), _count_clearance(p, built, geom)
+        built,
+        geom.couple_gap,
+        geom.sib_gap,
+        _label_clearance(p, built, geom, clinical),
+        _count_clearance(p, built, geom, clinical),
     )
     blocks = _blocks(built, seps, sibships)
     model = _x_model(built, seps, sibships, blocks, geom)
@@ -128,13 +138,13 @@ class _Prepared:
     phantom: frozenset[int]
 
 
-def _prepare(p: pb.Pedigree) -> _Prepared:
+def _prepare(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> _Prepared:
     """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, phantoms, pass-throughs.
 
     Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
     couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
     """
-    ir.validate(p)
+    ir.validate(p, conditions)
     g = _layout._derive(p)
     ghost_of = _layout._duplicate_cross_generation(g, p)
     cross = _layout._cross_matings(g)
@@ -262,7 +272,9 @@ def _apart(
     return tuple(out)
 
 
-def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, tuple[float, float]]:
+def _label_clearance(
+    p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry, clinical: _labels.Clinical
+) -> dict[int, tuple[float, float]]:
     """Each cell's label reach left and right in layout units: the stack's reach plus half the gap between labels.
 
     Two neighbours need the left cell's right reach plus the right cell's left reach between centres for their
@@ -274,30 +286,30 @@ def _label_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geomet
     label may be narrower than it: ``_row_seps`` adds that as its own floor (``_count_clearance``).
     """
     out: dict[int, tuple[float, float]] = {}
-    sixths = _labels.sixths(p)
     for level, row in enumerate(lay.nid):
         for k, c in enumerate(row):
             if c in lay.passthrough or c in lay.phantom:
                 out[c] = (0.0, 0.0)
                 continue
             ind = p.individuals[lay.ghost_of.get(c, c)]
-            left, right = _labels.label_reach(ind, geom, side=lay.label_side(level, k), sixths=sixths)
+            left, right = _labels.label_reach(ind, geom, side=lay.label_side(level, k), clinical=clinical)
             out[c] = ((left + geom.label_size / 2) / geom.x_unit, (right + geom.label_size / 2) / geom.x_unit)
     return out
 
 
-def _count_clearance(p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry) -> dict[int, float]:
+def _count_clearance(
+    p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry, clinical: _labels.Clinical
+) -> dict[int, float]:
     """Each cell with a count beside its symbol -> the centre separation, in layout units, that clears the next symbol.
 
     The count's reach right of centre, then half the label gap, then the neighbour's symbol half.
     """
     out: dict[int, float] = {}
-    sixths = _labels.sixths(p)
     for row in lay.nid:
         for c in row:
             if c in lay.passthrough or c in lay.phantom:
                 continue
-            if reach := _labels.outside_count_reach(p.individuals[lay.ghost_of.get(c, c)], geom, sixths=sixths):
+            if reach := _labels.outside_count_reach(p.individuals[lay.ghost_of.get(c, c)], geom, clinical):
                 out[c] = (reach + geom.label_size / 2 + geom.symbol_size / 2) / geom.x_unit
     return out
 

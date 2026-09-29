@@ -117,11 +117,14 @@ often beside named carrier-only conditions) is eligible like any other. The rest
 labels first, then by first appearance in `Position` order, then the unnamed condition — which also breaks ties. The
 primary is the one a reader looks for first, so it gets the fill that survives every size and printer. The index picks
 both the condition's fills and its section, pedigree-wide, so a condition looks the same and sits in the same place on
-every symbol that shows it. The legend holds the conditions someone in the pedigree carries, under any status. A
-phenotype label orders the conditions it names, but one that names no one's condition (a family's name, "DUH family"
-beside the condition "DUH") is not a condition: it takes no index, makes no section and has no key entry, so it cannot
-turn a one-condition pedigree into halves. A condition that occurs only as unaffected still holds its index, so the
-drawing of one individual never depends on another's status.
+every symbol that shows it. The legend holds the conditions someone in the pedigree carries, under any status, each by
+its declaration (`ir.md`, "Conditions are declared once, by id"): the name and the mode of inheritance come from the
+set's `ConditionDef`, never from the entry, so the renderer takes the set's declarations alongside a pedigree
+(`conditions=`; `render_set_svg` and `render_svgs` pass the set's own). A phenotype label orders the conditions it
+names, but one that names no one's condition (a family's name, "DUH family" beside the condition "DUH") is not a
+condition: it takes no index, makes no section and has no key entry, so it cannot turn a one-condition pedigree into
+halves. A condition that occurs only as unaffected still holds its index, so the drawing of one individual never depends
+on another's status.
 
 **Fills: the tone says the condition, the texture the status.**
 
@@ -197,8 +200,8 @@ spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke,
   before.
 - Otherwise every affected and every carried condition fills its own section. A carrier of one condition is one hatched
   section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
-  and a carrier of another is a flat section and a hatched one. A condition that is both affected and carried on one
-  individual (same-named entries) draws as affected.
+  and a carrier of another is a flat section and a hatched one. A person has one entry per condition (the loader checks
+  it), so one condition is never both affected and carried on one symbol.
 - The **presymptomatic** line is a heavy vertical bar: twice the outline's width, with round caps, over a white halo,
   inset from the outline at top and bottom. The weight parts it from a filled half's thin border it may lie on, the halo
   from any fill beneath it (a black whole fill, a dark tone, a hatch) and from a coincident border, and the inset from
@@ -210,8 +213,8 @@ spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke,
 
 **Carrier style.** `Geometry.carrier_style` is a render option, not IR meaning; both styles read the same `Condition`
 entries. `CarrierStyle.PARTITION_FILL`, the default, is the standard as above. `CarrierStyle.INHERITANCE_GLYPH` draws
-figures the way the pre-2022 literature does: on a symbol with no affected condition, an X-linked carrier is a central
-dot, edged white so it reads over a tone; every other carrier is a section as above.
+figures the way the pre-2022 literature does: on a symbol with no affected condition, a carrier of a condition declared
+X-linked is a central dot, edged white so it reads over a tone; every other carrier is a section as above.
 
 **Colour mode.** `Geometry.palette` (the `render --colour` flag) is a render option like the carrier style.
 `Palette.GREYSCALE`, the default, is the table above and survives any printer. `Palette.COLOUR` paints the condition

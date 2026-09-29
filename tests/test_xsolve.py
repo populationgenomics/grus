@@ -32,8 +32,8 @@ def test_hinge_family_is_centred_and_compact() -> None:
     # II-5 by 2t and III-5 by t moves no child off its parents, so centring cannot place them. The old relaxation
     # sweeps drifted along that direction until their pass cap (70 units wide for 12 people). Compactness, ranked
     # below centring, places them: III-5 under II-2 x II-5 and packed against its row.
-    p = test_render._load("hinge_family")
-    lay = render.layout(p)
+    p, defs = test_render._golden("hinge_family")
+    lay = render.layout(p, conditions=defs)
     x = _at(p, lay)
     assert abs((x[(2, 2)] + x[(2, 5)]) / 2 - x[(3, 5)]) < _EPS
     assert abs(x[(3, 5)] - x[(3, 4)] - render.DEFAULT_GEOMETRY.sib_gap) < _EPS
@@ -42,16 +42,18 @@ def test_hinge_family_is_centred_and_compact() -> None:
 
 @pytest.mark.parametrize("name", test_render._NAMES)
 def test_z3_is_repeatable(name: str) -> None:
-    p = test_render._load(name)
-    assert render.layout(p) == render.layout(p)
+    p, defs = test_render._golden(name)
+    assert render.layout(p, conditions=defs) == render.layout(p, conditions=defs)
 
 
 @pytest.mark.parametrize("name", test_render._NAMES)
 def test_highs_agrees_with_z3(name: str) -> None:
     pytest.importorskip("highspy")
-    p = test_render._load(name)
-    exact = render.layout(p)
-    floating = render.layout(p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS))
+    p, defs = test_render._golden(name)
+    exact = render.layout(p, conditions=defs)
+    floating = render.layout(
+        p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS), conditions=defs
+    )
     assert floating.nid == exact.nid
     for a, b in zip(exact.pos, floating.pos, strict=True):
         assert all(abs(u - v) < _EPS for u, v in zip(a, b, strict=True)), f"{name}: backends disagree"
@@ -137,7 +139,7 @@ def test_concurrent_layouts_in_threads_agree_with_sequential() -> None:
     import concurrent.futures
 
     names = test_render._NAMES
-    sequential = [render.layout(test_render._load(n)).pos for n in names]
+    sequential = [test_render._lay(n).pos for n in names]
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        threaded = list(pool.map(lambda n: render.layout(test_render._load(n)).pos, names * 3))
+        threaded = list(pool.map(lambda n: test_render._lay(n).pos, names * 3))
     assert threaded == sequential * 3

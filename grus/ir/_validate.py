@@ -14,6 +14,8 @@ Two layers, split by what protobuf can express (docs/design/ir.md, "Validation")
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import protovalidate
 
 from grus.models import pedigree_pb2 as pb
@@ -52,7 +54,7 @@ def _partners(m: pb.Mating) -> list[pb.Position]:
     return partners
 
 
-def validate(p: pb.Pedigree) -> None:
+def validate(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> None:
     """Fail loud unless ``p`` is a well-formed pedigree IR.
 
     Runs protovalidate (which recurses into every nested message) for the field-local rules, then the
@@ -69,7 +71,9 @@ def validate(p: pb.Pedigree) -> None:
     _check_references(p, positions)
     _check_reproductive_outcome_terminal(p)
     _check_generation_order(p)
-    _check_supports(p, positions)
+    declared = {d.id for d in conditions}
+    _check_entries(p, declared)
+    _check_supports(p, positions, declared)
 
 
 def validate_set(ps: pb.PedigreeSet) -> None:
@@ -88,11 +92,12 @@ def validate_set(ps: pb.PedigreeSet) -> None:
             malformed, duplicated or dangling.
     """
     ids = _check_citations(ps)
+    _check_declarations(ps, ids)
     for i, p in enumerate(ps.pedigrees):
         labels = [label.text for label in p.labels]
         tag = f"pedigrees[{i}]" + (f" (labels={labels})" if labels else "")
         try:
-            validate(p)
+            validate(p, ps.conditions)
         except (protovalidate.ValidationError, IntegrityError) as e:
             raise IntegrityError(f"{tag} is not a valid pedigree: {e}") from e
         for ref in p.evidence:
@@ -102,6 +107,13 @@ def validate_set(ps: pb.PedigreeSet) -> None:
             for ref in support.citations:
                 if ref not in ids:
                     raise IntegrityError(f"{tag}: supports[{j}] ({support.field}) cites unknown citation {ref!r}")
+    referenced = {c.condition_id for p in ps.pedigrees for ind in p.individuals for c in ind.conditions}
+    for k, d in enumerate(ps.conditions):
+        if d.id not in referenced:
+            raise IntegrityError(
+                f"conditions[{k}] ({d.id!r}, {d.name!r}) is declared but no entry references it; "
+                "a declaration claims a condition the figure draws"
+            )
 
 
 def _check_mating_shape(p: pb.Pedigree) -> None:
@@ -222,8 +234,11 @@ _INDIVIDUAL_FIELDS = (
     "external_id",
     "annotations",
 )
-SUPPORT_CONDITION_PREFIX = "condition."  # a path with it names a Condition field and needs Support.condition
-_CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status", "name", "inheritance", "onset_age"))
+SUPPORT_CONDITION_PREFIX = "condition."  # a path with it names a condition and needs Support.condition_id
+# A person's entry (people in scope, or none for everyone who has it) and the declaration (the whole pedigree only:
+# a name or a mode of inheritance belongs to the condition, not to any one person).
+_CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status", "onset_age"))
+_DECLARATION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("name", "inheritance"))
 _MATING_FIELDS = ("consanguineous", "status", "childlessness", "annotations")
 _OFFSPRING_FIELDS = ("twin_group", "twin_type", "parentage", "adoption")
 # Path -> the kinds of thing it may describe. ``annotations`` is both an individual's and a mating's; the support's
@@ -232,6 +247,7 @@ SUPPORT_FIELDS: dict[str, frozenset[str]] = {}
 for _kind, _paths in (
     ("individual", _INDIVIDUAL_FIELDS),
     ("condition", _CONDITION_FIELDS),
+    ("declaration", _DECLARATION_FIELDS),
     ("mating", _MATING_FIELDS),
     ("offspring", _OFFSPRING_FIELDS),
     ("pedigree", ("labels",)),
@@ -262,7 +278,46 @@ def _mating_ref_key(m: pb.Mating | pb.MatingRef) -> frozenset[Key]:
     return frozenset(_key(getattr(m, role)) for role in ("partner_a", "partner_b") if m.HasField(role))
 
 
-def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
+def _check_declarations(ps: pb.PedigreeSet, citation_ids: set[str]) -> None:
+    """Each declaration is well-formed, its id unique and no citation's, and its name declared once."""
+    ids: set[str] = set()
+    names: dict[str, str] = {}
+    for k, d in enumerate(ps.conditions):
+        where = f"conditions[{k}] ({d.id!r})"
+        try:
+            protovalidate.validate(d)
+        except protovalidate.ValidationError as e:
+            raise IntegrityError(f"{where} is malformed: {e}") from e
+        if d.id in ids:
+            raise IntegrityError(f"{where}: condition id {d.id!r} is declared twice; ids are unique in the set")
+        if d.id in citation_ids:
+            raise IntegrityError(f"{where}: condition id {d.id!r} is also a citation id; ids are unique in the set")
+        if d.name in names:
+            raise IntegrityError(
+                f"{where}: condition {d.name!r} is already declared as {names[d.name]!r}; one declaration per condition"
+            )
+        ids.add(d.id)
+        names[d.name] = d.id
+
+
+def _check_entries(p: pb.Pedigree, declared: set[str]) -> None:
+    """Every entry's condition is declared, and no person has two entries for one condition."""
+    for ind in p.individuals:
+        seen: set[str] = set()
+        for c in ind.conditions:
+            if c.condition_id not in declared:
+                raise IntegrityError(
+                    f"individual {(ind.generation, ind.index)}: condition_id {c.condition_id!r} is not declared; "
+                    "conditions are declared once in PedigreeSet.conditions"
+                )
+            if c.condition_id in seen:
+                raise IntegrityError(
+                    f"individual {(ind.generation, ind.index)} has two entries for condition {c.condition_id!r}"
+                )
+            seen.add(c.condition_id)
+
+
+def _check_supports(p: pb.Pedigree, positions: set[Key], declared: set[str]) -> None:
     """Each support names a listed field, a scope that exists and suits it, and a condition iff it needs one."""
     matings = {_mating_ref_key(m) for m in p.matings}
     children = {_key(off.child) for m in p.matings for off in m.offspring}
@@ -281,9 +336,11 @@ def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
                 raise IntegrityError(f"{where}: no mating of {sorted(_mating_ref_key(ref))} in the pedigree")
         if s.matings and people:
             raise IntegrityError(f"{where}: scopes both individuals and matings; a support scopes one kind")
+        if (s.matings or people) and kinds == {"declaration"}:
+            raise IntegrityError(f"{where}: {s.field} describes the declaration, so it scopes the whole pedigree")
         if s.matings and "mating" not in kinds:
             raise IntegrityError(f"{where}: scopes matings, but {s.field} is not a mating field")
-        if people and not kinds - {"mating", "pedigree"}:
+        if people and not kinds - {"mating", "pedigree", "declaration"}:
             raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {'/'.join(sorted(kinds))} field")
         # The one kind this support describes: only ``annotations`` has two, and couples in scope make it a mating's.
         kind = "mating" if s.matings else ("individual" if "individual" in kinds else next(iter(kinds)))
@@ -291,9 +348,11 @@ def _check_supports(p: pb.Pedigree, positions: set[Key]) -> None:
             for key in people:
                 if key not in children:
                     raise IntegrityError(f"{where}: {key} is no one's child; an offspring field scopes the child")
-        if (kind == "condition") != s.HasField("condition"):
-            raise IntegrityError(f"{where}: names a condition iff the field is {SUPPORT_CONDITION_PREFIX}*")
-        if kind == "condition":
+        if (kind in ("condition", "declaration")) != s.HasField("condition_id"):
+            raise IntegrityError(f"{where}: names a condition_id iff the field is {SUPPORT_CONDITION_PREFIX}*")
+        if s.HasField("condition_id"):
+            if s.condition_id not in declared:
+                raise IntegrityError(f"{where}: condition_id {s.condition_id!r} is not declared")
             scope = [by_key[key] for key in people] or list(p.individuals)
-            if not any(c.name == s.condition for ind in scope for c in ind.conditions):
-                raise IntegrityError(f"{where}: no one in scope has condition {s.condition!r}")
+            if not any(c.condition_id == s.condition_id for ind in scope for c in ind.conditions):
+                raise IntegrityError(f"{where}: no one in scope has condition {s.condition_id!r}")

@@ -13,6 +13,7 @@ import pathlib
 import re
 
 import pytest
+import test_render
 from google.protobuf import text_format
 
 from grus import ir, render
@@ -30,16 +31,17 @@ citations { id: "panel-a" region { page: 3 x0: 72 y0: 144 x1: 300 y1: 420 } }
 citations { id: "s1" quote: "II-1, the proband, and her affected sibs II-2 and II-3" }
 evidence: "fig"
 evidence: "cap"
+conditions { id: "cf" name: "cystic fibrosis" inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE }
 pedigrees {
   labels { text: "Family A" kind: LABEL_KIND_FAMILY }
   individuals { generation: 1 index: 1 gender: GENDER_MAN }
   individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
   individuals { generation: 2 index: 1 gender: GENDER_WOMAN proband: true
-                conditions { name: "cystic fibrosis" status: CONDITION_STATUS_AFFECTED } }
+                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 2 index: 2 gender: GENDER_MAN
-                conditions { name: "cystic fibrosis" status: CONDITION_STATUS_AFFECTED } }
+                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 2 index: 3 gender: GENDER_WOMAN
-                conditions { name: "cystic fibrosis" status: CONDITION_STATUS_AFFECTED } }
+                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   matings {
     partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } consanguineous: true
     offspring { child { generation: 2 index: 1 } }
@@ -47,8 +49,8 @@ pedigrees {
     offspring { child { generation: 2 index: 3 } twin_group: 1 twin_type: ZYGOSITY_TYPE_DIZYGOTIC }
   }
   evidence: "panel-a"
-  supports { citations: "cap" field: "condition.name" condition: "cystic fibrosis" }
-  supports { citations: "s1" field: "condition.status" condition: "cystic fibrosis"
+  supports { citations: "cap" field: "condition.name" condition_id: "cf" }
+  supports { citations: "s1" field: "condition.status" condition_id: "cf"
              individuals { generation: 2 index: 1 } individuals { generation: 2 index: 2 }
              individuals { generation: 2 index: 3 } }
   supports { citations: "s1" field: "proband" individuals { generation: 2 index: 1 } }
@@ -97,7 +99,9 @@ def test_diff_and_render_ignore_citations() -> None:
     assert d == ir.diff_set(uncited, uncited), "a record with and without citations diffs the same"
     assert len(d.matched) == 1 and not d.only_in_a and not d.only_in_b and not d.matched[0].diff.mismatches
     assert render.render_set_svg(cited) == render.render_set_svg(uncited)
-    assert render.render_svg(cited.pedigrees[0]) == render.render_svg(uncited.pedigrees[0])
+    assert render.render_svg(cited.pedigrees[0], conditions=cited.conditions) == render.render_svg(
+        uncited.pedigrees[0], conditions=uncited.conditions
+    )
 
 
 def test_support_fields_name_real_schema_fields() -> None:
@@ -105,18 +109,26 @@ def test_support_fields_name_real_schema_fields() -> None:
     messages = {
         "individual": pb.Individual,
         "condition": pb.Condition,
+        "declaration": pb.ConditionDef,
         "mating": pb.Mating,
         "offspring": pb.Offspring,
         "pedigree": pb.Pedigree,
     }
     for path, kinds in _validate.SUPPORT_FIELDS.items():
         for kind in kinds:
-            name = path.removeprefix("condition.") if kind == "condition" else path
-            assert (kind == "condition") == path.startswith("condition.")
+            prefixed = kind in ("condition", "declaration")
+            name = path.removeprefix("condition.") if prefixed else path
+            assert prefixed == path.startswith("condition.")
             assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
     assert _validate.SUPPORT_FIELDS["annotations"] == {"individual", "mating"}
     assert ir.SUPPORT_FIELDS is _validate.SUPPORT_FIELDS, "exported for callers listing the valid paths"
-    assert all(p.startswith(ir.SUPPORT_CONDITION_PREFIX) for p, k in ir.SUPPORT_FIELDS.items() if "condition" in k)
+    assert all(
+        p.startswith(ir.SUPPORT_CONDITION_PREFIX)
+        for p, k in ir.SUPPORT_FIELDS.items()
+        if k & {"condition", "declaration"}
+    )
+    assert _validate.SUPPORT_FIELDS["condition.name"] == {"declaration"}
+    assert _validate.SUPPORT_FIELDS["condition.status"] == {"condition"}
 
 
 # --- loud ---------------------------------------------------------------------------------------------------------
@@ -154,15 +166,26 @@ def _broken(edit: str, old: str) -> str:
             r"no mating of \[\(1, 1\), \(2, 2\)\]",
         ),
         (
-            'field: "condition.name" condition: "cystic fibrosis"',
-            'field: "condition.name" condition: "sickle cell"',
-            r"no one in scope has condition 'sickle cell'",
+            'field: "condition.name" condition_id: "cf"',
+            'field: "condition.name" condition_id: "sc"',
+            r"condition_id 'sc' is not declared",
         ),
-        ('field: "condition.name" condition: "cystic fibrosis"', 'field: "condition.name"', r"names a condition iff"),
+        (
+            "individuals { generation: 2 index: 1 } individuals { generation: 2 index: 2 }\n"
+            "             individuals { generation: 2 index: 3 } }",
+            "individuals { generation: 1 index: 1 } }",
+            r"no one in scope has condition 'cf'",
+        ),
+        (
+            'field: "condition.name" condition_id: "cf" }',
+            'field: "condition.name" condition_id: "cf" individuals { generation: 2 index: 1 } }',
+            r"condition.name describes the declaration, so it scopes the whole pedigree",
+        ),
+        ('field: "condition.name" condition_id: "cf"', 'field: "condition.name"', r"names a condition_id iff"),
         (
             'field: "proband" individuals',
-            'field: "proband" condition: "cystic fibrosis" individuals',
-            r"names a condition iff",
+            'field: "proband" condition_id: "cf" individuals',
+            r"names a condition_id iff",
         ),
         (
             'field: "twin_type" individuals { generation: 2 index: 2 }',
@@ -223,6 +246,6 @@ def test_a_support_with_no_citation_is_malformed() -> None:
 def test_goldens_are_unchanged_by_the_schema() -> None:
     # No golden carries citations, and parsing one back emits none.
     for path in _GOLDENS.glob("*.pbtxt"):
-        p = ir.load_pbtxt(path.read_text())
+        p, _ = test_render._golden(path.stem)
         assert not p.evidence and not p.supports
         assert not re.search(r"\b(citations|evidence|supports)\b", text_format.MessageToString(p))

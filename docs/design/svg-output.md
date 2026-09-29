@@ -115,22 +115,22 @@ The groups, and what each promises:
 
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
-  legend**: the same order the drawer uses to pick each condition's fills and its section of a divided symbol
+  legend**: the declared names (`ir.md`, "Conditions are declared once, by id") of the conditions this pedigree's
+  entries reference, in the order the drawer uses to pick each condition's fills and its section of a divided symbol
   (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
-  condition `data-condition-i` names on every individual below it. When any individual has an unnamed condition (the
-  figure's sole, unlabelled one) the array holds an empty string for it, so every condition has an index: last, or first
-  when the unnamed condition is the primary. A phenotype label no one's condition carries is not in the array and takes
-  no index.
+  condition `data-condition-i` names on every individual below it. The unnamed condition (the figure's sole, unlabelled
+  one, declared with an empty name) is an empty string, so every condition has an index: last, or first when it is the
+  primary. A phenotype label that names no referenced condition is not in the array and takes no index.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
   the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
-  individual has, whose value is the status (affected, carrier, presymptomatic, unknown). State classes mirror the IR —
-  `affected`, `carrier`, `presymptomatic`, `unknown`, `deceased`, `proband`, `consultand` — not the subset of marks the
-  drawer chose to draw, so a consumer selects on what is true of the person. A **ghost** — the duplicated partner of a
-  cross-generation join — is an `individual ghost` group with the *same* classes and data attributes as the real cell
-  and a `ghost-` id (with an ordinal suffix when one individual is ghosted more than once), so selecting by position
-  lights both, selecting by id lights one, and `.individual:not(.ghost)` counts drawn symbols (a count-collapsed one
-  stands for several people).
+  individual has, whose value is the status of its one entry for it (affected, carrier, presymptomatic, unknown). State
+  classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`, `deceased`, `proband`, `consultand` — not
+  the subset of marks the drawer chose to draw, so a consumer selects on what is true of the person. A **ghost** — the
+  duplicated partner of a cross-generation join — is an `individual ghost` group with the *same* classes and data
+  attributes as the real cell and a `ghost-` id (with an ordinal suffix when one individual is ghosted more than once),
+  so selecting by position lights both, selecting by id lights one, and `.individual:not(.ghost)` counts drawn symbols
+  (a count-collapsed one stands for several people).
 - **`mating`** — the line or double line between an adjacent couple, or the childless glyph. It names both partners'
   positions and carries `consanguineous` and the childlessness kind as classes. A lone parent's line to an omitted
   partner is a `mating partner-omitted` group naming the one parent.

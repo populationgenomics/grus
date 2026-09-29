@@ -2,7 +2,8 @@
 
 A case names one pedigree and loads it where it is laid out, so a worker parses it with the grus tree under test. A
 case's ``key`` is its identity across runs and trees: ``g{maxgen}:{seed}`` for a generated pedigree, the path for a
-``Pedigree`` pbtxt file, ``path#k`` for the ``k``-th pedigree of a ``PedigreeSet`` file.
+``Pedigree`` pbtxt file, ``path#k`` for the ``k``-th pedigree of a ``PedigreeSet`` file. A case loads as its pedigree
+and the condition declarations its entries reference (its set's ``conditions``; none for a generated or bare pedigree).
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import dataclasses
 import pathlib
 import re
 from collections.abc import Iterable, Sequence
+from typing import NamedTuple
 
 from google.protobuf import text_format
 
@@ -22,6 +24,13 @@ DEFAULT_CORPUS = "4:0-299"
 _SPEC = re.compile(r"(\d+):(\d+)(?:-(\d+))?")
 
 
+class Loaded(NamedTuple):
+    """A case's pedigree and the set's condition declarations it is read through."""
+
+    pedigree: pb.Pedigree
+    conditions: tuple[pb.ConditionDef, ...]
+
+
 @dataclasses.dataclass(frozen=True)
 class GenCase:
     maxgen: int
@@ -31,8 +40,8 @@ class GenCase:
     def key(self) -> str:
         return f"g{self.maxgen}:{self.seed}"
 
-    def load(self) -> pb.Pedigree:
-        return gen.gen(self.seed, self.maxgen)
+    def load(self) -> Loaded:
+        return Loaded(gen.gen(self.seed, self.maxgen), ())
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,11 +53,12 @@ class FileCase:
     def key(self) -> str:
         return self.path if self.member is None else f"{self.path}#{self.member}"
 
-    def load(self) -> pb.Pedigree:
+    def load(self) -> Loaded:
         text = pathlib.Path(self.path).read_text()
         if self.member is None:
-            return ir.load_pbtxt(text)
-        return ir.load_set_pbtxt(text).pedigrees[self.member]
+            return Loaded(ir.load_pbtxt(text), ())
+        ps = ir.load_set_pbtxt(text)
+        return Loaded(ps.pedigrees[self.member], tuple(ps.conditions))
 
 
 Case = GenCase | FileCase

@@ -57,3 +57,15 @@ def test_a_tree_against_itself_never_differs_in_bytes() -> None:
     ):
         search = minimize.tree_search("bytes", [pa, pb_], reason="", shuffles=0, highs=False)
         assert search([gen.gen(0, 4)]) is None
+
+
+def test_a_probe_reads_entries_through_the_declarations_it_is_given() -> None:
+    from tools.fuzz import probe
+
+    p = gen.gen(3, 4)
+    p.individuals[0].conditions.add(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)
+    defs = pb.PedigreeSet(conditions=[pb.ConditionDef(id="k1", name="CF")]).SerializeToString()
+    assert probe.outcome_of(p.SerializeToString(), False).startswith("invalid: ")
+    assert not probe.outcome_of(p.SerializeToString(), False, defs).startswith(("invalid", "defer"))
+    outs = probe.shuffle_outcomes_of(p.SerializeToString(), 2, False, defs)
+    assert len(outs) == 3 and len(set(outs)) == 1

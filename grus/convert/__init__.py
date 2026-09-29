@@ -19,7 +19,7 @@ import pathlib
 from collections.abc import Callable
 
 from grus.convert import _kinship2, _openpedigree, _ped, _phenopackets
-from grus.convert._core import Extras, PedigreeImportError, Person, build_pedigree, build_set
+from grus.convert._core import Condition, Extras, PedigreeImportError, Person, build_pedigree, build_set, build_sets
 from grus.models import pedigree_pb2 as pb
 
 Importer = Callable[[str], pb.PedigreeSet]
@@ -92,6 +92,7 @@ def import_file(path: pathlib.Path | str, fmt: str | None = None) -> pb.Pedigree
 
 __all__ = [
     "IMPORTERS",
+    "Condition",
     "Extras",
     "Importer",
     "PedigreeImportError",
@@ -99,6 +100,7 @@ __all__ = [
     "UnknownFormatError",
     "build_pedigree",
     "build_set",
+    "build_sets",
     "import_file",
     "import_text",
     "infer_format",

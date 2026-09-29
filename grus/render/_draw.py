@@ -17,17 +17,16 @@ generation marker (Roman numeral) is drawn once per row in a reserved left gutte
 fact it draws, so a consumer can select and restyle parts without reading coordinates:
 
 * The root ``<svg>`` (or, in a composed figure, each tile's nested ``<svg>``) is ``class="pedigree"`` with
-  ``data-title`` and ``data-conditions``, a JSON array of the pedigree's condition names in legend order —
-  the same order that keys every fill and section — with ``""`` appended when any individual has an
-  unnamed condition, so every condition has an index. A deferred pedigree's placeholder is ``pedigree
+  ``data-title`` and ``data-conditions``, a JSON array of the declared names of the pedigree's conditions in
+  legend order — the same order that keys every fill and section — ``""`` standing for the unnamed condition,
+  so every condition has an index. A deferred pedigree's placeholder is ``pedigree
   deferred``.
 * ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
   ``data-generation``, ``data-index``, ``data-gender`` (man / woman / nonbinary / unknown),
   ``data-count`` on a count-collapsed symbol (the number, or ``n`` for an unknown number; absent for one
   person), ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
-  (affected / carrier / presymptomatic / unknown / …; same-named conditions share a slot and their statuses
-  join space-separated, so select one with ``[data-condition-0~="carrier"]``). State classes mirror the IR,
-  not the subset of marks the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``,
+  (affected / carrier / presymptomatic / unknown / …; a person has one entry per condition). State classes
+  mirror the IR, not the subset of marks the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``,
   ``deceased``, ``proband``, ``consultand``. A cross-generation duplicate is ``individual ghost`` with the
   same classes and data attributes as its real cell and id ``{prefix}ghost-{position}`` (``-2``, ``-3``, …
   when one individual is ghosted more than once), so ``[data-position]`` lights both and
@@ -83,6 +82,7 @@ import re
 from collections.abc import Sequence
 from typing import Protocol
 
+from grus import ir
 from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 from grus.render import _geometry, _labels, _layout, _layout2, _store
@@ -164,8 +164,12 @@ def render_svg(
     *,
     id_prefix: str = "",
     stored_layout: lpb.PedigreeLayout | None = None,
+    conditions: Sequence[pb.ConditionDef] = (),
 ) -> str:
     """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string.
+
+    ``conditions`` are the declarations of ``p``'s set (``PedigreeSet.conditions``), which its condition entries
+    reference; a pedigree with no entries needs none.
 
     With ``stored_layout`` (from ``store_layout``), draw from it instead of laying out: the same bytes, without the
     layout's cost. It must be a layout of this pedigree content under this geometry's layout fields
@@ -173,14 +177,20 @@ def render_svg(
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    return _Draw(p, _lay_out(p, geom, stored_layout), geom, id_prefix=id_prefix).svg()
+    lay = _lay_out(p, geom, stored_layout, conditions)
+    return _Draw(p, lay, geom, ir.Conditions(conditions), id_prefix=id_prefix).svg()
 
 
-def _lay_out(p: pb.Pedigree, geom: _geometry.Geometry, stored: lpb.PedigreeLayout | None) -> _layout.Layout:
+def _lay_out(
+    p: pb.Pedigree,
+    geom: _geometry.Geometry,
+    stored: lpb.PedigreeLayout | None,
+    conditions: Sequence[pb.ConditionDef],
+) -> _layout.Layout:
     """``p``'s layout: read from ``stored`` when given (checked for staleness), else computed."""
     if stored is None:
-        return _layout2.layout(p, geom)
-    return _store.load_layout(p, stored, geom)
+        return _layout2.layout(p, geom, conditions=conditions)
+    return _store.load_layout(p, stored, geom, conditions=conditions)
 
 
 def _stored_per_pedigree(
@@ -214,15 +224,18 @@ def render_set_svg(
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
+    defs = pedigree_set.conditions
+    table = ir.Conditions(defs)
     tiles: list[_Tile] = []
     for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            draw = _Draw(ped, _lay_out(ped, geom, stored), geom, id_prefix=f"{id_prefix}p{len(tiles)}-")
+            lay = _lay_out(ped, geom, stored, defs)
+            draw = _Draw(ped, lay, geom, table, id_prefix=f"{id_prefix}p{len(tiles)}-")
             width, height = draw.dimensions()
             tiles.append((title, width, height, draw.body(), draw.root_attrs()))
         except _layout.DeferredFeatureError as deferred:
-            tiles.append(_placeholder_tile(ped, str(deferred)))
+            tiles.append(_placeholder_tile(ped, table, str(deferred)))
     return _compose_tiles(tiles, geom)
 
 
@@ -243,13 +256,15 @@ def render_svgs(
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
+    defs = pedigree_set.conditions
+    table = ir.Conditions(defs)
     out: list[tuple[str, str]] = []
     for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            svg = _Draw(ped, _lay_out(ped, geom, stored), geom, id_prefix=id_prefix).svg()
+            svg = _Draw(ped, _lay_out(ped, geom, stored, defs), geom, table, id_prefix=id_prefix).svg()
         except _layout.DeferredFeatureError as deferred:
-            _, width, height, body, attrs = _placeholder_tile(ped, str(deferred))
+            _, width, height, body, attrs = _placeholder_tile(ped, table, str(deferred))
             svg = _svg_root(width, height, body, attrs)
         out.append((title, svg))
     return out
@@ -261,9 +276,9 @@ def _check_prefix(id_prefix: str) -> None:
         raise ValueError(f"id_prefix must be empty or match {_ID_PREFIX_RE.pattern}, got {id_prefix!r}")
 
 
-def _pedigree_attrs(p: pb.Pedigree, *, deferred: bool = False) -> str:
+def _pedigree_attrs(p: pb.Pedigree, conditions: ir.Conditions, *, deferred: bool = False) -> str:
     """The ``pedigree`` group's attributes, for the root ``<svg>``, a composed figure's tile, or a placeholder."""
-    legend = json.dumps(_labels.data_legend(p), ensure_ascii=False)
+    legend = json.dumps(_labels.data_legend(p, conditions), ensure_ascii=False)
     cls = "pedigree deferred" if deferred else "pedigree"
     return f'class="{cls}" data-title="{_attr(_display_title(p))}" data-conditions="{_attr(legend)}"'
 
@@ -316,7 +331,7 @@ def _svg_root(width: float, height: float, body: list[str], attrs: str = "") -> 
     return "\n".join(out) + "\n"
 
 
-def _placeholder_tile(ped: pb.Pedigree, reason: str) -> _Tile:
+def _placeholder_tile(ped: pb.Pedigree, conditions: ir.Conditions, reason: str) -> _Tile:
     """A dashed box naming a deferred (non-tier-1) pedigree, so a figure with one still renders the rest.
 
     The reason is word-wrapped (not clipped) and the box sized to fit, so a reviewer sees *why* the pedigree
@@ -334,7 +349,7 @@ def _placeholder_tile(ped: pb.Pedigree, reason: str) -> _Tile:
     for line in lines:
         body.append(_text(width / 2, y, _escape(line), 12.0))
         y += line_h
-    return (_display_title(ped), width, height, body, _pedigree_attrs(ped, deferred=True))
+    return (_display_title(ped), width, height, body, _pedigree_attrs(ped, conditions, deferred=True))
 
 
 def _wrap_words(text: str, width: int) -> list[str]:
@@ -429,8 +444,16 @@ class _KeyEntry:
 class _Draw:
     """Holds the pedigree, its layout, and geometry; emits the SVG body once."""
 
-    def __init__(self, p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry, id_prefix: str = "") -> None:
+    def __init__(
+        self,
+        p: pb.Pedigree,
+        lay: _layout.Layout,
+        geom: _geometry.Geometry,
+        conditions: ir.Conditions,
+        id_prefix: str = "",
+    ) -> None:
         self.p = p
+        self._conditions = conditions  # the set's declarations: each entry's name and inheritance
         self.lay = lay
         self.geom = geom
         self.id_prefix = id_prefix  # namespaces SVG element ids (clipPaths) so composed tiles don't collide
@@ -445,12 +468,13 @@ class _Draw:
         self.label_band = max(self.label_band, geom.label_box_height * geom.label_size)
         self.gen_height = max(geom.gen_height, geom.symbol_size + self.label_band + geom.label_gap + geom.sib_stub)
         # Ordered condition names plus the unnamed slot: the index keys `data-condition-{i}`, fills and sections.
-        self._data_legend = _labels.data_legend(p)
+        self._data_legend = _labels.data_legend(p, conditions)
         # Two or more conditions: sections exist, and the key shows each entry's position.
         self._divided = len(self._data_legend) >= 2
         self._tones = _COLOUR_TONES if geom.palette is _geometry.Palette.COLOUR else _AFFECTED_TONES
         n = len(self._data_legend)
         self._slots = 2 if n <= 2 else 4 if n <= 4 else 6  # sections per symbol: halves, quadrants or sixths
+        self._clinical = _labels.Clinical(conditions, sixths=self._slots == 6)
         self._plans = [self._fill_plan(ind) for ind in p.individuals]
         # A real individual may be ghosted more than once; each ghost cell gets an ordinal for a unique id. Both
         # the ordinal and the ghost-link order follow layout cell order, which is shuffle-invariant.
@@ -489,17 +513,18 @@ class _Draw:
             DeferredFeatureError: a fill for a condition past the sixth (legend index ``_FILLS`` or above).
         """
         index = self._data_legend.index
-        affected = {index(c.name) for c in ind.conditions if c.status == pb.CONDITION_STATUS_AFFECTED}
-        carriers = [c for c in ind.conditions if c.status == pb.CONDITION_STATUS_CARRIER]
+        entries = self._conditions.entries(ind)
+        affected = {index(e.name) for e in entries if e.status == pb.CONDITION_STATUS_AFFECTED}
+        carriers = [e for e in entries if e.status == pb.CONDITION_STATUS_CARRIER]
         dot = None
         if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected:
-            x_linked = [c for c in carriers if c.inheritance in _X_LINKED]
+            x_linked = [e for e in carriers if e.inheritance in _X_LINKED]
             if x_linked:
                 dot = min(
-                    index(c.name) for c in x_linked
+                    index(e.name) for e in x_linked
                 )  # one dot, the lowest index; any other carried condition is a section
-                carriers = [c for c in carriers if index(c.name) != dot]
-        carried = {index(c.name) for c in carriers} - affected  # affected and carried alike draws as affected
+                carriers = [e for e in carriers if index(e.name) != dot]
+        carried = {index(e.name) for e in carriers} - affected  # affected and carried alike draws as affected
         sections = sorted([(i, _AFFECTED) for i in affected] + [(i, _CARRIER) for i in carried])
         for i, _ in sections:
             if i >= _FILLS:
@@ -538,10 +563,10 @@ class _Draw:
         """Every condition index some individual is presymptomatic for: the glyph does not say which, the key does."""
         return sorted(
             {
-                self._data_legend.index(c.name)
+                self._data_legend.index(e.name)
                 for ind in self.p.individuals
-                for c in ind.conditions
-                if c.status == pb.CONDITION_STATUS_PRESYMPTOMATIC
+                for e in self._conditions.entries(ind)
+                if e.status == pb.CONDITION_STATUS_PRESYMPTOMATIC
             }
         )
 
@@ -655,7 +680,7 @@ class _Draw:
         return self._label_reach(self._ind_at(idx), side=self._side[idx])
 
     def _label_reach(self, ind: pb.Individual, *, side: int) -> tuple[float, float]:
-        return _labels.label_reach(ind, self.geom, side=side, sixths=self._slots == 6)
+        return _labels.label_reach(ind, self.geom, side=side, clinical=self._clinical)
 
     def _build_px_map(self) -> dict[float, float]:
         """Map each layout-x to a pixel offset: ``x_unit`` per layout unit, one scale for the whole figure.
@@ -808,7 +833,7 @@ class _Draw:
 
     def root_attrs(self) -> str:
         """The ``pedigree`` group's attributes, for the root ``<svg>`` or a composed figure's tile."""
-        return _pedigree_attrs(self.p)
+        return _pedigree_attrs(self.p, self._conditions)
 
     def svg(self) -> str:
         width, height = self.dimensions()
@@ -1192,14 +1217,11 @@ class _Draw:
             attrs["data-count"] = count
         if ind.HasField("external_id"):
             attrs["data-external-id"] = ind.external_id
-        # Same-named conditions share a legend slot; their statuses join space-separated (CSS ``~=`` selects one).
-        statuses_by_slot: dict[str, list[str]] = {}
-        for c in ind.conditions:
-            key = f"data-condition-{self._data_legend.index(c.name)}"
-            word = _enum_word(pb.ConditionStatus, c.status, "CONDITION_STATUS_")
-            if word not in statuses_by_slot.setdefault(key, []):
-                statuses_by_slot[key].append(word)
-        attrs.update({key: " ".join(words) for key, words in statuses_by_slot.items()})
+        # One entry per condition (the loader checks it), so each legend slot holds one status.
+        for e in self._conditions.entries(ind):
+            attrs[f"data-condition-{self._data_legend.index(e.name)}"] = _enum_word(
+                pb.ConditionStatus, e.status, "CONDITION_STATUS_"
+            )
         return _open_g(classes, attrs)
 
     def _hit_rect(self, ind: pb.Individual, cx: float, cy: float, *, arrow: bool, side: int) -> str:
@@ -1294,7 +1316,7 @@ class _Draw:
         beside the upper right when a mark already runs through the centre. Either way it has a halo in the
         contrasting colour, so it reads over a carrier's region fill or a line.
         """
-        mark = _labels.count_mark(ind, self.geom, sixths=self._slots == 6)
+        mark = _labels.count_mark(ind, self.geom, self._clinical)
         if mark is None:
             return []
         if not mark.inside:

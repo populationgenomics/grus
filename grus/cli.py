@@ -7,7 +7,9 @@ entry points and are not dispatched from here.
 
 Input is a ``PedigreeSet`` or a bare ``Pedigree`` in either text surface (pbtxt / proto3-JSON); the
 surface is taken from the file suffix (``.json`` -> JSON, anything else -> pbtxt) unless ``--format``
-says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure.
+says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure. Conditions
+are declared at set level, so a pedigree with condition entries is a one-pedigree set; ``migrate`` rewrites a
+pre-1.0 record (conditions by name on each entry) as one.
 
 ``layout`` writes an IR file's stored layout (a ``PedigreeLayout``, or a ``PedigreeSetLayout`` for a set) in the
 same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
@@ -54,7 +56,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
         ps = parse(text, pb.PedigreeSet())
     except (json_format.ParseError, text_format.ParseError):
         ps = None
-    if ps is not None and (ps.pedigrees or ps.HasField("provenance")):
+    if ps is not None and (ps.pedigrees or ps.conditions or ps.HasField("provenance")):
         ir.validate_set(ps)
         return ps
     p = parse(text, pb.Pedigree())
@@ -198,7 +200,9 @@ def _cmd_layout(args: argparse.Namespace) -> int:
         return 1
     geom = _geometry(args)
     record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
-        lpb.PedigreeSetLayout(pedigrees=[render.store_layout(p, geom) for p in loaded.pedigrees])
+        lpb.PedigreeSetLayout(
+            pedigrees=[render.store_layout(p, geom, conditions=loaded.conditions) for p in loaded.pedigrees]
+        )
         if isinstance(loaded, pb.PedigreeSet)
         else render.store_layout(loaded, geom)
     )
@@ -222,9 +226,38 @@ def _cmd_import(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_migrate(args: argparse.Namespace) -> int:
+    path: pathlib.Path = args.input
+    fmt = _text_format(path, args.format)
+    try:
+        text = path.read_text(encoding="utf-8")
+        ps = ir.migrate_json(text) if fmt == "json" else ir.migrate_pbtxt(text)
+    except OSError as e:
+        cause = f"cannot read it: {e.strerror or e}"
+    except UnicodeDecodeError as e:
+        cause = f"not UTF-8 text: {e.reason} at byte {e.start}"
+    except (json_format.ParseError, text_format.ParseError) as e:
+        cause = f"not a pre-1.0 pedigree IR: {e}"
+    except ir.MigrationError as e:
+        cause = f"cannot migrate: {e}"
+    except (ir.ValidationError, ir.IntegrityError) as e:
+        cause = f"invalid once migrated: {_describe(e)}"
+    else:
+        out = ir.dump_set_json(ps) if (args.to or fmt) == "json" else ir.dump_set_pbtxt(ps)
+        if args.output is None:
+            sys.stdout.write(out)
+        else:
+            args.output.write_text(out)
+        return 0
+    print(f"grus migrate: error: {path}: {' '.join(cause.split())}", file=sys.stderr)
+    return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
-    """Build the ``grus`` argument parser with its validate / render / layout / import subcommands."""
-    parser = argparse.ArgumentParser(prog="grus", description="Pedigree IR tools: validate, render, layout, import.")
+    """Build the ``grus`` argument parser with its validate / render / layout / import / migrate subcommands."""
+    parser = argparse.ArgumentParser(
+        prog="grus", description="Pedigree IR tools: validate, render, layout, import, migrate."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     validate = sub.add_parser("validate", help="parse + validate IR files (pbtxt / JSON), report each")
@@ -280,6 +313,15 @@ def build_parser() -> argparse.ArgumentParser:
     imp.add_argument("--to", choices=("pbtxt", "json"), default="pbtxt", help="IR text surface to write")
     imp.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
     imp.set_defaults(func=_cmd_import)
+
+    migrate = sub.add_parser(
+        "migrate", help="rewrite a pre-1.0 IR file (conditions named on each entry) as a 1.0 PedigreeSet"
+    )
+    migrate.add_argument("input", type=pathlib.Path)
+    migrate.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
+    migrate.add_argument("--format", choices=("pbtxt", "json"), help="override the suffix-derived text surface")
+    migrate.add_argument("--to", choices=("pbtxt", "json"), help="text surface to write (default: the input's)")
+    migrate.set_defaults(func=_cmd_migrate)
     return parser
 
 

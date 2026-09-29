@@ -75,18 +75,17 @@ def _time_element(t: dict[str, Any] | None) -> str | None:
     return None
 
 
-def _conditions_from_diseases(diseases: list[dict[str, Any]]) -> list[pb.Condition]:
-    out: list[pb.Condition] = []
+def _conditions_from_diseases(diseases: list[dict[str, Any]]) -> list[_core.Condition]:
+    out: list[_core.Condition] = []
     for d in diseases:
         term = _get(d, "term", {}) or {}
-        c = pb.Condition(
-            name=str(_get(term, "label") or _get(term, "id", "")),
-            status=pb.CONDITION_STATUS_UNAFFECTED if _get(d, "excluded", False) else pb.CONDITION_STATUS_AFFECTED,
+        out.append(
+            _core.Condition(
+                name=str(_get(term, "label") or _get(term, "id", "")),
+                status=pb.CONDITION_STATUS_UNAFFECTED if _get(d, "excluded", False) else pb.CONDITION_STATUS_AFFECTED,
+                onset_age=_time_element(_get(d, "onset")) or None,
+            )
         )
-        onset = _time_element(_get(d, "onset"))
-        if onset:
-            c.onset_age = onset
-        out.append(c)
     return out
 
 
@@ -125,10 +124,10 @@ def _family(fam: dict[str, Any]) -> tuple[list[_core.Person], _core.Extras, str]
         annotations: list[pb.Annotation] = []
         if sex_code in ("OTHER_SEX", "3"):
             annotations.append(pb.Annotation(text="OTHER_SEX", type=pb.ANNOTATION_TYPE_OTHER))
-        conditions: list[pb.Condition] = []
+        conditions: list[_core.Condition] = []
         status = _AFFECTED.get(str(_get(p, "affectedStatus", "MISSING")))
         if status is not None:
-            conditions.append(pb.Condition(status=status))
+            conditions.append(_core.Condition(status=status))
 
         deceased = False
         packet = packets.get(pid)
@@ -184,15 +183,15 @@ def import_phenopackets(text: str) -> pb.PedigreeSet:
     except json.JSONDecodeError as e:
         raise _core.PedigreeImportError(f"not JSON: {e}") from e
     families = doc if isinstance(doc, list) else [doc]
-    ps = pb.PedigreeSet(provenance=pb.Provenance(source_format=FORMAT))
+    sources: list[tuple[list[_core.Person], _core.Extras]] = []
     for fam in families:
         if not isinstance(fam, dict):
             raise _core.PedigreeImportError("expected a Family object")
         people, extras, family_id = _family(fam)
-        # Each Family is one pedigree; build_set groups by Person.family, which we set uniformly.
+        # Each Family is one pedigree; build_sets groups by Person.family, which we set uniformly.
         for person in people:
             person.family = family_id
-        ps.pedigrees.extend(_core.build_set(people, extras).pedigrees)
-    if not ps.pedigrees:
+        sources.append((people, extras))
+    if not sources:
         raise _core.PedigreeImportError("no families found")
-    return ps
+    return _core.build_sets(sources, provenance=pb.Provenance(source_format=FORMAT))
