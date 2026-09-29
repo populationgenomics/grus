@@ -172,8 +172,8 @@ class Clinical:
 def has_borders(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clinical) -> bool:
     """Whether ``ind``'s symbol draws a filled section's border through its centre.
 
-    A symbol with any section fill does: a carrier, several conditions, or in sixths any affected condition. A
-    symbol wholly in one affected fill, or with none, is its outline alone; the X-linked dot is no section.
+    A symbol with any section fill does: several conditions, or in sixths any one. A symbol wholly in one fill
+    (affected or carrier), or with none, is its outline alone; the X-linked dot is no section.
     """
     entries = clinical.conditions.entries(ind)
     affected = {e.name for e in entries if e.status == pb.CONDITION_STATUS_AFFECTED}
@@ -186,7 +186,7 @@ def has_borders(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clinical
     ):
         carried -= 1  # one carried condition is the dot, not a section
     filled = len(affected) + carried
-    return filled > 1 or (filled == 1 and (carried == 1 or clinical.sixths))
+    return filled > 1 or (filled == 1 and clinical.sixths)
 
 
 def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clinical) -> bool:

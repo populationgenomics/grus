@@ -3,8 +3,8 @@
 Reads only the per-level arrays (the geometry seam) plus each individual's symbol attributes from the IR.
 Emits deterministic bytes — no randomness, no timestamps, fixed number formatting — so goldens are stable.
 Symbols: square (man) / circle (woman) / diamond (nonbinary or unknown); clinical status as NSGC 2022 fills (one
-per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; one
-affected condition fills the whole shape (in sixths, its wedge), anything else one legend-keyed section per condition;
+per condition index and status: affected a flat tone, carrier the same tone with a contrasting diagonal hatch; a
+symbol showing one condition is that fill whole (in sixths, its wedge), several one legend-keyed section per condition;
 a filled section's edges inside a symbol are drawn as thin borders, and nothing else divides it),
 presymptomatic bar (twice the outline, round caps, white halo, inset from the outline), deceased
 slash, proband/consultand arrow, and a count-collapsed symbol's number (or ``n``) centred inside it. A key below the
@@ -413,13 +413,13 @@ class _FillPlan:
     """How one individual's clinical status is painted (docs/design/renderer.md, Clinical status).
 
     Attributes:
-        whole: the condition index whose affected fill covers the whole shape, when that is the only fill (never in
-            sixths, where every fill keeps its section).
+        whole: the ``(index, status)`` fill that covers the whole shape, when it is the only fill (never in sixths,
+            where every fill keeps its section).
         sections: otherwise each ``(index, status)`` painted in the index's section, in index order.
         dot: the condition index of the X-linked carrier dot (``CarrierStyle.INHERITANCE_GLYPH`` only).
     """
 
-    whole: int | None
+    whole: tuple[int, str] | None
     sections: tuple[tuple[int, str], ...]
     dot: int | None
 
@@ -507,7 +507,7 @@ class _Draw:
         self._key, self._key_w, self._key_h = self._lay_out_key()
 
     def _fill_plan(self, ind: pb.Individual) -> _FillPlan:
-        """``ind``'s fills: one affected condition fills the whole shape (outside sixths); anything else is sections.
+        """``ind``'s fills: one fill, affected or carrier, covers the whole shape (outside sixths); more are sections.
 
         Raises:
             DeferredFeatureError: a fill for a condition past the sixth (legend index ``_FILLS`` or above).
@@ -532,10 +532,10 @@ class _Draw:
                     f"{_position(ind)} is drawn with condition {self._data_legend[i]!r} at legend index {i}; "
                     f"at most {_FILLS} conditions can be drawn (halves for 2, quadrants for 3-4, sixths for 5-6)"
                 )
-        # One affected condition fills the whole shape, except in sixths: there six tones cannot carry identity alone,
-        # so every fill keeps its section.
-        if len(sections) == 1 and sections[0][1] == _AFFECTED and self._slots < 6:
-            return _FillPlan(whole=sections[0][0], sections=(), dot=dot)
+        # A symbol showing one condition is not divided (NSGC 2022 §4.5): its one fill, affected or carrier, covers the
+        # whole shape. Except in sixths: there six tones cannot carry identity alone, so every fill keeps its section.
+        if len(sections) == 1 and self._slots < 6:
+            return _FillPlan(whole=sections[0], sections=(), dot=dot)
         return _FillPlan(whole=None, sections=tuple(sections), dot=dot)
 
     def _used_fills(self) -> list[tuple[int, str, bool]]:
@@ -543,7 +543,7 @@ class _Draw:
         used: set[tuple[int, str, bool]] = set()
         for plan in self._plans:
             if plan.whole is not None:
-                used.add((plan.whole, _AFFECTED, False))
+                used.add((*plan.whole, False))
             used |= {(i, status, False) for i, status in plan.sections}
             if plan.dot is not None:
                 used.add((plan.dot, _CARRIER, True))
@@ -554,7 +554,7 @@ class _Draw:
         forms: dict[tuple[int, str], set[str]] = collections.defaultdict(set)
         for plan in self._plans:
             if plan.whole is not None:
-                forms[(plan.whole, _AFFECTED)].add("whole")
+                forms[plan.whole].add("whole")
             for i, status in plan.sections:
                 forms[(i, status)].add("section")
         return {key: tuple(f for f in ("whole", "section") if f in found) for key, found in forms.items()}
@@ -1322,7 +1322,10 @@ class _Draw:
         if not mark.inside:
             x, y = cx + self.half + _labels.COUNT_OUTSIDE_DX, cy - self.half + mark.size / 2
             return [self._count_text(x, y, mark, _STROKE, "#ffffff", "mark count outside", anchor="start")]
-        dark = plan.whole is not None and _contrast(self._tones[plan.whole]) == "#ffffff"
+        # White only on a shape wholly in a dark affected tone; a carrier's hatch keeps the black text and white halo.
+        dark = (
+            plan.whole is not None and plan.whole[1] == _AFFECTED and _contrast(self._tones[plan.whole[0]]) == "#ffffff"
+        )
         fill, halo = ("#ffffff", _STROKE) if dark else (_STROKE, "#ffffff")
         return [self._count_text(cx, cy, mark, fill, halo, "mark count", anchor="middle")]
 
@@ -1338,7 +1341,7 @@ class _Draw:
     def _status_fill(self, ind: pb.Individual, plan: _FillPlan, cx: float, cy: float, *, clip_id: str) -> list[str]:
         """The ``fill`` and ``divider`` parts, drawn under the outline (docs/design/renderer.md, Clinical status).
 
-        One affected condition paints the whole shape (outside sixths). Otherwise each section is a rectangle, or in
+        One fill paints the whole shape (outside sixths). Otherwise each section is a rectangle, or in
         sixths a wedge, for its condition index, clipped to the shape by reusing the shape as a clipPath, so there is
         no per-shape math. The X-linked dot, when drawn, sits over it.
         """
@@ -1348,15 +1351,16 @@ class _Draw:
         at = f'transform="translate({_num(cx + ox)} {_num(cy)})"'
         out: list[str] = []
         if plan.whole is not None:
+            i, status = plan.whole
             out.append(
                 self._shape(
                     ind.gender,
                     -ox,
                     0.0,
-                    f"url(#{self._fill_id(plan.whole, _AFFECTED)})",
+                    f"url(#{self._fill_id(i, status)})",
                     stroke=False,
                     cls="fill",
-                    extra=f'data-condition="{plan.whole}" data-status="{_AFFECTED}" {at}',
+                    extra=f'data-condition="{i}" data-status="{status}" {at}',
                 )
             )
         elif plan.sections:

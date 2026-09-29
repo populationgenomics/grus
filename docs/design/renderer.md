@@ -181,27 +181,27 @@ a 2×3 grid on the square would put index 1 in a different place on a square tha
 diamond at all. On the square the top and bottom wedges are narrower than the corner ones (about 190 against 230 square
 pixels), on the diamond a little wider (120 against 100); neither is small enough to lose its fill. The wedges' edges
 run along 1, 3, 5, 7, 9 and 11 o'clock: none is vertical, so the presymptomatic line, which is vertical, never lies on
-one. In sixths every fill keeps its section, even a single affected condition (which elsewhere fills the whole shape),
-because position identifies it there; in colour mode (below) the colour does too.
+one. In sixths every fill keeps its section, even a symbol's only fill (which elsewhere covers the whole shape), because
+position identifies it there; in colour mode (below) the colour does too.
 
 A section is a rectangle (in sixths a wedge) clipped to the shape by a per-symbol `clipPath`, so one code path covers □
 ○ ◇. Every filled section has a visible edge, and only filled sections do. Where it meets the outline its edge is the
 outline; inside the symbol it gets a **border**, a line from the centre along each boundary it shares with the rest of
 the symbol or with another filled section, at half the outline's stroke width. A boundary between two empty sections has
-no line, a wholly filled symbol none, and no border is stroked twice. A lone carrier's half thus has the thin line down
-the centre; a carrier's single quadrant, its two radii. A symbol's borders are one path, out from the centre along each
-ray and back, with round joins: separate butt-capped lines left notches where rays meet at the centre, and a mitre join
-spikes at a sixth's 60° angle. A ray's far end lies under the outline's stroke, so it needs no join there.
+no line, a wholly filled symbol none, and no border is stroked twice. A filled half thus has the thin line down the
+centre; a single filled quadrant, its two radii. A symbol's borders are one path, out from the centre along each ray and
+back, with round joins: separate butt-capped lines left notches where rays meet at the centre, and a mitre join spikes
+at a sixth's 60° angle. A ray's far end lies under the outline's stroke, so it needs no join there.
 
 **What a symbol shows.**
 
-- Affected with exactly one condition and carrying none: the whole shape in that condition's affected tone, except in
-  sixths, where it is that condition's wedge. An affected symbol of a single-condition pedigree is solid black, as
-  before.
-- Otherwise every affected and every carried condition fills its own section. A carrier of one condition is one hatched
-  section in its index's place — a whole-shape fill would move the condition off its place; affected with one condition
-  and a carrier of another is a flat section and a hatched one. A person has one entry per condition (the loader checks
-  it), so one condition is never both affected and carried on one symbol.
+- Showing exactly one condition, affected or carried: the whole shape in that fill (the affected tone, or the carrier
+  hatch on it), except in sixths, where it is that condition's wedge. The standard does not divide a symbol showing one
+  condition; the tone and the key name the condition. An affected symbol of a single-condition pedigree is solid black,
+  and its carrier wholly hatched.
+- Otherwise every affected and every carried condition fills its own section: affected with one condition and a carrier
+  of another is a flat section and a hatched one, a carrier of two conditions two hatched sections. A person has one
+  entry per condition (the loader checks it), so one condition is never both affected and carried on one symbol.
 - The **presymptomatic** line is a heavy vertical bar: twice the outline's width, with round caps, over a white halo,
   inset from the outline at top and bottom. The weight parts it from a filled half's thin border it may lie on, the halo
   from any fill beneath it (a black whole fill, a dark tone, a hatch) and from a coincident border, and the inset from
@@ -340,6 +340,10 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
 
 - **Divide every symbol** (kinship2) — rejected: the standard divides only a symbol showing more than one condition, and
   a divided empty symbol is the presymptomatic glyph.
+
+- **A lone carrier in its condition's section** (a carrier of one condition as a hatched half or quadrant, so the
+  condition keeps its place on every symbol) — rejected: the standard does not divide a symbol showing one condition, a
+  lone affected condition already fills the whole shape, and in a one-condition pedigree the empty half says nothing.
 
 - **Pie sectors, as Figure 2 draws three conditions on a circle** — rejected for fixed halves / quadrants keyed by
   index: sectors sized to each individual's own conditions would move a condition from symbol to symbol.

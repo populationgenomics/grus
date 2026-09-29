@@ -86,12 +86,12 @@ not depend on styling:
 
 1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
    link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
-1. **`fill`** — status paint inside the shape: the whole shape for an individual affected with one condition (outside
-   sixths), else one legend-indexed section per affected or carried condition (a clipped rectangle, or in sixths a
-   clipped wedge polygon), or the central dot an X-linked carrier gets under the inheritance-glyph style (`renderer.md`,
-   Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints with that pair's
-   named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one selector reaches all
-   status paint.
+1. **`fill`** — status paint inside the shape: the whole shape for an individual showing one condition, affected or
+   carried (outside sixths), else one legend-indexed section per affected or carried condition (a clipped rectangle, or
+   in sixths a clipped wedge polygon), or the central dot an X-linked carrier gets under the inheritance-glyph style
+   (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints
+   with that pair's named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one
+   selector reaches all status paint.
 1. **`divider`** — the borders of filled sections inside the symbol: one path of thin rays from the centre along each
    section boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline,
    so the outline stays whole.
