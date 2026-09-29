@@ -18,61 +18,61 @@
 <text x="20" y="426" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">V</text>
 </g>
 <g class="mating" data-partners="I-1 I-2">
-<line x1="197.111" y1="66" x2="217.111" y2="66" stroke="#000000" stroke-width="2"/>
+<line x1="197.111" y1="66" x2="217.111" y2="66" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="197.111" y1="66" x2="217.111" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="II-1 II-2">
-<line x1="225.111" y1="156" x2="245.111" y2="156" stroke="#000000" stroke-width="2"/>
+<line x1="225.111" y1="156" x2="245.111" y2="156" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="225.111" y1="156" x2="245.111" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="III-1 III-2">
-<line x1="253.111" y1="246" x2="273.111" y2="246" stroke="#000000" stroke-width="2"/>
+<line x1="253.111" y1="246" x2="273.111" y2="246" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="253.111" y1="246" x2="273.111" y2="246" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="IV-1 IV-4">
-<line x1="138" y1="336" x2="158" y2="336" stroke="#000000" stroke-width="2"/>
+<line x1="138" y1="336" x2="158" y2="336" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="138" y1="336" x2="158" y2="336" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="IV-3 IV-6">
-<line x1="282.667" y1="336" x2="302.667" y2="336" stroke="#000000" stroke-width="2"/>
+<line x1="282.667" y1="336" x2="302.667" y2="336" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="282.667" y1="336" x2="302.667" y2="336" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating" data-partners="IV-2 IV-5">
-<line x1="422.667" y1="336" x2="442.667" y2="336" stroke="#000000" stroke-width="2"/>
+<line x1="422.667" y1="336" x2="442.667" y2="336" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="422.667" y1="336" x2="442.667" y2="336" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating consanguineous" data-partners="V-1 V-4">
-<line x1="208" y1="424" x2="228" y2="424" stroke="#000000" stroke-width="2"/>
-<line x1="208" y1="428" x2="228" y2="428" stroke="#000000" stroke-width="2"/>
+<line x1="208" y1="424" x2="228" y2="424" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="208" y1="428" x2="228" y2="428" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="208" y1="426" x2="228" y2="426" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1">
-<line x1="207.111" y1="66" x2="207.111" y2="138" stroke="#000000" stroke-width="2"/>
+<line x1="207.111" y1="66" x2="207.111" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="II-1 II-2" data-children="III-1">
-<line x1="235.111" y1="156" x2="235.111" y2="228" stroke="#000000" stroke-width="2"/>
+<line x1="235.111" y1="156" x2="235.111" y2="228" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="III-1 III-2" data-children="IV-1 IV-3 IV-2">
-<line x1="263.111" y1="246" x2="263.111" y2="296" stroke="#000000" stroke-width="2"/>
-<line x1="120" y1="296" x2="404.667" y2="296" stroke="#000000" stroke-width="2"/>
-<line x1="120" y1="296" x2="120" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="264.667" y1="296" x2="264.667" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="404.667" y1="296" x2="404.667" y2="318" stroke="#000000" stroke-width="2"/>
+<line x1="263.111" y1="246" x2="263.111" y2="296" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="120" y1="296" x2="404.667" y2="296" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="120" y1="296" x2="120" y2="318" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="264.667" y1="296" x2="264.667" y2="318" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="404.667" y1="296" x2="404.667" y2="318" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="IV-1 IV-4" data-children="V-2 V-1">
-<line x1="148" y1="336" x2="148" y2="386" stroke="#000000" stroke-width="2"/>
-<line x1="106" y1="386" x2="190" y2="386" stroke="#000000" stroke-width="2"/>
-<line x1="106" y1="386" x2="106" y2="408" stroke="#000000" stroke-width="2"/>
-<line x1="190" y1="386" x2="190" y2="408" stroke="#000000" stroke-width="2"/>
+<line x1="148" y1="336" x2="148" y2="386" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="106" y1="386" x2="190" y2="386" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="106" y1="386" x2="106" y2="408" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="190" y1="386" x2="190" y2="408" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="IV-3 IV-6" data-children="V-4 V-5">
-<line x1="292.667" y1="336" x2="292.667" y2="386" stroke="#000000" stroke-width="2"/>
-<line x1="246" y1="386" x2="339.333" y2="386" stroke="#000000" stroke-width="2"/>
-<line x1="246" y1="386" x2="246" y2="408" stroke="#000000" stroke-width="2"/>
-<line x1="339.333" y1="386" x2="339.333" y2="408" stroke="#000000" stroke-width="2"/>
+<line x1="292.667" y1="336" x2="292.667" y2="386" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="246" y1="386" x2="339.333" y2="386" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="246" y1="386" x2="246" y2="408" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="339.333" y1="386" x2="339.333" y2="408" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="IV-2 IV-5" data-children="V-3">
-<line x1="432.667" y1="336" x2="432.667" y2="408" stroke="#000000" stroke-width="2"/>
+<line x1="432.667" y1="336" x2="432.667" y2="408" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="161.111" y="48" width="36" height="36" fill="#ffffff"/>

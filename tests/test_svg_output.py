@@ -741,6 +741,25 @@ def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
     assert _classes(count) == ["mark", "count"] and count.get("fill") == "#ffffff", "white on the black tone"
 
 
+@pytest.mark.parametrize("name", _NAMES)
+def test_connector_corners_are_filled_and_the_arrow_tip_is_a_point(name: str) -> None:
+    # Butt-capped lines meeting at a corner left a notch on its outside; square caps fill it. The deceased slash is a
+    # mark with a drawn length, so it keeps butt caps. An arrowhead is one mitred path, not two notched lines.
+    root = _parse((_GOLDENS / f"{name}.svg").read_text())
+    presymptomatic = {id(line) for g in root.iter(f"{_SVG}g") if "presymptomatic" in _classes(g) for line in g}
+    for line in root.iter(f"{_SVG}line"):
+        if "hit" in _classes(line) or id(line) in presymptomatic:
+            continue
+        cap = line.get("stroke-linecap")
+        assert cap == (None if "deceased" in _classes(line) else "square"), (_classes(line), cap)
+    for g in _groups(root, "mark"):
+        if not {"proband", "consultand"} & set(_classes(g)):
+            continue
+        (head,) = [c for c in g if "head" in _classes(c)]
+        assert head.tag == f"{_SVG}path" and head.get("stroke-linejoin") == "miter" and head.get("fill") == "none"
+        assert len(re.findall(r"[ML]", head.get("d", ""))) == 3, "barb, tip, barb: one path through the tip"
+
+
 def _presymptomatic(g: ET.Element) -> tuple[ET.Element, ET.Element]:
     """A group's presymptomatic mark as its (halo, line)."""
     (mark,) = [c for c in g if "presymptomatic" in _classes(c)]

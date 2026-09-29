@@ -9,14 +9,14 @@
 <text x="20" y="156" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">II</text>
 </g>
 <g class="mating" data-partners="I-1 I-2">
-<line x1="138" y1="66" x2="158" y2="66" stroke="#000000" stroke-width="2"/>
+<line x1="138" y1="66" x2="158" y2="66" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="138" y1="66" x2="158" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2">
-<line x1="148" y1="66" x2="148" y2="116" stroke="#000000" stroke-width="2"/>
-<line x1="148" y1="116" x2="106" y2="138" stroke="#000000" stroke-width="2"/>
-<line x1="148" y1="116" x2="190" y2="138" stroke="#000000" stroke-width="2"/>
-<line x1="124.9" y1="128.1" x2="171.1" y2="128.1" stroke="#000000" stroke-width="2"/>
+<line x1="148" y1="66" x2="148" y2="116" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="148" y1="116" x2="106" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="148" y1="116" x2="190" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="124.9" y1="128.1" x2="171.1" y2="128.1" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="102" y="48" width="36" height="36" fill="#ffffff"/>

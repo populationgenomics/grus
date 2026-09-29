@@ -91,6 +91,12 @@ parent cell, so the sib bar hangs from a short vertical stub rising to a point i
 stub from the mating midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars
 for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
+Every connector is a separate straight line with **square caps**, which extend each end by half the stroke: where two
+meet at a corner (a sib bar's end and its child's stub, a descent's top on its mating line) the caps fill the corner,
+where butt caps left a notch on its outside. An end inside a symbol lies under its backing. The deceased slash, a mark
+rather than a connector, keeps butt caps at its drawn length. The proband arrow's head is one open path through its tip
+with a mitred join, so the tip is a point.
+
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line).
 

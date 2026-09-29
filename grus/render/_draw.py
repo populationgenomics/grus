@@ -1289,7 +1289,7 @@ class _Draw:
             out += _presymptomatic_mark(cx, cy, self.half, _PRESYMPTOMATIC_INSET, cls="mark presymptomatic")
         if ind.deceased:
             d = self.half * 1.4
-            out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
+            out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased", square=False))
         if ind.proband:
             out += ['<g class="mark proband">', *self._arrow(cx, cy, label="P"), "</g>"]
         elif ind.consultand:
@@ -1455,9 +1455,17 @@ class _Draw:
         ux, uy = 1 / math.sqrt(2), -1 / math.sqrt(2)  # pointing up-right, toward the symbol
         tx, ty = hx - ux * s, hy - uy * s
         out = [_line(tx, ty, hx, hy)]
+        # The head is one open path through the tip, mitred there (60° between the barbs: a miter of twice the
+        # half-width, inside the default limit), so the tip is a point rather than two butt ends' notch.
+        barbs = []
         for ang in (math.radians(150), math.radians(-150)):
             ca, sa = math.cos(ang), math.sin(ang)
-            out.append(_line(hx, hy, hx + 9 * (ux * ca - uy * sa), hy + 9 * (ux * sa + uy * ca)))
+            barbs.append((hx + 9 * (ux * ca - uy * sa), hy + 9 * (ux * sa + uy * ca)))
+        (ax, ay), (bx, by) = barbs
+        out.append(
+            f'<path class="head" d="M{_num(ax)},{_num(ay)}L{_num(hx)},{_num(hy)}L{_num(bx)},{_num(by)}" fill="none" '
+            f'stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}" stroke-linejoin="miter"/>'
+        )
         if label:
             out.append(_text(tx - _ARROW_LABEL_DX, ty + _ARROW_LABEL_DY, label, _ARROW_LABEL_SIZE))
         return out
@@ -1524,10 +1532,19 @@ def _cls(cls: str) -> str:
     return f'class="{cls}" ' if cls else ""
 
 
-def _line(x1: float, y1: float, x2: float, y2: float, cls: str = "", width: float = _WIDTH) -> str:
+def _line(
+    x1: float, y1: float, x2: float, y2: float, cls: str = "", width: float = _WIDTH, *, square: bool = True
+) -> str:
+    """A straight stroke, square-capped unless ``square`` is false.
+
+    Square caps extend each end by half the width, so two lines meeting end to end at a corner (a sib bar's end and
+    its child's stub) fill the corner instead of leaving a notch; an end inside a symbol lies under its backing. A
+    free-standing mark (the deceased slash) keeps butt caps at its drawn length.
+    """
+    cap = ' stroke-linecap="square"' if square else ""
     return (
         f'<line {_cls(cls)}x1="{_num(x1)}" y1="{_num(y1)}" x2="{_num(x2)}" y2="{_num(y2)}" '
-        f'stroke="{_STROKE}" stroke-width="{_num(width)}"/>'
+        f'stroke="{_STROKE}" stroke-width="{_num(width)}"{cap}/>'
     )
 
 

@@ -15,35 +15,35 @@
 <text x="20" y="336" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">IV</text>
 </g>
 <g class="mating" data-partners="I-1 I-2">
-<line x1="239" y1="66" x2="259" y2="66" stroke="#000000" stroke-width="2"/>
+<line x1="239" y1="66" x2="259" y2="66" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="239" y1="66" x2="259" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating partner-omitted" data-partners="II-1">
-<line x1="123" y1="156" x2="231" y2="156" stroke="#000000" stroke-width="2"/>
+<line x1="123" y1="156" x2="231" y2="156" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="123" y1="156" x2="231" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating partner-omitted" data-partners="II-1">
-<line x1="267" y1="156" x2="375" y2="156" stroke="#000000" stroke-width="2"/>
+<line x1="267" y1="156" x2="375" y2="156" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="267" y1="156" x2="375" y2="156" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="mating partner-omitted" data-partners="III-1">
-<line x1="88" y1="246" x2="126" y2="246" stroke="#000000" stroke-width="2"/>
+<line x1="88" y1="246" x2="126" y2="246" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 <line class="hit" x1="88" y1="246" x2="126" y2="246" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1">
-<line x1="249" y1="66" x2="249" y2="138" stroke="#000000" stroke-width="2"/>
+<line x1="249" y1="66" x2="249" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="II-1" data-children="III-1 III-2">
-<line x1="186" y1="156" x2="186" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="144" y1="206" x2="228" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="144" y1="206" x2="144" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="228" y1="206" x2="228" y2="228" stroke="#000000" stroke-width="2"/>
+<line x1="186" y1="156" x2="186" y2="206" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="144" y1="206" x2="228" y2="206" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="144" y1="206" x2="144" y2="228" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="228" y1="206" x2="228" y2="228" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="II-1" data-children="III-3">
-<line x1="312" y1="156" x2="312" y2="228" stroke="#000000" stroke-width="2"/>
+<line x1="312" y1="156" x2="312" y2="228" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g class="sibship" data-parents="III-1" data-children="IV-1">
-<line x1="116" y1="246" x2="116" y2="318" stroke="#000000" stroke-width="2"/>
+<line x1="116" y1="246" x2="116" y2="318" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
 </g>
 <g id="ind-I-1" class="individual affected" data-position="I-1" data-generation="1" data-index="1" data-gender="man" data-condition-0="affected">
 <rect class="backing" x="203" y="48" width="36" height="36" fill="#ffffff"/>
@@ -64,9 +64,8 @@
 <circle class="fill" data-condition="0" data-status="affected" transform="translate(253.5 156)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="249" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
-<line x1="205.544" y1="199.456" x2="231" y2="174" stroke="#000000" stroke-width="2"/>
-<line x1="231" y1="174" x2="228.671" y2="182.693" stroke="#000000" stroke-width="2"/>
-<line x1="231" y1="174" x2="222.307" y2="176.329" stroke="#000000" stroke-width="2"/>
+<line x1="205.544" y1="199.456" x2="231" y2="174" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<path class="head" d="M228.671,182.693L231,174L222.307,176.329" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 <text x="197.544" y="203.456" font-family="sans-serif" font-size="15" fill="#000000" text-anchor="middle" dominant-baseline="central">P</text>
 </g>
 <text class="label" x="249" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
