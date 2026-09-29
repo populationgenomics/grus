@@ -4,9 +4,11 @@ Before 1.0 a person's condition entry carried its own ``name`` and ``inheritance
 its condition by name. 1.0 declares each condition once in ``PedigreeSet.conditions`` and references it by id. The
 migration reads the old record through the 0.x schema, rebuilt here from the current one, declares one condition per
 distinct name in order of first appearance (``k1``, ``k2``, …), points every entry and support at its declaration,
-and validates the result. Entries of one name that state different modes of inheritance cannot become one
-declaration, so they fail loudly; an entry that states none takes the others'. Two entries of one name on one person
-(pre-1.0 allowed, say, affected and carrier) have no 1.0 form either, and fail loudly too.
+and validates the result. A support of a declaration field (``condition.name``, ``condition.inheritance``) that
+scoped the people whose entries it described now describes the one declaration, so it loses that scope. Entries of
+one name that state different modes of inheritance cannot become one declaration, so they fail loudly; an entry that
+states none takes the others'. Two entries of one name on one person (pre-1.0 allowed, say, affected and carrier)
+have no 1.0 form either, and fail loudly too.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from google.protobuf import descriptor_pb2, descriptor_pool, json_format, messag
 from google.protobuf.message import Message
 
 from grus.ir._conditions import Conditions
-from grus.ir._validate import validate_set
+from grus.ir._validate import SUPPORT_FIELDS, validate_set
 from grus.models import pedigree_pb2 as pb
 
 _PACKAGE = pb.DESCRIPTOR.package
@@ -176,6 +178,9 @@ def _migrate(old: Any) -> pb.PedigreeSet:
                 if s_old.condition not in ids:
                     raise MigrationError(f"supports[{k}] names condition {s_old.condition!r}, which no entry has")
                 s_new.condition_id = ids[s_old.condition]
+            if SUPPORT_FIELDS.get(s_new.field) == {"declaration"}:
+                del s_new.individuals[:]
+                del s_new.matings[:]
     validate_set(new)
     return new
 
