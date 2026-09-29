@@ -2,6 +2,8 @@
 
 * **Grouping** — one declaration per distinct name, ids ``k1``, ``k2``, … by first appearance across the set; every
   entry and support points at its declaration.
+* **Declaration supports** — a ``condition.name`` / ``condition.inheritance`` support that scoped the people it
+  described now describes the declaration, so it scopes the whole pedigree.
 * **Loud** — entries of one name that state different inheritance, two entries of one name on one person, and a
   support naming a condition no one has all fail.
 * **Continuity** — a migrated record keeps its stored-layout digest: the digest reads entries through their
@@ -33,7 +35,7 @@ pedigrees {
                 conditions { name: "CF" status: CONDITION_STATUS_AFFECTED onset_age: "P2Y" } }
   matings { partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 }
             offspring { child { generation: 2 index: 1 } } }
-  supports { citations: "cap" field: "condition.name" condition: "CF" }
+  supports { citations: "cap" field: "condition.name" condition: "CF" individuals { generation: 2 index: 1 } }
   supports { citations: "cap" field: "condition.status" condition: "DMD" individuals { generation: 1 index: 2 } }
 }
 pedigrees {
@@ -58,6 +60,9 @@ def test_one_declaration_per_name_by_first_appearance() -> None:
     assert _entries(ps) == [[("k1", c), ("k1", c), ("k2", c), ("k1", a)], [("k3", a), ("k2", a)]]
     assert ps.pedigrees[0].individuals[2].conditions[0].onset_age == "P2Y"
     assert [sup.condition_id for sup in ps.pedigrees[0].supports] == ["k1", "k2"]
+    name, status = ps.pedigrees[0].supports
+    assert not name.individuals, "a declaration field's support loses its people"
+    assert [(i.generation, i.index) for i in status.individuals] == [(1, 2)], "an entry field's keeps them"
     assert ps.citations[0].id == "cap", "everything else carries over"
     assert ir.load_set_pbtxt(ir.dump_set_pbtxt(ps)) == ps
 
