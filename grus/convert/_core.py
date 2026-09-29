@@ -4,12 +4,15 @@ A format module parses its file into ``Person`` records (opaque ids, parent ids,
 format-level extras; ``build_set`` groups them into pedigrees, derives one ``Mating`` per distinct parent
 pair, synthesises the ``Position`` identity (kinship2-style ``kindepth`` with couple alignment for the
 generation; source order within the generation for the index), and validates the result through
-``grus.ir`` so no importer ever returns an invalid IR.
+``grus.ir`` so no importer ever returns an invalid IR. A person's conditions are stated by name (``Condition``);
+``build_set`` declares one ``ConditionDef`` per distinct name, ids ``k1``, ``k2``, … in order of first appearance
+across the set, and points each entry at its declaration.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from grus import ir
@@ -18,6 +21,15 @@ from grus.models import pedigree_pb2 as pb
 
 class PedigreeImportError(ValueError):
     """The source file is malformed or references an unknown individual. Fails loud, names the offender."""
+
+
+@dataclass(frozen=True)
+class Condition:
+    """One condition entry as a source states it: by name ("" = the sole, unnamed condition)."""
+
+    status: pb.ConditionStatus
+    name: str = ""
+    onset_age: str | None = None
 
 
 @dataclass
@@ -33,7 +45,7 @@ class Person:
     father: str | None = None
     mother: str | None = None
     family: str = ""
-    conditions: list[pb.Condition] = field(default_factory=list)
+    conditions: list[Condition] = field(default_factory=list)
     deceased: bool = False
     proband: bool = False
     consultand: bool = False
@@ -69,21 +81,49 @@ def build_set(
     people: list[Person], extras: Extras | None = None, *, provenance: pb.Provenance | None = None
 ) -> pb.PedigreeSet:
     """Group ``people`` by family, build each ``Pedigree``, validate, return the set (families in source order)."""
-    extras = extras or Extras()
-    by_family: dict[str, list[Person]] = defaultdict(list)
-    for person in people:
-        by_family[person.family].append(person)
+    return build_sets([(people, extras or Extras())], provenance=provenance)
+
+
+def build_sets(
+    sources: list[tuple[list[Person], Extras]], *, provenance: pb.Provenance | None = None
+) -> pb.PedigreeSet:
+    """``build_set`` over several sources (people with their own extras) into one set, sources in order.
+
+    For a format whose file holds several independently keyed documents (a Phenopackets array of families): each
+    source's pedigrees are built from its own extras, and conditions are declared once across the whole set.
+    """
+    ids: dict[str, str] = {}
+    for people, _ in sources:
+        for person in people:
+            names = [c.name for c in person.conditions]
+            if len(set(names)) != len(names):
+                dup = sorted({n for n in names if names.count(n) > 1})
+                raise PedigreeImportError(f"individual {person.id!r} states condition(s) {dup} more than once")
+            for name in names:
+                ids.setdefault(name, f"k{len(ids) + 1}")
     ps = pb.PedigreeSet()
-    for family, members in by_family.items():
-        ps.pedigrees.append(build_pedigree(members, extras, family_id=family))
+    ps.conditions.extend(pb.ConditionDef(id=cid, name=name) for name, cid in ids.items())
+    for people, extras in sources:
+        by_family: dict[str, list[Person]] = defaultdict(list)
+        for person in people:
+            by_family[person.family].append(person)
+        for family, members in by_family.items():
+            ps.pedigrees.append(build_pedigree(members, extras, family_id=family, condition_ids=ids))
     if provenance is not None:
         ps.provenance.CopyFrom(provenance)
     ir.validate_set(ps)
     return ps
 
 
-def build_pedigree(people: list[Person], extras: Extras, *, family_id: str = "") -> pb.Pedigree:
-    """Build one ``Pedigree`` from the members of one family (see module doc)."""
+def build_pedigree(
+    people: list[Person], extras: Extras, *, family_id: str = "", condition_ids: Mapping[str, str] | None = None
+) -> pb.Pedigree:
+    """Build one ``Pedigree`` from the members of one family (see module doc).
+
+    ``condition_ids`` maps each condition name to its declaration's id (``build_set`` declares them); a person's
+    condition whose name it lacks is an error.
+    """
+    condition_ids = condition_ids or {}
     ids = [p.id for p in people]
     if len(set(ids)) != len(ids):
         dup = sorted({i for i in ids if ids.count(i) > 1})
@@ -132,7 +172,12 @@ def build_pedigree(people: list[Person], extras: Extras, *, family_id: str = "")
         ind = ped.individuals.add(generation=pos[p.id].generation, index=pos[p.id].index, gender=p.gender)
         if p.sex_assigned_at_birth is not None:
             ind.sex_assigned_at_birth = p.sex_assigned_at_birth
-        ind.conditions.extend(p.conditions)
+        for c in p.conditions:
+            if c.name not in condition_ids:
+                raise PedigreeImportError(f"individual {p.id!r}: condition {c.name!r} has no declared id")
+            entry = ind.conditions.add(condition_id=condition_ids[c.name], status=c.status)
+            if c.onset_age is not None:
+                entry.onset_age = c.onset_age
         ind.deceased = p.deceased
         ind.proband = p.proband
         ind.consultand = p.consultand

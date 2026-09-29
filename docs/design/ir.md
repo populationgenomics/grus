@@ -57,16 +57,15 @@ once:
   not "square", keeps it meaning-only. Pre-2022 figures draw phenotypic sex; they map onto `gender` by the standard's
   assume-aligned rule (2022 Box 1.1.f), with `sex_assigned_at_birth` unset — and the moment a figure annotates AMAB/AFAB
   or draws nonbinary, it is captured faithfully.
-- **Clinical status is `repeated Condition{name, status, inheritance, onset_age}`**, not a flat affection+carrier pair.
-  A person can be affected with one condition and a carrier of another — the 2022 standard draws this by partitioning
-  the symbol into per-condition fill regions (and moved carrier itself from a dot to a fill). One `Condition` = one
-  region keyed to the legend; `status` ∈ unaffected/affected/carrier/presymptomatic/unknown. The single-condition case
-  is one entry. `inheritance` (AD/AR/XLD/XLR/Y/mito, absent = unspecified) records the condition's mode **only when the
-  figure states it** — never inferred from the pedigree pattern (see no-inference non-goal); the carrier *glyph* is a
-  render choice, not implied by this field. `onset_age` is the as-drawn age at onset/diagnosis for **this** condition,
-  verbatim ("42", "40s", "prenatal") — kept on the condition rather than as a floating annotation so the age↔condition
-  binding survives. A condition's own facts (its name, its mode of inheritance) are declared once, by id (next section);
-  a person's entry carries only what is about the person.
+- **Clinical status is `repeated Condition{condition_id, status, onset_age}`**, not a flat affection+carrier pair. A
+  person can be affected with one condition and a carrier of another — the 2022 standard draws this by partitioning the
+  symbol into per-condition fill regions (and moved carrier itself from a dot to a fill). One entry = one region keyed
+  to the legend; `status` ∈ unaffected/affected/carrier/presymptomatic/unknown. The single-condition case is one entry.
+  The condition's own facts are declared once, by id (below): its `name` and its `inheritance` (AD/AR/XLD/XLR/Y/mito,
+  absent = unspecified), recorded **only when the figure states it** — never inferred from the pedigree pattern (see
+  no-inference non-goal); the carrier *glyph* is a render choice, not implied by this field. `onset_age` is the as-drawn
+  age at onset/diagnosis for **this** person and condition, verbatim ("42", "40s", "prenatal") — kept on the entry
+  rather than as a floating annotation so the age↔condition binding survives.
 - **Labels are `repeated Label{text, kind}`** (kind ∈ family/panel/gene/phenotype/other), not a single `title` — a
   pedigree often carries several at once, each a distinct fact for reasoning; the renderer picks the display title. The
   panel label lives here (as-drawn meaning), not in `Provenance`.
@@ -128,7 +127,7 @@ message Region {             // page units, origin top left: PDF points on a PDF
 message Support {            // one kind of fact, about some people or the whole pedigree, and what backs it
   repeated string citations = 1;
   string field = 2;          // a path into the IR, from a closed list (below)
-  optional string condition = 3;       // which condition, when `field` starts "condition."
+  optional string condition_id = 6;    // a ConditionDef id, iff `field` starts "condition."
   repeated Position individuals = 4;   // scope; none of individuals/matings = the whole pedigree
   repeated MatingRef matings = 5;      // a couple, by its partners' positions
 }
@@ -150,13 +149,15 @@ Two levels of evidence, and an optional third:
 
 `field` is a path into the IR, checked against a closed list: the `Individual` fields (`gender`, `deceased`, `proband`,
 `consultand`, `documented_evaluation`, `reproductive_outcome`, `reproductive_role`, `count`, `count_unspecified`,
-`sex_assigned_at_birth`, `external_id`, `annotations`), the `Condition` fields as `condition.status`, `condition.name`,
-`condition.inheritance` and `condition.onset_age` (with `condition` naming it), the `Mating` fields (`consanguineous`,
-`status`, `childlessness`, `annotations`; a support's scope says whose `annotations` it means), the `Offspring` fields
-(`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the pedigree. The loader
-fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a condition no one in scope has,
-or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked where the document
-text is available (the store), as case records check theirs; the IR alone cannot.
+`sex_assigned_at_birth`, `external_id`, `annotations`), a person's entry as `condition.status` and `condition.onset_age`
+and the declaration as `condition.name` and `condition.inheritance` (each with `condition_id` naming the condition; a
+declaration path scopes the whole pedigree only, since a name or a mode belongs to the condition, not to one person),
+the `Mating` fields (`consanguineous`, `status`, `childlessness`, `annotations`; a support's scope says whose
+`annotations` it means), the `Offspring` fields (`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the
+child, and `labels` for the pedigree. The loader fails loud on an unknown id, an unknown path, a person or couple not in
+the pedigree, a condition no one in scope has, or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in
+its document is checked where the document text is available (the store), as case records check theirs; the IR alone
+cannot.
 
 A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
 a pedigree was read, never where anything sits in a rendering.
@@ -169,27 +170,35 @@ disagree on inheritance with nothing to check it, and a renderer legend or a cit
 condition by joining on a free-text name. So conditions are declared once, with local ids, as citations are:
 
 ```proto
-message ConditionDef {                  // in PedigreeSet.conditions, the normalised list
+message ConditionDef {                  // in PedigreeSet.conditions = 5, the normalised list
   string id = 1;                        // local ("k1"), unique in the set
   string name = 2;                      // as printed; "" = the figure's sole, unnamed condition
   optional Inheritance inheritance = 3; // the condition's mode, when the figure or its text states it
 }
 message Condition {                     // a person's entry
-  string condition_id = 1;              // which declared condition
+  reserved 1, 3;                        // were name and inheritance: now on the declaration
+  reserved "name", "inheritance";
+  string condition_id = 5;              // which declared condition
   ConditionStatus status = 2;
   optional string onset_age = 4;        // this person's age at onset, verbatim
-  reserved 3;                           // was inheritance: now on the declaration
 }
-// Support: `condition_id` replaces the name-based `condition`.
+// Support: `optional string condition_id = 6` replaces the name-based `condition = 3` (reserved).
 ```
+
+A removed field's number and name are reserved, never reused: `condition_id` takes a new number rather than the retired
+`name`'s, so a pre-1.0 record read as 1.0 never mistakes a name for an id.
 
 - **Set level, not pedigree level.** A multi-family figure often shares one condition and one key ("EB phenotypes in
   families 1 and 2"); both families' people reference the same declaration, as two pedigrees may cite one caption.
 - **Unnamed conditions are declared too.** The common "filled = affected" figure is one declaration with an empty name,
   so every entry references an id and there is no special case.
 - **A person's entry is `{condition_id, status, onset_age}`**: which condition, and what is true of this person. The
-  entry's old `name` and `inheritance` are gone, not deprecated: a breaking change, made with a major version bump and
-  every consumer and golden migrated in the same release.
+  entry's old `name` and `inheritance` are gone, not deprecated: a breaking change, made in 1.0 with every consumer and
+  golden migrated in the same release.
+- **A pedigree's conditions live in its set.** A bare `Pedigree` has nowhere to declare them, so one with condition
+  entries is validated (`grus.ir.validate`, `load_pbtxt`, `load_json`) and drawn (`render_svg`, `layout`,
+  `store_layout`, …) with the set's declarations passed alongside (`conditions=`); a file holding one is a one-pedigree
+  `PedigreeSet`.
 - **Checks** (loader, loud): declaration ids unique across the set and distinct from citation ids; declaration names
   unique across the set, so one condition cannot be declared twice; every `condition_id` resolves; no person has two
   entries for the same condition; a support's `condition_id` names a condition someone in its scope (or the pedigree)
@@ -199,7 +208,16 @@ message Condition {                     // a person's entry
   the declaration; `diff_set` and `match_individuals` compare a person's entries by the declared name, so ids assigned
   differently in two records still match.
 - **Emission.** A model declares each condition once, usually from the figure's key or legend, then writes the short id
-  on each symbol, which is easier to get right than repeating a long name.
+  on each symbol, which is easier to get right than repeating a long name. The importers (`convert.md`) declare one
+  condition per distinct stated name, ids `k1`, `k2`, … by first appearance.
+- **Migration.** `grus.ir.migrate_pbtxt` / `migrate_json` (and `grus migrate`) read a pre-1.0 record — a set or a bare
+  pedigree — and declare one condition per distinct name, ids `k1`, `k2`, … by first appearance across the set. An entry
+  that states no inheritance takes its name's stated one; entries of one name stating different modes, or one person
+  with two entries of one name (pre-1.0 allowed affected and carrier together), have no 1.0 form and raise
+  `MigrationError`; so does a support naming a condition no one has. The result is validated.
+- **Stored layouts keep their key.** The stored-layout digest (`layout-store.md`) reads each entry through its
+  declaration in the pre-1.0 encoding, so a migrated pedigree has the digest it had, and a declaration's id never enters
+  it; its name and inheritance do.
 
 A condition-centred view (each condition with the people who have it, as a case-record `Assertion` with `applies_to`) is
 a mechanical projection of this form, so an export can produce it without storing it.
@@ -213,9 +231,10 @@ for them. Covered: gender + sex-assigned-at-birth (incl. nonbinary, VSC via `con
 presymptomatic, multi-condition partition; deceased, proband, consultand; reproductive outcomes (pregnancy, stillbirth,
 SAB, TOP, ectopic) and count-collapsed sibships; consanguinity, separated/divorced, single parent, childlessness/
 infertility; twins (MZ/DZ/unknown); adoption (in/out, dashed vs solid descent); ART donor/surrogate; family/panel/gene
-labels. Evolution is additive by default (`buf breaking`, FILE, in CI); a breaking change is allowed only with a major
-version bump of the package in the same change, which the CI check recognises, with every consumer migrated in that
-release. The pre-release rewrites (slice 22) are history.
+labels. Evolution is additive by default: CI runs `buf breaking` (FILE) against the baseline, through
+`tools/schema/compat.py`, which passes a break only when the same change raises the major version in `pyproject.toml`
+above the baseline's — the breaking release, with every consumer migrated in it. A removed field's number and name are
+reserved, never reused. Downstream pins a major (`grus>=1,<2`). The pre-release rewrites (slice 22) are history.
 
 ### Serialization
 
@@ -226,9 +245,10 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 ### Validation, split by what protobuf can express
 
 - **Field-local / single-message** rules are **protovalidate** options on the `.proto`: `Position` components ≥ 1;
-  `gender` and `Condition.status` are real values not the zero sentinel; `twin_type` set iff `twin_group` present;
-  `Individual.count` ≥ 1 when set (1 is one person, the same as absent) and never together with `count_unspecified` (a
-  known and an unknown number at once).
+  `gender` and `Condition.status` are real values not the zero sentinel; `ConditionDef.id`, `Condition.condition_id` and
+  a set `Support.condition_id` are non-empty; `twin_type` set iff `twin_group` present; `Individual.count` ≥ 1 when set
+  (1 is one person, the same as absent) and never together with `count_unspecified` (a known and an unknown number at
+  once).
 - **Graph invariants** live in the `grus.ir` loader, which fails loud: every referenced `Position` exists among the
   pedigree's individuals; `(generation, index)` is unique per pedigree; a mating's two partners are distinct; offspring
   exist; a child's generation exceeds each parent's, and one mating's offspring share a generation. Generation is the
@@ -239,10 +259,12 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   well-formed (a non-empty id, exactly one anchor, a region with page ≥ 0 and x1 > x0, y1 > y0 — protovalidate), ids are
   unique across the set, every evidence and support id resolves, a support's `field` is on the closed path list
   (`grus.ir.SUPPORT_FIELDS`, exported with `grus.ir.SUPPORT_CONDITION_PREFIX` so a prompt can list the valid paths), it
-  names a `condition` iff the field is `condition.*` and someone in scope has it, every person and couple in scope is in
-  the pedigree, an offspring field is scoped by the child, and a mating field by couples. Each failure names the
-  pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are `optional` (absent
-  = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never emitted.
+  names a declared `condition_id` iff the field is `condition.*` and someone in scope has it, a declaration path scopes
+  the whole pedigree, every person and couple in scope is in the pedigree, an offspring field is scoped by the child,
+  and a mating field by couples. Condition declarations are checked as listed under "Conditions are declared once, by
+  id". Each failure names the pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare
+  axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never
+  emitted.
 
 ## Alternatives considered
 

@@ -33,24 +33,27 @@ from grus.render import _store
 _GEOM = render.DEFAULT_GEOMETRY
 
 
-def _fixtures() -> dict[str, pb.Pedigree]:
-    """Every drawable golden, plus the shapes with synthetic cells no golden has."""
-    out = {name: test_render._load(name) for name in test_layout2._DRAWABLE}
-    out["ghost"] = test_svg_output._avuncular()
-    out["two_ghosts"] = test_svg_output._avuncular(second_niece=True)
-    out.update(test_layout2.GHOST_PEDIGREES)
+_Defs = tuple[pb.ConditionDef, ...]
+
+
+def _fixtures() -> dict[str, tuple[pb.Pedigree, _Defs]]:
+    """Every drawable golden, plus the shapes with synthetic cells no golden has; each with its declarations."""
+    out = {name: test_render._golden(name) for name in test_layout2._DRAWABLE}
+    out["ghost"] = (test_svg_output._avuncular(), ())
+    out["two_ghosts"] = (test_svg_output._avuncular(second_niece=True), ())
+    out.update({name: (p, ()) for name, p in test_layout2.GHOST_PEDIGREES.items()})
     return out
 
 
 _FIXTURES = _fixtures()
 
 
-def _record(p: pb.Pedigree) -> lpb.PedigreeLayout:
-    return _store.to_proto(p, render.layout(p, _GEOM), _GEOM)
+def _record(p: pb.Pedigree, defs: _Defs = ()) -> lpb.PedigreeLayout:
+    return _store.to_proto(p, render.layout(p, _GEOM, conditions=defs), _GEOM, defs)
 
 
 def test_fixtures_cover_every_kind_of_cell() -> None:
-    layouts = [render.layout(p) for p in _FIXTURES.values()]
+    layouts = [render.layout(p, conditions=defs) for p, defs in _FIXTURES.values()]
     assert any(lay.ghost_of for lay in layouts)
     assert any(lay.phantom for lay in layouts)
     assert any(lay.passthrough for lay in layouts)
@@ -59,35 +62,35 @@ def test_fixtures_cover_every_kind_of_cell() -> None:
 
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
 def test_round_trip_is_lossless(name: str) -> None:
-    p = _FIXTURES[name]
-    lay = render.layout(p, _GEOM)
-    record = _store.to_proto(p, lay, _GEOM)
+    p, defs = _FIXTURES[name]
+    lay = render.layout(p, _GEOM, conditions=defs)
+    record = _store.to_proto(p, lay, _GEOM, defs)
     protovalidate.validate(record)
     back = lpb.PedigreeLayout.FromString(record.SerializeToString())
-    assert _store.from_proto(p, back.placement, _GEOM) == lay
+    assert _store.from_proto(p, back.placement, _GEOM, defs) == lay
 
 
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
 def test_record_is_independent_of_input_order(name: str) -> None:
-    p = _FIXTURES[name]
-    ref = _record(p).SerializeToString(deterministic=True)
+    p, defs = _FIXTURES[name]
+    ref = _record(p, defs).SerializeToString(deterministic=True)
     for seed in range(4):
         q = test_layout2._shuffled(p, seed)
-        assert _record(q).SerializeToString(deterministic=True) == ref
+        assert _record(q, defs).SerializeToString(deterministic=True) == ref
 
 
 @pytest.mark.parametrize("name", sorted(test_layout2.GHOST_PEDIGREES))
 def test_ghost_records_are_independent_of_mating_order(name: str) -> None:
     # A record of one mating order draws every other order exactly as a fresh render of it does.
-    p = test_layout2.GHOST_PEDIGREES[name]
-    ref = _record(p)
+    p, defs = test_layout2.GHOST_PEDIGREES[name], ()
+    ref = _record(p, defs)
     for perm in itertools.permutations(p.matings):
         q = pb.Pedigree()
         q.CopyFrom(p)
         del q.matings[:]
         q.matings.extend(perm)
-        assert _record(q).SerializeToString(deterministic=True) == ref.SerializeToString(deterministic=True)
-        assert render.render_svg(q, stored_layout=ref) == render.render_svg(q)
+        assert _record(q, defs).SerializeToString(deterministic=True) == ref.SerializeToString(deterministic=True)
+        assert render.render_svg(q, stored_layout=ref, conditions=defs) == render.render_svg(q, conditions=defs)
 
 
 def test_repeated_avuncular_marriages_store_distinct_ghosts() -> None:
@@ -98,53 +101,53 @@ def test_repeated_avuncular_marriages_store_distinct_ghosts() -> None:
 
 def test_record_reads_back_into_a_shuffled_pedigree() -> None:
     # The record names identities, so it maps onto any input order of the same pedigree.
-    p = _FIXTURES["two_ghosts"]
-    record = _record(p)
+    p, defs = _FIXTURES["two_ghosts"]
+    record = _record(p, defs)
     q = test_layout2._shuffled(p, 1)
-    assert _store.from_proto(q, record.placement, _GEOM) == render.layout(q, _GEOM)
+    assert _store.from_proto(q, record.placement, _GEOM, defs) == render.layout(q, _GEOM, conditions=defs)
 
 
 def test_digest_ignores_order_but_not_content() -> None:
-    p = _FIXTURES["three_generation"]
-    assert _store.pedigree_digest(test_layout2._shuffled(p, 0)) == _store.pedigree_digest(p)
+    p, defs = _FIXTURES["three_generation"]
+    assert _store.pedigree_digest(test_layout2._shuffled(p, 0), defs) == _store.pedigree_digest(p, defs)
     q = pb.Pedigree()
     q.CopyFrom(p)
     q.individuals[0].annotations.add(text="d.72", type=pb.ANNOTATION_TYPE_AGE_AT_DEATH)
-    assert _store.pedigree_digest(q) != _store.pedigree_digest(p)
+    assert _store.pedigree_digest(q, defs) != _store.pedigree_digest(p, defs)
 
 
 def test_digest_keeps_birth_order() -> None:
-    p = _FIXTURES["sibship"]
+    p, defs = _FIXTURES["sibship"]
     q = pb.Pedigree()
     q.CopyFrom(p)
     offspring = list(q.matings[0].offspring)
     del q.matings[0].offspring[:]
     q.matings[0].offspring.extend(reversed(offspring))
-    assert _store.pedigree_digest(q) != _store.pedigree_digest(p)
+    assert _store.pedigree_digest(q, defs) != _store.pedigree_digest(p, defs)
 
 
 def test_a_cell_the_pedigree_does_not_lay_out_is_refused() -> None:
-    p = _FIXTURES["sibship"]
-    record = _record(p)
+    p, defs = _FIXTURES["sibship"]
+    record = _record(p, defs)
     record.placement.rows[0].cells[0].individual.index = 99
     with pytest.raises(_store.StaleLayoutError, match="does not lay out"):
-        _store.from_proto(p, record.placement, _GEOM)
+        _store.from_proto(p, record.placement, _GEOM, defs)
 
 
 def test_a_missing_cell_is_refused() -> None:
-    p = _FIXTURES["sibship"]
-    record = _record(p)
+    p, defs = _FIXTURES["sibship"]
+    record = _record(p, defs)
     del record.placement.rows[-1].cells[-1]
     with pytest.raises(_store.StaleLayoutError, match="missing"):
-        _store.from_proto(p, record.placement, _GEOM)
+        _store.from_proto(p, record.placement, _GEOM, defs)
 
 
 def test_a_column_outside_its_row_is_refused() -> None:
-    p = _FIXTURES["sibship"]
-    record = _record(p)
+    p, defs = _FIXTURES["sibship"]
+    record = _record(p, defs)
     record.placement.rows[1].cells[0].parent_column = 7
     with pytest.raises(_store.StaleLayoutError, match="parent column 7"):
-        _store.from_proto(p, record.placement, _GEOM)
+        _store.from_proto(p, record.placement, _GEOM, defs)
 
 
 # --- drawing from a stored layout ---------------------------------------------------------------------------------
@@ -169,7 +172,8 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> N
     pinned: dict[str, dict[str, str]] = pins.setdefault(str(render.LAYOUT_VERSION), {}).setdefault(solver, {})
     problems = [f"{name}: its golden is gone; remove the pin" for name in sorted(set(pinned) - set(test_render._NAMES))]
     for name in test_render._NAMES:
-        record = render.store_layout(test_render._load(name), geom)
+        p, defs = test_render._golden(name)
+        record = render.store_layout(p, geom, conditions=defs)
         now = {
             "pedigree": record.key.pedigree_digest.hex(),
             "placement": hashlib.sha256(record.placement.SerializeToString(deterministic=True)).hexdigest(),
@@ -190,26 +194,32 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> N
 
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
 def test_drawing_from_a_stored_layout_is_byte_identical(name: str) -> None:
-    p = _FIXTURES[name]
-    stored = lpb.PedigreeLayout.FromString(render.store_layout(p).SerializeToString())
-    assert render.render_svg(p, stored_layout=stored, id_prefix="f-") == render.render_svg(p, id_prefix="f-")
+    p, defs = _FIXTURES[name]
+    stored = lpb.PedigreeLayout.FromString(render.store_layout(p, conditions=defs).SerializeToString())
+    assert render.render_svg(p, stored_layout=stored, id_prefix="f-", conditions=defs) == render.render_svg(
+        p, id_prefix="f-", conditions=defs
+    )
 
 
 def test_drawing_only_geometry_may_vary() -> None:
-    p = _FIXTURES["carrier_inheritance"]
-    stored = render.store_layout(p)
+    p, defs = _FIXTURES["carrier_inheritance"]
+    stored = render.store_layout(p, conditions=defs)
     # Row pitch, margins, stubs and the vertical label rhythm move nothing horizontally. symbol_size and carrier_style
     # did, once count marks and labels beside a drop entered the spacing; they are in the key now.
     geom = dataclasses.replace(
         _GEOM, gen_height=120.0, margin=10.0, sib_stub=30.0, elbow_gap=10.0, label_line_gap=4.0, label_box_height=3.0
     )
-    assert render.render_svg(p, geom, stored_layout=stored) == render.render_svg(p, geom)
+    assert render.render_svg(p, geom, stored_layout=stored, conditions=defs) == render.render_svg(
+        p, geom, conditions=defs
+    )
 
 
 def test_a_stored_layout_draws_a_shuffled_pedigree() -> None:
-    p = _FIXTURES["two_ghosts"]
+    p, defs = _FIXTURES["two_ghosts"]
     q = test_layout2._shuffled(p, 2)
-    assert render.render_svg(q, stored_layout=render.store_layout(p)) == render.render_svg(q)
+    assert render.render_svg(q, stored_layout=render.store_layout(p, conditions=defs)) == render.render_svg(
+        q, conditions=defs
+    )
 
 
 _KEY_FIELDS = (
@@ -227,39 +237,39 @@ _KEY_FIELDS = (
 
 @pytest.mark.parametrize("field", _KEY_FIELDS)
 def test_a_layout_under_other_layout_geometry_is_stale(field: str) -> None:
-    p = _FIXTURES["three_generation"]
-    stored = render.store_layout(p)
+    p, defs = _FIXTURES["three_generation"]
+    stored = render.store_layout(p, conditions=defs)
     enums = {"x_solver": render.XSolver.HIGHS, "carrier_style": render.CarrierStyle.INHERITANCE_GLYPH}
     changed = enums[field] if field in enums else getattr(_GEOM, field) + 1.0
     geom = dataclasses.replace(_GEOM, **{field: changed})
     with pytest.raises(render.StaleLayoutError, match=field):
-        render.render_svg(p, geom, stored_layout=stored)
+        render.render_svg(p, geom, stored_layout=stored, conditions=defs)
 
 
 def test_a_layout_of_other_pedigree_content_is_stale() -> None:
-    p = _FIXTURES["three_generation"]
-    stored = render.store_layout(p)
+    p, defs = _FIXTURES["three_generation"]
+    stored = render.store_layout(p, conditions=defs)
     q = pb.Pedigree()
     q.CopyFrom(p)
     q.individuals[0].deceased = not q.individuals[0].deceased
     with pytest.raises(render.StaleLayoutError, match="digest"):
-        render.render_svg(q, stored_layout=stored)
+        render.render_svg(q, stored_layout=stored, conditions=defs)
 
 
 def test_a_layout_from_another_algorithm_version_is_stale() -> None:
-    p = _FIXTURES["three_generation"]
-    stored = render.store_layout(p)
+    p, defs = _FIXTURES["three_generation"]
+    stored = render.store_layout(p, conditions=defs)
     stored.key.algorithm_version = render.LAYOUT_VERSION + 1
     with pytest.raises(render.StaleLayoutError, match="version"):
-        render.render_svg(p, stored_layout=stored)
+        render.render_svg(p, stored_layout=stored, conditions=defs)
 
 
 def test_a_malformed_record_is_refused() -> None:
-    p = _FIXTURES["three_generation"]
-    stored = render.store_layout(p)
+    p, defs = _FIXTURES["three_generation"]
+    stored = render.store_layout(p, conditions=defs)
     stored.key.ClearField("geometry")
     with pytest.raises(ir.ValidationError):
-        render.render_svg(p, stored_layout=stored)
+        render.render_svg(p, stored_layout=stored, conditions=defs)
 
 
 def test_a_deferral_is_stored_and_replayed() -> None:
@@ -270,16 +280,17 @@ def test_a_deferral_is_stored_and_replayed() -> None:
     assert stored.deferred == str(fresh.value)
     with pytest.raises(render.DeferredFeatureError, match="more than one mating"):
         render.render_svg(p, stored_layout=stored)
-    ps = pb.PedigreeSet(pedigrees=[_FIXTURES["trio"], p])
-    stored_set = [render.store_layout(ped) for ped in ps.pedigrees]
+    ps = test_render._set_of("trio")
+    ps.pedigrees.append(p)
+    stored_set = [render.store_layout(ped, conditions=ps.conditions) for ped in ps.pedigrees]
     assert render.render_set_svg(ps, stored_layouts=stored_set) == render.render_set_svg(ps)
     assert render.render_svgs(ps, stored_layouts=stored_set) == render.render_svgs(ps)
 
 
 def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
-    ps = pb.PedigreeSet(pedigrees=[_FIXTURES["trio"], _FIXTURES["sibship"]])
+    ps = test_render._set_of("trio", "sibship")
     with pytest.raises(render.StaleLayoutError, match="1 stored layouts for a set of 2"):
-        render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0])])
+        render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0], conditions=ps.conditions)])
 
 
 # --- an internally inconsistent record (a serializer or version bug) ------------------------------------------------
@@ -287,7 +298,8 @@ def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
 
 def _edited(name: str, edit: Callable[[lpb.Placement], None]) -> lpb.PedigreeLayout:
     """``name``'s stored layout with ``edit`` applied to its placement."""
-    record = render.store_layout(_FIXTURES[name])
+    p, defs = _FIXTURES[name]
+    record = render.store_layout(p, conditions=defs)
     edit(record.placement)
     return record
 
@@ -351,8 +363,9 @@ _EDITS: dict[str, tuple[str, Callable[[lpb.Placement], None], str]] = {
 @pytest.mark.parametrize("case", sorted(_EDITS))
 def test_an_inconsistent_record_is_refused(case: str) -> None:
     name, edit, why = _EDITS[case]
+    p, defs = _FIXTURES[name]
     with pytest.raises(render.StaleLayoutError, match=why):
-        render.render_svg(_FIXTURES[name], stored_layout=_edited(name, edit))
+        render.render_svg(p, stored_layout=_edited(name, edit), conditions=defs)
 
 
 def _deferred_pedigree() -> pb.Pedigree:
@@ -391,11 +404,11 @@ def test_every_geometry_field_the_layout_reads_is_in_the_key() -> None:
 def test_citation_supports_leave_a_stored_layout_valid() -> None:
     # Evidence and supports are provenance the layout never reads: adding them keeps the digest, so a layout stored
     # before they were added draws without a relayout.
-    p = test_render._load("trio")
-    stored = render.store_layout(p)
+    p, defs = test_render._golden("trio")
+    stored = render.store_layout(p, conditions=defs)
     cited = pb.Pedigree()
     cited.CopyFrom(p)
     cited.evidence.append("panel-a")
     cited.supports.add(citations=["cap"], field="proband", individuals=[pb.Position(generation=2, index=1)])
-    assert _store.pedigree_digest(cited) == _store.pedigree_digest(p)
-    assert render.render_svg(cited, stored_layout=stored) == render.render_svg(p)
+    assert _store.pedigree_digest(cited, defs) == _store.pedigree_digest(p, defs)
+    assert render.render_svg(cited, stored_layout=stored, conditions=defs) == render.render_svg(p, conditions=defs)

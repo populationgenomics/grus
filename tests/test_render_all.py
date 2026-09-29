@@ -12,8 +12,9 @@ import functools
 import pathlib
 
 import pytest
+import test_render
 
-from grus import ir, render
+from grus import render
 from grus.models import pedigree_pb2 as pb
 from tools.fuzz import gen
 
@@ -25,8 +26,7 @@ _STATUSES = (pb.CONDITION_STATUS_AFFECTED, pb.CONDITION_STATUS_CARRIER, pb.CONDI
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_every_golden_draws(name: str) -> None:
-    p = ir.load_pbtxt((_GOLDENS / f"{name}.pbtxt").read_text())
-    svg = render.render_svg(p)
+    svg = test_render._svg(name)
     assert 'class="individual' in svg
 
 
@@ -51,7 +51,7 @@ def _with_conditions(p: pb.Pedigree, n: int) -> pb.Pedigree:
         for j, name in enumerate(names):
             status = _STATUSES[(k + j) % len(_STATUSES)]
             if (k >> j) % 2:
-                ind.conditions.add(name=name, status=status)
+                ind.conditions.append(test_render._entry(status, name))
     return out
 
 
@@ -61,4 +61,4 @@ def test_every_fuzz_case_that_lays_out_draws(seed: int, conditions: int) -> None
     if not _lays_out(seed):
         pytest.skip("the layout defers this case")
     p = _with_conditions(gen.gen(seed, 4), conditions) if conditions else gen.gen(seed, 4)
-    render.render_svg(p)  # raises on any drawing-time refusal
+    render.render_svg(p, conditions=test_render._declared(p))  # raises on any drawing-time refusal

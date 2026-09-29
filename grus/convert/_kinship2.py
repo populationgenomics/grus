@@ -202,16 +202,16 @@ def import_kinship2(text: str, relation_text: str | None = None) -> pb.PedigreeS
         if pid in _MISSING:
             raise _core.PedigreeImportError("an id is missing or blank")
         gender, terminated = sex_table[r[cols["sex"]]]
-        conditions: list[pb.Condition] = []
+        conditions: list[_core.Condition] = []
         for c in affected_cols:
             status = _affected(r[c])
             if status is not None:
                 name = "" if c == "affected" or len(affected_cols) == 1 else c.removeprefix("affected").lstrip("._ ")
-                conditions.append(pb.Condition(name=name, status=status))
+                conditions.append(_core.Condition(name=name, status=status))
         if "carrier" in cols and _truthy(r[cols["carrier"]]):
-            conditions.append(pb.Condition(status=pb.CONDITION_STATUS_CARRIER))
+            conditions.append(_core.Condition(status=pb.CONDITION_STATUS_CARRIER))
         if "asymptomatic" in cols and _truthy(r[cols["asymptomatic"]]):
-            conditions.append(pb.Condition(status=pb.CONDITION_STATUS_PRESYMPTOMATIC))
+            conditions.append(_core.Condition(status=pb.CONDITION_STATUS_PRESYMPTOMATIC))
         annotations: list[pb.Annotation] = []
         if "dateofbirth" in cols and r[cols["dateofbirth"]] not in _MISSING:
             annotations.append(pb.Annotation(text=f"b. {r[cols['dateofbirth']]}", type=pb.ANNOTATION_TYPE_AGE))

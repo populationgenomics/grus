@@ -12,6 +12,9 @@ import pytest
 from grus import ir
 from grus.models import pedigree_pb2 as pb
 
+# The battery's one condition, unnamed: its entries reference it.
+_DEFS = [pb.ConditionDef(id="k1")]
+
 
 def _copy(p: pb.Pedigree) -> pb.Pedigree:
     q = pb.Pedigree()
@@ -32,21 +35,21 @@ def _ad() -> pb.Pedigree:
                 generation=1,
                 index=2,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_CARRIER)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_CARRIER)],
                 annotations=[pb.Annotation(text="N/M", type=pb.ANNOTATION_TYPE_GENOTYPE)],
             ),
             pb.Individual(
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
                 proband=True,
             ),
             pb.Individual(
                 generation=2,
                 index=2,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -73,7 +76,7 @@ def _consang() -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -99,7 +102,7 @@ def _multi_mate() -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
             pb.Individual(generation=2, index=2, gender=pb.GENDER_WOMAN),
         ],
@@ -128,7 +131,7 @@ def _single_parent() -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -197,13 +200,13 @@ _BATTERY = [_ad, _consang, _multi_mate, _single_parent, _twins, _founder_sibship
 @pytest.mark.parametrize("build", _BATTERY, ids=lambda b: b.__name__)
 def test_pbtxt_round_trip(build) -> None:
     p = build()
-    assert ir.load_pbtxt(ir.dump_pbtxt(p)) == p
+    assert ir.load_pbtxt(ir.dump_pbtxt(p), _DEFS) == p
 
 
 @pytest.mark.parametrize("build", _BATTERY, ids=lambda b: b.__name__)
 def test_json_round_trip(build) -> None:
     p = build()
-    assert ir.load_json(ir.dump_json(p)) == p
+    assert ir.load_json(ir.dump_json(p), _DEFS) == p
 
 
 # --- validate: graph invariants (protovalidate passes; the loader must reject) --------------------
@@ -211,7 +214,7 @@ def test_json_round_trip(build) -> None:
 
 def test_validate_accepts_battery() -> None:
     for build in _BATTERY:
-        ir.validate(build())  # does not raise
+        ir.validate(build(), _DEFS)  # does not raise
 
 
 def test_validate_rejects_dangling_reference() -> None:
@@ -443,7 +446,7 @@ def test_load_json_validates() -> None:
 @pytest.mark.parametrize("build", _BATTERY, ids=lambda b: b.__name__)
 def test_diff_identical_is_empty(build) -> None:
     p = build()
-    d = ir.diff(p, _copy(p))
+    d = ir.diff(p, _copy(p), a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.mismatches == []
     assert d.only_in_a == []
     assert d.only_in_b == []
@@ -457,7 +460,7 @@ def test_diff_flipped_gender_is_localized() -> None:
     b = _copy(a)
     (ii1,) = (ind for ind in b.individuals if (ind.generation, ind.index) == (2, 1))
     ii1.gender = pb.GENDER_WOMAN  # was GENDER_MAN
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.only_in_a == [] and d.only_in_b == []
     assert d.precision() == 1.0 and d.recall() == 1.0  # still matched by position
     assert len(d.mismatches) == 1
@@ -474,7 +477,7 @@ def test_diff_annotation_text_mismatch_is_localized() -> None:
     (b_ii1,) = (ind for ind in b.individuals if (ind.generation, ind.index) == (2, 1))
     a_ii1.annotations.append(pb.Annotation(text="M/M", type=pb.ANNOTATION_TYPE_GENOTYPE))
     b_ii1.annotations.append(pb.Annotation(text="N/M", type=pb.ANNOTATION_TYPE_GENOTYPE))
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.precision() == 1.0 and d.recall() == 1.0  # still matched by position
     ann = [m for m in d.mismatches if m.field == "annotation:genotype"]
     assert len(ann) == 1
@@ -488,7 +491,7 @@ def test_diff_annotation_present_on_one_side_is_localized() -> None:
     b = _copy(a)
     (a_i1,) = (ind for ind in a.individuals if (ind.generation, ind.index) == (1, 1))
     a_i1.annotations.append(pb.Annotation(text="175", type=pb.ANNOTATION_TYPE_MEASUREMENT))
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     meas = [m for m in d.mismatches if m.field == "annotation:measurement"]
     assert len(meas) == 1
     assert (meas[0].subject, meas[0].a_value, meas[0].b_value) == ("1-1", "175", "absent")
@@ -499,7 +502,7 @@ def test_diff_dropped_consanguinity_is_localized() -> None:
     a = _consang()
     b = _copy(a)
     b.matings[0].consanguineous = False
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.precision() == 1.0 and d.recall() == 1.0
     cons = [m for m in d.mismatches if m.field == "consanguineous"]
     assert len(cons) == 1
@@ -513,7 +516,7 @@ def test_diff_missing_founder_sibship_grouping_is_localized() -> None:
     a = _founder_sibship()
     b = _copy(a)
     del b.matings[:]
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.precision() == 1.0 and d.recall() == 1.0  # all individuals recovered
     sib = [m for m in d.mismatches if m.field == "sibship"]
     assert len(sib) == 1
@@ -525,7 +528,7 @@ def test_diff_matched_founder_sibship_is_empty() -> None:
     # Two founder sibships grouping the same offspring set diff clean even at disjoint positions.
     a = _founder_sibship()
     b = _copy(a)
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.mismatches == []
 
 
@@ -536,7 +539,7 @@ def test_diff_missing_individual_shows_in_only_in_a() -> None:
     del b.individuals[idx]
     (oidx,) = (i for i, off in enumerate(b.matings[0].offspring) if (off.child.generation, off.child.index) == (2, 2))
     del b.matings[0].offspring[oidx]
-    d = ir.diff(a, b)
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.only_in_a == ["2-2"]
     assert d.only_in_b == []
     assert d.precision() == 1.0
@@ -556,13 +559,13 @@ def _chain(off: int) -> pb.Pedigree:
                 generation=1,
                 index=2 + off,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
             pb.Individual(
                 generation=2,
                 index=1 + off,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
                 proband=True,
             ),
             pb.Individual(generation=2, index=2 + off, gender=pb.GENDER_WOMAN),
@@ -582,16 +585,89 @@ def _chain(off: int) -> pb.Pedigree:
 
 def test_match_individuals_is_structural_across_disjoint_positions() -> None:
     a, b = _chain(0), _chain(10)
-    mapping = ir.match_individuals(a, b)
+    mapping = ir.match_individuals(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
     assert len(mapping) == 4  # full bijection with no shared positions and no labels
     assert mapping[(2, 1)] == (2, 11)  # II-1 -> its structural twin
     assert mapping[(1, 1)] == (1, 11)  # I-1 -> its structural twin
 
 
 def test_diff_structural_match_is_empty_across_disjoint_positions() -> None:
-    d = ir.diff(_chain(0), _chain(10))
+    d = ir.diff(_chain(0), _chain(10), a_conditions=_DEFS, b_conditions=_DEFS)
     assert d.mismatches == []
     assert d.only_in_a == []
     assert d.only_in_b == []
     assert d.precision() == 1.0
     assert d.recall() == 1.0
+
+
+# --- conditions: declared once, by id, at set level (docs/design/ir.md, "Conditions are declared once, by id") ------
+
+
+def _declaring(*defs: pb.ConditionDef, entries: tuple[str, ...] = ("k1",)) -> pb.PedigreeSet:
+    """A set of ``_ad`` whose affected child II-1 has one entry per id in ``entries``, declaring ``defs``."""
+    p = _ad()
+    for ind in p.individuals:
+        del ind.conditions[:]
+    (ii1,) = (ind for ind in p.individuals if (ind.generation, ind.index) == (2, 1))
+    ii1.conditions.extend(pb.Condition(condition_id=cid, status=pb.CONDITION_STATUS_AFFECTED) for cid in entries)
+    return pb.PedigreeSet(pedigrees=[p], conditions=list(defs))
+
+
+def test_validate_set_accepts_declared_conditions() -> None:
+    ps = _declaring(
+        pb.ConditionDef(id="k1", name="CF", inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE),
+        pb.ConditionDef(id="k2", name=""),
+        entries=("k1", "k2"),
+    )
+    ir.validate_set(ps)
+
+
+@pytest.mark.parametrize(
+    ("ps", "match"),
+    [
+        (_declaring(pb.ConditionDef(id="k1"), pb.ConditionDef(id="k1", name="CF")), r"'k1' is declared twice"),
+        (
+            _declaring(pb.ConditionDef(id="k1", name="CF"), pb.ConditionDef(id="k2", name="CF"), entries=("k1", "k2")),
+            r"condition 'CF' is already declared as 'k1'",
+        ),
+        (_declaring(pb.ConditionDef(id="", name="CF"), entries=("",)), r"conditions\[0\] \(''\) is malformed"),
+        (_declaring(entries=("k1",)), r"condition_id 'k1' is not declared"),
+        (_declaring(pb.ConditionDef(id="k1"), entries=("k1", "k1")), r"two entries for condition 'k1'"),
+        (
+            _declaring(pb.ConditionDef(id="k1"), pb.ConditionDef(id="k2", name="unused")),
+            r"conditions\[1\] \('k2', 'unused'\) is declared but no entry references it",
+        ),
+    ],
+)
+def test_validate_set_rejects_bad_declarations(ps: pb.PedigreeSet, match: str) -> None:
+    with pytest.raises(ir.IntegrityError, match=match):
+        ir.validate_set(ps)
+
+
+def test_a_condition_id_may_not_be_a_citation_id() -> None:
+    ps = _declaring(pb.ConditionDef(id="cap", name="CF"), entries=("cap",))
+    ps.citations.add(id="cap", quote="Figure 2. Family A with cystic fibrosis.")
+    with pytest.raises(ir.IntegrityError, match=r"condition id 'cap' is also a citation id"):
+        ir.validate_set(ps)
+
+
+def test_an_entry_needs_a_real_status() -> None:
+    ps = _declaring(pb.ConditionDef(id="k1"))
+    ps.pedigrees[0].individuals[2].conditions[0].status = pb.CONDITION_STATUS_UNSPECIFIED
+    with pytest.raises(ir.IntegrityError, match=r"not a valid pedigree"):
+        ir.validate_set(ps)
+
+
+def test_conditions_resolve_entries_through_their_declarations() -> None:
+    cf = pb.ConditionDef(id="cf", name="CF", inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
+    table = ir.Conditions([cf, pb.ConditionDef(id="u")])
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN)
+    ind.conditions.add(condition_id="u", status=pb.CONDITION_STATUS_CARRIER)
+    ind.conditions.add(condition_id="cf", status=pb.CONDITION_STATUS_AFFECTED, onset_age="P2Y")
+    assert table.entries(ind) == [
+        ir.Entry("u", "", pb.CONDITION_STATUS_CARRIER, None, None),
+        ir.Entry("cf", "CF", pb.CONDITION_STATUS_AFFECTED, pb.INHERITANCE_AUTOSOMAL_RECESSIVE, "P2Y"),
+    ]
+    assert "cf" in table and "nope" not in table
+    with pytest.raises(ir.UndeclaredConditionError, match="'nope' is not declared"):
+        table.declaration("nope")

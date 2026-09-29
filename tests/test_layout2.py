@@ -40,7 +40,7 @@ def _drawable() -> list[str]:
     names: list[str] = []
     for name in test_render._NAMES:
         try:
-            render.layout(test_render._load(name))
+            test_render._lay(name)
         except render.DeferredFeatureError:
             continue
         names.append(name)
@@ -65,16 +65,35 @@ def test_some_goldens_are_drawable() -> None:
     assert _DRAWABLE, "no drawable goldens to exercise the layout against"
 
 
-def _load_pair(name: str) -> pb.Pedigree:
-    """Load a review-set figure's first pedigree (the pairs are ``PedigreeSet``s, unlike the bare goldens)."""
+def _pair(name: str) -> tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]:
+    """A review-set figure's first pedigree and the set's condition declarations."""
     if not _HAS_REVIEW_SET:
         pytest.skip("review set (CPG-internal) not present")
-    return ir.load_set_pbtxt((_PAIRS / name / "ir.pbtxt").read_text()).pedigrees[0]
+    ps = ir.load_set_pbtxt((_PAIRS / name / "ir.pbtxt").read_text())
+    return ps.pedigrees[0], tuple(ps.conditions)
+
+
+def _pair_lay(name: str) -> render.Layout:
+    p, defs = _pair(name)
+    return render.layout(p, conditions=defs)
+
+
+def _lay_any(name: str, golden: bool) -> render.Layout:
+    return test_render._lay(name) if golden else _pair_lay(name)
+
+
+def _topology(p: pb.Pedigree) -> pb.Pedigree:
+    """``p`` without its condition entries: the layout's graph never reads them, and so needs no declarations."""
+    q = pb.Pedigree()
+    q.CopyFrom(p)
+    for ind in q.individuals:
+        del ind.conditions[:]
+    return q
 
 
 def _prepared(p: pb.Pedigree) -> _layout_mod._Graph:
     """Run the layout front end (the graph the crossing counter reads)."""
-    return _layout2_mod._prepare(p).graph
+    return _layout2_mod._prepare(_topology(p)).graph
 
 
 def _crossings(p: pb.Pedigree, ranks: list[list[int]]) -> int:
@@ -87,7 +106,7 @@ def _ident_rows(p: pb.Pedigree, ranks: list[list[int]]) -> list[list[tuple[int, 
     Read from the prepared graph, so a pass-through cell has its synthetic identity (keyed on the sibship it
     leads to, not on the input order).
     """
-    graph = _layout2_mod._prepare(p).graph
+    graph = _prepared(p)
     return [[graph.ident(i) for i in row] for row in ranks]
 
 
@@ -112,20 +131,20 @@ def _shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
 
 @pytest.mark.parametrize("name", _TIER1)
 def test_tier1_has_zero_crossings(name: str) -> None:
-    p = test_render._load(name)
-    assert _crossings(p, render.layout(p).nid) == 0
+    p, defs = test_render._golden(name)
+    assert _crossings(p, render.layout(p, conditions=defs).nid) == 0
 
 
 @pytest.mark.parametrize("name", _CROSS_JOINS)
 def test_cross_join_orders_with_zero_crossings(name: str) -> None:
-    p = _load_pair(name)
-    assert _crossings(p, render.layout(p).nid) == 0
+    p, defs = _pair(name)
+    assert _crossings(p, render.layout(p, conditions=defs).nid) == 0
 
 
 @pytest.mark.parametrize("name", [*_TIER1, *_CROSS_JOINS])
 def test_couples_adjacent_and_children_span(name: str) -> None:
-    p = test_render._load(name) if name in _TIER1 else _load_pair(name)
-    at, idx = test_render._coords(render.layout(p)), test_render._index(p)
+    p, defs = test_render._golden(name) if name in _TIER1 else _pair(name)
+    at, idx = test_render._coords(render.layout(p, conditions=defs)), test_render._index(p)
     for m in p.matings:
         if m.HasField("partner_b"):
             a, b = at[idx[test_render._pos(m.partner_a)]], at[idx[test_render._pos(m.partner_b)]]
@@ -140,8 +159,8 @@ def test_couples_adjacent_and_children_span(name: str) -> None:
 
 
 def test_twins_stay_adjacent() -> None:
-    p = test_render._load("twins")
-    at, idx = test_render._coords(render.layout(p)), test_render._index(p)
+    p, defs = test_render._golden("twins")
+    at, idx = test_render._coords(render.layout(p, conditions=defs)), test_render._index(p)
     for m in p.matings:
         co = [o for o in m.offspring if o.HasField("twin_group")]
         for x, y in itertools.pairwise(co):
@@ -153,8 +172,8 @@ def test_twins_stay_adjacent() -> None:
 
 @pytest.mark.parametrize("name", [*_TIER1, *_CROSS_JOINS])
 def test_order_is_run_to_run_deterministic(name: str) -> None:
-    p = test_render._load(name) if name in _TIER1 else _load_pair(name)
-    assert render.layout(p) == render.layout(p)
+    p, defs = test_render._golden(name) if name in _TIER1 else _pair(name)
+    assert render.layout(p, conditions=defs) == render.layout(p, conditions=defs)
 
 
 _SHUFFLED_GOLDENS = (
@@ -179,11 +198,11 @@ _SHUFFLED_GOLDENS = (
 def test_order_is_shuffle_invariant(name: str) -> None:
     # The strongest determinism test: the drawn arrangement (by stable identity) must not depend on the input
     # individuals'/matings' order — only on the tie-break. Shuffling changes row indices but not the drawing.
-    p = test_render._load(name) if name in _TIER1 or name in _SHUFFLED_GOLDENS else _load_pair(name)
-    ref = _ident_rows(p, render.layout(p).nid)
+    p, defs = test_render._golden(name) if name in _TIER1 or name in _SHUFFLED_GOLDENS else _pair(name)
+    ref = _ident_rows(p, render.layout(p, conditions=defs).nid)
     for seed in range(4):
         q = _shuffled(p, seed)
-        assert _ident_rows(q, render.layout(q).nid) == ref
+        assert _ident_rows(q, render.layout(q, conditions=defs).nid) == ref
 
 
 # --- quantisation (byte-stable goldens) -------------------------------------------------------------------
@@ -193,7 +212,7 @@ def test_order_is_shuffle_invariant(name: str) -> None:
 def test_pos_is_quantised(name: str) -> None:
     # The x-solve converges iteratively, so its residual is float-noisy; the final pos is rounded to a fixed
     # decimal grid so the byte-compared goldens cannot tip a rounding boundary across arch/compiler.
-    for row in render.layout(test_render._load(name)).pos:
+    for row in test_render._lay(name).pos:
         for x in row:
             assert x == round(x, _POS_QUANTUM), f"pos {x!r} is not on the 1e-{_POS_QUANTUM} grid"
 
@@ -263,8 +282,8 @@ def test_overflow_is_deterministic_and_shuffle_invariant() -> None:
 def test_cousin_marriage_draws_as_adjacent_consanguineous_couple() -> None:
     # c05: a cousin marriage where both partners have siblings. The ordering pulls each cousin to its sibship
     # end, so the loop mating is an ordinary ADJACENT consanguineous couple — no routing, no deferral.
-    p = _load_pair("c05")
-    lay = render.layout(p)
+    p, defs = _pair("c05")
+    lay = render.layout(p, conditions=defs)
     at, idx = test_render._coords(lay), test_render._index(p)
     consang = [m for m in p.matings if m.consanguineous]
     assert consang, "c05 has consanguineous matings"
@@ -273,16 +292,16 @@ def test_cousin_marriage_draws_as_adjacent_consanguineous_couple() -> None:
         assert a[0] == b[0] and abs(a[1] - b[1]) == 1  # adjacent columns
         col = min(a[1], b[1])
         assert lay.spouse[a[0]][col] == 2  # flagged consanguineous (double line)
-    render.render_svg(p)  # renders without raising
+    render.render_svg(p, conditions=defs)  # renders without raising
 
 
 def test_avuncular_marriage_draws_via_the_ghost() -> None:
     # An avuncular (cross-generation) marriage draws via the ghost duplication (a same-row couple on the deeper
     # partner's rank), not a routed cross-rank edge. It must draw, with the ghost and no routed edge.
-    p = _load_pair("c18")
-    lay = render.layout(p)
+    p, defs = _pair("c18")
+    lay = render.layout(p, conditions=defs)
     assert lay.ghost_of, "avuncular join is drawn via the ghost duplication"
-    render.render_svg(p)  # renders without raising
+    render.render_svg(p, conditions=defs)  # renders without raising
 
 
 @pytest.mark.skipif(not _HAS_REVIEW_SET, reason="review set (CPG-internal) not present")
@@ -291,7 +310,7 @@ def test_review_set_deferral_count_is_zero() -> None:
     deferred = []
     for name in _REVIEW_SET:
         try:
-            render.layout(_load_pair(name))
+            _pair_lay(name)
         except render.DeferredFeatureError:
             deferred.append(name)
     assert deferred == [], f"expected no deferrals, got {deferred}"
@@ -320,7 +339,7 @@ def _couple_gaps(lay: render.Layout) -> list[float]:
 def test_drawn_couples_stay_tight(name: str) -> None:
     # Couples-stay-tight invariant: no ordinary drawn couple stretches past sib_gap — anything wider is a torn
     # contiguity block. (The couples the layout leaves free stretch by design; see _couple_gaps.)
-    lay = render.layout(test_render._load(name) if name in _DRAWABLE else _load_pair(name))
+    lay = _lay_any(name, name in _DRAWABLE)
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"
 
@@ -328,7 +347,7 @@ def test_drawn_couples_stay_tight(name: str) -> None:
 def test_couple_over_a_passthrough_centres_on_it() -> None:
     # I-1 x I-3's child is drawn on row III: the couple's midpoint sits over the pass-through on row II, and the
     # pass-through over the child, so the descent is one straight line.
-    lay = render.layout(test_render._load("descent_across_rows"))
+    lay = test_render._lay("descent_across_rows")
     ((cell,),) = [[c for c in row if c in lay.passthrough] for row in lay.nid if any(c in lay.passthrough for c in row)]
     level, k = next((lv, row.index(cell)) for lv, row in enumerate(lay.nid) if cell in row)
     pc = lay.fam[level][k]
@@ -342,7 +361,7 @@ def test_couple_over_a_passthrough_centres_on_it() -> None:
 def test_c05_couples_are_at_couple_gap() -> None:
     # Regression lock for the torn-couple fix: every c05 couple — the born-in<->marry-in pairs 2-5x2-6 and
     # 3-7x3-8 that Stage A used to stretch — sits at exactly couple_gap, no longer pulled apart by its subtree.
-    gaps = _couple_gaps(render.layout(_load_pair("c05")))
+    gaps = _couple_gaps(_pair_lay("c05"))
     assert gaps, "c05 has drawn couples"
     for gap in gaps:
         assert abs(gap - render.DEFAULT_GEOMETRY.couple_gap) < _EPS
@@ -351,8 +370,8 @@ def test_c05_couples_are_at_couple_gap() -> None:
 def test_half_sibs_hinge_centres_over_both_sibships() -> None:
     # The hinge case cohesion must NOT reel tight: the individual with two matings sits between its two
     # spouses so each mating's midpoint centres on that mating's children. Assert both sibships are centred.
-    p = test_render._load("half_sibs")
-    at, idx = test_render._coords(render.layout(p)), test_render._index(p)
+    p, defs = test_render._golden("half_sibs")
+    at, idx = test_render._coords(render.layout(p, conditions=defs)), test_render._index(p)
     heads: dict[tuple[int, int], int] = {}
     centred = 0
     for m in p.matings:
@@ -382,7 +401,7 @@ def test_review_set_blocks_hold(name: str) -> None:
     # Every review-set figure: no contiguity block splits. A couple never stretches past sib_gap, and the
     # figure stays no wider than packing every cell in one row at sib_gap — a torn block (c19's founder
     # sibship pre-fix) blows a figure many times past that bound.
-    lay = render.layout(_load_pair(name))
+    lay = _pair_lay(name)
     for gap in _couple_gaps(lay):
         assert gap <= render.DEFAULT_GEOMETRY.sib_gap + _EPS, f"{name}: a drawn couple is torn ({gap:.3f} units apart)"
     packed = sum(lay.n) * render.DEFAULT_GEOMETRY.sib_gap  # a sound upper bound on a healthy figure's width
@@ -393,8 +412,8 @@ def test_c19_founder_sibship_stays_contiguous() -> None:
     # Regression lock for the founder-sibship tear: the leaf founder-sib 1-1 (count 9, no descent) used to sit
     # at x~0 while its sibling 1-10 (heading the descent) was pulled to x~402, blowing the figure ~35x wider.
     # As a block the sibship rides together — 1-1 sits exactly sib_gap left of 1-10 — and the width stays sane.
-    p = _load_pair("c19")
-    lay = render.layout(p)
+    p, defs = _pair("c19")
+    lay = render.layout(p, conditions=defs)
     packed = sum(lay.n) * render.DEFAULT_GEOMETRY.sib_gap
     assert _width(lay) <= packed + _EPS, f"c19 width {_width(lay):.1f} exceeds one-row packing bound {packed:.1f}"
     at, idx = test_render._coords(lay), test_render._index(p)
@@ -499,11 +518,11 @@ def test_deferral_names_the_partners_not_a_passthrough() -> None:
     assert "the partners of 1-1 x 1-4 cannot stand side by side" in _overflow_reason(p)
 
 
-def _married_twin(older: bool) -> pb.Pedigree:
-    """``twin_married`` with either twin marrying II-4."""
-    p = test_render._load("twin_married")
+def _married_twin(older: bool) -> tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]:
+    """``twin_married`` with either twin marrying II-4, and its declarations."""
+    p, defs = test_render._golden("twin_married")
     p.matings[1].partner_a.index = 1 if older else 2
-    return p
+    return p, defs
 
 
 @pytest.mark.parametrize(
@@ -514,8 +533,8 @@ def test_married_twin_keeps_birth_order(older: bool, expected: list[str]) -> Non
     # alone and never reversed, so the older twin's marriage drew the twins younger-first with the spouse between
     # siblings, although a zero-crossing order in birth order exists. Birth order is weak, but it only yields to
     # what a mating forces, and this marriage forces nothing.
-    p = _married_twin(older)
-    lay = render.layout(p)
+    p, defs = _married_twin(older)
+    lay = render.layout(p, conditions=defs)
     assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == expected
 
 
@@ -524,7 +543,7 @@ def test_cousins_across_a_family_move_it_aside() -> None:
     # order that put III-2 inside III-3/III-4's sibship (one crossing) and the layout deferred it as torn. Sibship
     # contiguity is strong and crossings weak, so the ordering now ranks torn sibships first and moves II-2's
     # family to the end instead.
-    render.layout(test_render._load("cousins_across_family"))  # draws, torn nowhere
+    test_render._lay("cousins_across_family")  # draws, torn nowhere
 
 
 def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
@@ -532,8 +551,8 @@ def test_a_twin_chain_reverses_for_a_cousin_marriage_below() -> None:
     # marries II-3's son, so II-1 must stand next to II-3 and the chain reversed. Local moves cannot reverse it and
     # re-sort row III together, so the search kept a torn order and the pedigree deferred; the retry from reversed
     # atoms finds the clean one.
-    p = test_render._load("twins_marry_cousins_apart")
-    lay = render.layout(p)
+    p, defs = test_render._golden("twins_marry_cousins_apart")
+    lay = render.layout(p, conditions=defs)
     assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == [
         "2-4",
         "2-2",
@@ -597,9 +616,9 @@ def test_a_count_collapsed_parent_drops_from_its_own_centre() -> None:
     # literature drops a straight line from the group symbol to its offspring (review-set figure c05): no phantom,
     # the drop leaves the symbol's centre, and the label stack moves beside the line. An ordinary lone parent keeps
     # its line to the omitted partner.
-    p = test_render._load("count_collapsed_parents")
-    lay = render.layout(p)
-    svg = render.render_svg(p)
+    p, defs = test_render._golden("count_collapsed_parents")
+    lay = render.layout(p, conditions=defs)
+    svg = render.render_svg(p, conditions=defs)
     at = {
         (i.generation, i.index): (lv, k)
         for lv, row in enumerate(lay.nid)
@@ -697,14 +716,14 @@ def test_crossing_descents_turn_on_their_own_tracks() -> None:
     # children, so the descents cross; the drops used to run along each other's bars at bar height and the row read
     # as one family. Each now turns on its own elbow track above the bars, and II-2 x II-6's drop, which stands over
     # II-3 x II-4's landing leg, turns on the higher track, so the two never run along one line.
-    svg = render.render_svg(test_render._load("crossing_descents"))
+    svg = test_render._svg("crossing_descents")
     elbows = re.findall(r'<path d="M([-0-9.]+),[-0-9.]+L[-0-9.]+,([-0-9.]+)Q', svg)
     assert len(elbows) == 2
     (_, y_left), (_, y_right) = sorted((float(x), float(y)) for x, y in elbows)
     assert y_left < y_right, "the drop standing over the other's landing leg turns higher"
     # And it stands clear of III-1, the other family's child it would otherwise sit exactly above.
-    p = test_render._load("crossing_descents")
-    lay = render.layout(p)
+    p, defs = test_render._golden("crossing_descents")
+    lay = render.layout(p, conditions=defs)
     x = {
         (i.generation, i.index): lay.pos[lv][k]
         for lv, row in enumerate(lay.nid)
@@ -788,8 +807,8 @@ def test_cousins_across_a_middle_sibling_start_at_facing_ends() -> None:
     # IV-1's son and IV-3's daughter marry; IV-2's family stands between them in birth order. Local moves reached
     # an order with a torn sibship and the pedigree deferred. A run seeded with the two lines adjacent and the
     # cousins at their facing ends finds the clean order: IV-2's family moves aside and V-1 = V-4 face each other.
-    p = test_render._load("cousins_across_middle_sibling")
-    lay = render.layout(p)
+    p, defs = test_render._golden("cousins_across_middle_sibling")
+    lay = render.layout(p, conditions=defs)
     row = [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[4] if i < len(p.individuals)]
     assert abs(row.index("5-1") - row.index("5-4")) == 1
 
@@ -802,7 +821,7 @@ def test_facing_seeds_do_not_depend_on_input_order() -> None:
     from grus.render import _ordering
 
     def seeds(p: pb.Pedigree) -> list[dict[tuple[tuple[int, ...], ...], list[tuple[int, ...]]]]:
-        prep = l2._prepare(p)
+        prep = l2._prepare(_topology(p))
         model = _ordering._Model(prep.graph)
         by_index = {mr.index: mr for mr in prep.graph.matings}
         return [
@@ -834,11 +853,11 @@ def test_which_overflow_mating_routes_does_not_depend_on_input_order() -> None:
 
 def test_founder_sibships_are_listed_in_layout_order() -> None:
     # The list is drawn in order, so an order taken from the input's matings would reorder the SVG under a shuffle.
-    p = test_render._load("founder_sibship_marry_in")
-    lay = render.layout(p)
+    p, defs = test_render._golden("founder_sibship_marry_in")
+    lay = render.layout(p, conditions=defs)
     assert lay.founder_sibships == sorted(lay.founder_sibships)
     for seed in range(4):
-        assert render.layout(_shuffled(p, seed)).founder_sibships == lay.founder_sibships
+        assert render.layout(_shuffled(p, seed), conditions=defs).founder_sibships == lay.founder_sibships
 
 
 def _ghost_ind(g: int, i: int, gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
@@ -974,7 +993,7 @@ def _two_condition_carriers() -> pb.Pedigree:
 
     def carrier(i: int, name: str) -> pb.Individual:
         ind = _ghost_ind(1, i)
-        ind.conditions.add(name=name, status=pb.CONDITION_STATUS_CARRIER)
+        ind.conditions.append(test_render._entry(pb.CONDITION_STATUS_CARRIER, name))
         return ind
 
     return pb.Pedigree(individuals=[carrier(2, "beta"), carrier(1, "alpha")])
@@ -985,14 +1004,15 @@ def test_render_is_shuffle_invariant(name: str) -> None:
     # Everything drawn depends on the pedigree, not on how the IR lists it: the whole SVG, including the condition
     # legend that keys each carrier's fill region, is byte-identical under a shuffle.
     if name in GHOST_PEDIGREES:
-        p = GHOST_PEDIGREES[name]
+        p, defs = GHOST_PEDIGREES[name], ()
     elif name == "two_condition_carriers":
         p = _two_condition_carriers()
+        defs = test_render._declared(p)
     else:
-        p = test_render._load(name)
-    ref = render.render_svg(p)
+        p, defs = test_render._golden(name)
+    ref = render.render_svg(p, conditions=defs)
     for seed in range(4):
-        assert render.render_svg(_shuffled(p, seed)) == ref
+        assert render.render_svg(_shuffled(p, seed), conditions=defs) == ref
 
 
 def _two_nieces(offset: int) -> pb.Pedigree:
@@ -1035,12 +1055,12 @@ def test_a_partner_stands_between_co_twins(name: str, row: list[str]) -> None:
     # A twin with two partners needs three neighbours. The ordering kept both matings adjacent anyway, so one marriage
     # was neither adjacent nor routed and its line silently not drawn. One partner now stands between the co-twins:
     # every marriage is an adjacent couple, the twin group is named by membership, and nothing routes.
-    p = test_render._load(name)
-    lay = render.layout(p)
+    p, defs = test_render._golden(name)
+    lay = render.layout(p, conditions=defs)
     assert [f"{p.individuals[i].generation}-{p.individuals[i].index}" for i in lay.nid[1]] == row
     (group,) = lay.twin_groups
     assert group.level == 1 and group.columns[1] - group.columns[0] == 2
-    svg = render.render_svg(p)
+    svg = render.render_svg(p, conditions=defs)
     assert svg.count('class="mating') == len(p.matings)
 
 

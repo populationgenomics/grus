@@ -103,7 +103,12 @@ input to the layout:
   costs one recomputation and never a wrong drawing. The one exclusion is a pedigree's citation `evidence` and
   `supports` (`ir.md`, Citations): provenance, never read by layout or drawing, which a harness adds or edits after the
   fact, so they must not mark a stored layout stale. The set-level citation list is outside the pedigree and so outside
-  the digest already.
+  the digest already. The set-level condition declarations are not (`ir.md`, "Conditions are declared once, by id"): a
+  declaration's name and inheritance are pedigree content (the legend, the key's labels and widths, the X-linked dot and
+  so a count's place), so each entry enters in the pre-1.0 encoding, its `condition_id` replaced by its declaration's
+  `name` and `inheritance`. Renaming a declaration or changing its inheritance changes the digest; renaming its id does
+  not; and a pedigree migrated from 0.x keeps the digest, and so the stored layouts, it had. `store_layout`,
+  `load_layout` and drawing from a stored layout take the declarations alongside the pedigree (`conditions=`).
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`

@@ -25,7 +25,7 @@ def _trio(title: str) -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -36,6 +36,15 @@ def _trio(title: str) -> pb.Pedigree:
             )
         ],
     )
+
+
+_DEFS = [pb.ConditionDef(id="k1")]  # the trios' one condition, unnamed
+
+
+def _set_of(*pedigrees: pb.Pedigree) -> pb.PedigreeSet:
+    """The pedigrees as a set, declaring the trios' condition when some entry references it."""
+    referenced = any(ind.conditions for p in pedigrees for ind in p.individuals)
+    return pb.PedigreeSet(pedigrees=list(pedigrees), conditions=_DEFS if referenced else [])
 
 
 def _broken() -> pb.Pedigree:
@@ -61,7 +70,7 @@ def _broken() -> pb.Pedigree:
 
 def test_validate_set_accepts_multiple_families_with_colliding_ids() -> None:
     # Two families both using I-1/I-2/II-1: local_ids are scoped per pedigree, so the set is valid.
-    ir.validate_set(pb.PedigreeSet(pedigrees=[_trio("Family 1"), _trio("Family 2")]))
+    ir.validate_set(_set_of(_trio("Family 1"), _trio("Family 2")))
 
 
 def test_validate_set_accepts_empty_set() -> None:
@@ -69,7 +78,7 @@ def test_validate_set_accepts_empty_set() -> None:
 
 
 def test_validate_set_names_the_failing_pedigree() -> None:
-    bad = pb.PedigreeSet(pedigrees=[_trio("ok"), _broken()])
+    bad = _set_of(_trio("ok"), _broken())
     with pytest.raises(ir.IntegrityError, match=r"pedigrees\[1\]") as excinfo:
         ir.validate_set(bad)
     message = str(excinfo.value)
@@ -81,12 +90,12 @@ def test_validate_set_names_the_failing_pedigree() -> None:
 
 
 def test_set_pbtxt_round_trip() -> None:
-    ps = pb.PedigreeSet(pedigrees=[_trio("F1"), _trio("F2")])
+    ps = _set_of(_trio("F1"), _trio("F2"))
     assert ir.load_set_pbtxt(ir.dump_set_pbtxt(ps)) == ps
 
 
 def test_set_json_round_trip() -> None:
-    ps = pb.PedigreeSet(pedigrees=[_trio("F1"), _trio("F2")])
+    ps = _set_of(_trio("F1"), _trio("F2"))
     assert ir.load_set_json(ir.dump_set_json(ps)) == ps
 
 
@@ -97,7 +106,7 @@ def test_empty_set_round_trips_both_surfaces() -> None:
 
 
 def test_load_set_validates_not_just_parses() -> None:
-    text = ir.dump_set_json(pb.PedigreeSet(pedigrees=[_broken()]))
+    text = ir.dump_set_json(_set_of(_broken()))
     with pytest.raises(ir.IntegrityError, match=r"pedigrees\[0\]"):
         ir.load_set_json(text)
 
@@ -116,10 +125,6 @@ def _couple(title: str) -> pb.Pedigree:
         ],
         matings=[pb.Mating(partner_a=pb.Position(generation=1, index=1), partner_b=pb.Position(generation=1, index=2))],
     )
-
-
-def _set_of(*pedigrees: pb.Pedigree) -> pb.PedigreeSet:
-    return pb.PedigreeSet(pedigrees=list(pedigrees))
 
 
 def test_diff_set_identical_sets_all_matched() -> None:
@@ -190,4 +195,30 @@ def test_diff_set_generalizes_single_pedigree_diff() -> None:
     b.individuals[2].ClearField("conditions")  # II-1 affected -> unaffected: a per-pedigree discrepancy
     d = ir.diff_set(_set_of(a), _set_of(b))
     assert len(d.matched) == 1
-    assert d.matched[0].diff == ir.diff(a, b)  # the pair's diff is exactly the single-pedigree diff
+    assert d.matched[0].diff == ir.diff(a, b, a_conditions=_DEFS)  # the pair's diff is exactly the single-pedigree diff
+
+
+def _named(title: str, cid: str, name: str, inheritance: pb.Inheritance | None = None) -> pb.PedigreeSet:
+    """A one-trio set whose condition is declared ``cid`` with ``name`` (and ``inheritance``)."""
+    p = _trio(title)
+    p.individuals[2].conditions[0].condition_id = cid
+    d = pb.ConditionDef(id=cid, name=name)
+    if inheritance is not None:
+        d.inheritance = inheritance
+    return pb.PedigreeSet(pedigrees=[p], conditions=[d])
+
+
+def test_diff_set_compares_conditions_by_declared_name_not_id() -> None:
+    # An id is the record's own handle: two records naming one condition by different ids agree.
+    d = ir.diff_set(_named("F1", "k1", "cystic fibrosis"), _named("F1", "cf", "cystic fibrosis"))
+    assert len(d.matched) == 1 and not d.matched[0].diff.mismatches
+
+
+def test_diff_set_reports_a_different_declared_name_or_inheritance() -> None:
+    ref = _named("F1", "k1", "cystic fibrosis", pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
+    for cand in (
+        _named("F1", "k1", "sickle cell", pb.INHERITANCE_AUTOSOMAL_RECESSIVE),
+        _named("F1", "k1", "cystic fibrosis"),
+    ):
+        (pair,) = ir.diff_set(ref, cand).matched
+        assert "conditions" in {m.field for m in pair.diff.mismatches}

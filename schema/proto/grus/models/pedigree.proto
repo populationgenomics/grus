@@ -10,6 +10,8 @@
 // within a Pedigree; a mating's two partners are distinct; offspring exist; acyclic for tier-1 render.
 // Citations (optional provenance) are checked there too: unique ids, every reference resolves, a Support's
 // field on the closed path list, its scope in the pedigree.
+// Conditions are declared once per set and referenced by id: every id resolves, declarations are unique and
+// each is referenced, and no person has two entries for one condition.
 
 syntax = "proto3";
 package grus.models.pedigree;
@@ -70,15 +72,24 @@ enum Inheritance {
   INHERITANCE_Y_LINKED = 5;
   INHERITANCE_MITOCHONDRIAL = 6;
 }
+// A condition, declared once per set (PedigreeSet.conditions) and referenced by id from each person's entry
+// (docs/design/ir.md, "Conditions are declared once, by id").
+message ConditionDef {
+  string id = 1 [(buf.validate.field).string.min_len = 1];  // local ("k1"), unique in the set
+  string name = 2;                        // as printed, e.g. "cystic fibrosis"; "" = the figure's sole, unnamed one
+  optional Inheritance inheritance = 3;   // absent = UNSPECIFIED; recorded when the figure states it, never inferred
+}
+// A person's entry for one declared condition: which condition, and what is true of this person.
 message Condition {
   option (buf.validate.message).cel = {
     id: "condition.status_specified", message: "status must be a real value", expression: "this.status != 0"
   };
-  string name = 1;             // legend key, e.g. "cystic fibrosis"; "" = the sole condition
+  reserved 1, 3;                          // were name and inheritance (pre-1.0): now on the ConditionDef
+  reserved "name", "inheritance";
+  string condition_id = 5 [(buf.validate.field).string.min_len = 1];  // a ConditionDef id in the set
   ConditionStatus status = 2;
-  optional Inheritance inheritance = 3;   // absent = UNSPECIFIED; recorded when the figure states it, never inferred
-  optional string onset_age = 4;          // as-drawn age at onset/diagnosis for THIS condition, verbatim
-                                          // ("42", "40s", "b.1975", "prenatal") — bound to the condition
+  optional string onset_age = 4;          // as-drawn age at onset/diagnosis for THIS person, verbatim
+                                          // ("42", "40s", "b.1975", "prenatal") — bound to the entry
 }
 
 // ── Reproductive outcome / role (the node is a pregnancy/loss, or a donor/surrogate) ────────────
@@ -205,6 +216,7 @@ message PedigreeSet {
   optional Provenance provenance = 2;
   repeated Citation citations = 3;                        // the normalised list evidence and supports refer to
   repeated string evidence = 4;                           // Citation ids: the figure as a whole, its caption
+  repeated ConditionDef conditions = 5;                   // every condition the set's entries reference, once
 }
 
 // ── Citations: where the record came from (docs/design/ir.md) ───────────────────────────────────
@@ -238,7 +250,10 @@ message Region {
 message Support {
   repeated string citations = 1 [(buf.validate.field).repeated.min_items = 1];  // Citation ids
   string field = 2 [(buf.validate.field).string.min_len = 1];  // a path into the IR, from the loader's closed list
-  optional string condition = 3;      // the condition's name ("" = the unnamed one), iff `field` starts "condition."
+  reserved 3;                         // was condition, by name (pre-1.0)
+  reserved "condition";
+  optional string condition_id = 6 [(buf.validate.field).string.min_len = 1];  // a ConditionDef id, iff `field`
+                                      // starts "condition."
   repeated Position individuals = 4;  // scope; neither individuals nor matings = the whole pedigree
   repeated MatingRef matings = 5;     // a couple (or lone parent), by its partners' positions
 }

@@ -103,9 +103,9 @@ def _person(p: dict[str, Any], i: int, refs: _Refs) -> _core.Person:
     carrier = str(p.get("carrierstatus", "affected" if disorders else "") or "").lower()
     if carrier not in _CARRIER:
         raise _core.PedigreeImportError(f"person {pid!r}: unrecognised carrierStatus {carrier!r}")
-    conditions = [pb.Condition(name=str(d), status=_CARRIER[carrier]) for d in disorders]
+    conditions = [_core.Condition(name=str(d), status=_CARRIER[carrier]) for d in disorders]
     if not disorders and carrier in ("carrier", "presymptomatic"):
-        conditions.append(pb.Condition(status=_CARRIER[carrier]))
+        conditions.append(_core.Condition(status=_CARRIER[carrier]))
 
     for key, atype, prefix in (
         ("birthdate", pb.ANNOTATION_TYPE_AGE, "b. "),

@@ -1,6 +1,9 @@
 """Lay out and draw one pedigree in a worker, and measure what a renderer change could move.
 
-Runs in a worker from ``tools.fuzz.workers``, so ``grus`` here is the tree under test.
+Runs in a worker from ``tools.fuzz.workers``, so ``grus`` here is the tree under test, while this module is the
+current tooling. Condition declarations reach the tree's ``grus`` only when a pedigree has some, so a tree from before
+1.0, whose calls take no ``conditions``, still probes every pedigree without conditions (every generated one); it
+cannot read a 1.0 IR file that has conditions.
 """
 
 from __future__ import annotations
@@ -9,6 +12,7 @@ import dataclasses
 import hashlib
 import random
 import time
+from collections.abc import Sequence
 
 from grus import ir, render
 from grus.models import pedigree_pb2 as pb
@@ -58,32 +62,60 @@ def geometry(highs: bool) -> render.Geometry:
     return render.DEFAULT_GEOMETRY
 
 
+# The tree's grus calls, passing declarations only when there are some (see the module doc).
+
+
+def _validate(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef]) -> None:
+    if conditions:
+        ir.validate(p, conditions)
+    else:
+        ir.validate(p)
+
+
+def _layout(p: pb.Pedigree, geom: render.Geometry, conditions: Sequence[pb.ConditionDef]) -> render.Layout:
+    return render.layout(p, geom, conditions=conditions) if conditions else render.layout(p, geom)
+
+
+def _svg(p: pb.Pedigree, geom: render.Geometry, conditions: Sequence[pb.ConditionDef]) -> str:
+    return render.render_svg(p, geom, conditions=conditions) if conditions else render.render_svg(p, geom)
+
+
 def measure(case: corpus.Case, highs: bool) -> Result:
     """Lay out and draw ``case``'s pedigree (a validation failure propagates).
 
     The drawing lays out again rather than drawing from a stored layout, so the result does not rest on the layout
     store, and so a tree from before it can be measured.
     """
-    p = case.load()
+    p, conditions = case.load()
     geom = geometry(highs)
     t = time.perf_counter()
     try:
-        lay = render.layout(p, geom)
+        lay = _layout(p, geom, conditions)
     except render.DeferredFeatureError as e:
         return Result(case.key, time.perf_counter() - t, None, str(e))
     seconds = time.perf_counter() - t
-    return Result(case.key, seconds, _drawn(p, lay, render.render_svg(p, geom)), None)
+    return Result(case.key, seconds, _drawn(p, lay, _svg(p, geom, conditions)), None)
 
 
-def outcome_of(data: bytes, highs: bool) -> str:
-    """The serialized pedigree's SVG digest if it draws, else ``defer: <reason>``, or ``invalid: <error>``."""
+def _declarations(data: bytes) -> list[pb.ConditionDef]:
+    """The condition declarations of a serialized ``PedigreeSet`` that carries only them."""
+    return list(pb.PedigreeSet.FromString(data).conditions)
+
+
+def outcome_of(data: bytes, highs: bool, conditions: bytes = b"") -> str:
+    """The serialized pedigree's SVG digest if it draws, else ``defer: <reason>``, or ``invalid: <error>``.
+
+    ``conditions`` is a serialized ``PedigreeSet`` carrying only the declarations the pedigree's entries reference.
+    A caller passes it only when there are some, so a tree from before 1.0 can probe a pedigree without conditions.
+    """
     p = pb.Pedigree.FromString(data)
+    defs = _declarations(conditions)
     try:
-        ir.validate(p)
+        _validate(p, defs)
     except (ir.ValidationError, ir.IntegrityError) as e:
         return f"invalid: {e}"
     try:
-        return hashlib.sha1(render.render_svg(p, geometry(highs)).encode()).hexdigest()
+        return hashlib.sha1(_svg(p, geometry(highs), defs).encode()).hexdigest()
     except render.DeferredFeatureError as e:
         return f"defer: {e}"
 
@@ -104,31 +136,38 @@ def shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
     return q
 
 
-def shuffle_outcomes(p: pb.Pedigree, shuffles: int, highs: bool) -> list[str]:
+def shuffle_outcomes(
+    p: pb.Pedigree, shuffles: int, highs: bool, conditions: Sequence[pb.ConditionDef] = ()
+) -> list[str]:
     """The SVG digest, or ``defer``, of ``p`` and of ``shuffled(p, s)`` for each ``s`` below ``shuffles``."""
     geom = geometry(highs)
     out = []
     for q in [p] + [shuffled(p, s) for s in range(shuffles)]:
         try:
-            out.append(hashlib.sha1(render.render_svg(q, geom).encode()).hexdigest())
+            out.append(hashlib.sha1(_svg(q, geom, conditions).encode()).hexdigest())
         except render.DeferredFeatureError:
             out.append("defer")
     return out
 
 
-def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool) -> list[str]:
-    """``shuffle_outcomes`` of a serialized pedigree; ``["invalid"]`` if it is not valid IR."""
+def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool, conditions: bytes = b"") -> list[str]:
+    """``shuffle_outcomes`` of a serialized pedigree; ``["invalid"]`` if it is not valid IR.
+
+    ``conditions`` is as for ``outcome_of``.
+    """
     p = pb.Pedigree.FromString(data)
+    defs = _declarations(conditions)
     try:
-        ir.validate(p)
+        _validate(p, defs)
     except (ir.ValidationError, ir.IntegrityError):
         return ["invalid"]
-    return shuffle_outcomes(p, shuffles, highs)
+    return shuffle_outcomes(p, shuffles, highs, defs)
 
 
 def shuffle_case(case: corpus.Case, shuffles: int, highs: bool) -> tuple[str, list[str]]:
     """``shuffle_outcomes`` of ``case``'s pedigree, with its key."""
-    return case.key, shuffle_outcomes(case.load(), shuffles, highs)
+    p, conditions = case.load()
+    return case.key, shuffle_outcomes(p, shuffles, highs, conditions)
 
 
 def _drawn(p: pb.Pedigree, lay: render.Layout, svg: str) -> Drawn:

@@ -10,7 +10,9 @@ sibship left with fewer than two children, an individual in no mating). It stops
 renumbers each generation 1..n in the original order, so the result reads as a figure would.
 
 Predicates run in worker pools on the trees they name, so a pedigree can be minimised against a baseline and a branch
-at once. A candidate that is not valid IR never counts as failing.
+at once. A candidate that is not valid IR never counts as failing. A pedigree with condition entries is probed with its
+set's declarations; a move that drops everyone with a condition leaves its declaration unreferenced, which a probe of
+one pedigree allows.
 """
 
 from __future__ import annotations
@@ -157,9 +159,17 @@ def minimize(p: pb.Pedigree, search: Search, batch: int = 1) -> tuple[pb.Pedigre
 
 
 def tree_search(
-    predicate: str, pools: Sequence[multiprocessing.pool.Pool], reason: str, shuffles: int, highs: bool
+    predicate: str,
+    pools: Sequence[multiprocessing.pool.Pool],
+    reason: str,
+    shuffles: int,
+    highs: bool,
+    conditions: Sequence[pb.ConditionDef] = (),
 ) -> Search:
     """A ``Search`` for one of ``PREDICATES``, evaluated in ``pools`` (one per tree it names).
+
+    ``conditions`` are the declarations of the pedigree's set; passed to the probes only when there are some, so a
+    pre-1.0 tree can still probe a pedigree without conditions.
 
     ``reason``, when not empty, narrows a deferral to one whose message contains it.
 
@@ -172,6 +182,8 @@ def tree_search(
     if len(pools) != (2 if two else 1):
         raise ValueError(f"predicate {predicate!r} takes {2 if two else 1} tree(s)")
 
+    defs = (pb.PedigreeSet(conditions=conditions).SerializeToString(),) if conditions else ()
+
     def defers(o: str) -> bool:
         return o.startswith("defer: ") and reason in o
 
@@ -181,10 +193,10 @@ def tree_search(
     def search(ps: Sequence[pb.Pedigree]) -> int | None:
         data = [q.SerializeToString() for q in ps]
         if predicate == "shuffle":
-            outs = pools[0].starmap(probe.shuffle_outcomes_of, [(d, shuffles, highs) for d in data])
+            outs = pools[0].starmap(probe.shuffle_outcomes_of, [(d, shuffles, highs, *defs) for d in data])
             hits = [len(set(o)) > 1 for o in outs]
         else:
-            args = [(d, highs) for d in data]
+            args = [(d, highs, *defs) for d in data]
             a = pools[0].starmap(probe.outcome_of, args)
             if predicate == "defers":
                 hits = [defers(o) for o in a]

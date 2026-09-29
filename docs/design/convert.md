@@ -67,7 +67,12 @@ suffix (`.ped .fam .psam .pre` → ped), by sniffing (`.json` → a `Family` obj
 - **Sex codes → `Gender`** by the assume-aligned rule (male → MAN, female → WOMAN, unknown/other → UNKNOWN);
   `sex_assigned_at_birth` is never set (no source states it). Phenopackets `OTHER_SEX` and Open Pedigree `other` are
   *sex*, not gender: UNKNOWN + an OTHER annotation carrying the source word.
-- **A single affected column → one `Condition{name: "", status}`**; a missing value omits the `Condition` (status not
+- **Conditions are stated by name and declared once.** A format module states each person's conditions by name
+  (`convert.Condition`); `build_set` declares one `ConditionDef` per distinct name across the set, ids `k1`, `k2`, … by
+  first appearance, and points each entry at it (`ir.md`, "Conditions are declared once, by id"). No format states a
+  mode of inheritance, so no declaration has one. A person stating one condition twice (a kinship2 row with both
+  `carrier` and `asymptomatic` set, both the sole unnamed condition) fails loud: an entry holds one status.
+- **A single affected column → one unnamed condition** (`name: ""`); a missing value omits the entry (status not
   indicated). `CONDITION_STATUS_UNKNOWN` is reserved for a drawn "?", which no data format states.
 - **Missing parent codes** (`0`, `NA`, `.`, `""`) are missing; the other parent is kept as a single parent.
 - **Dates and ages** are verbatim `Annotation`s (`b. …` AGE, `d. …` AGE_AT_DEATH); nothing is normalised.
@@ -109,7 +114,8 @@ Deviation: kinship2 rejects a single-parent row and `fixParents` invents the oth
 single-parent mating. Not expressible: consanguinity, relationship status, adoption direction.
 
 **Phenopackets v2 `Family`** (`_phenopackets.py`; one `Family` JSON or an array; camelCase or snake_case keys, enum
-names or ints; fixture `family.phenopackets.json`)
+names or ints; fixture `family.phenopackets.json`). An array's families are built each from its own people and extras
+(`build_sets`), their conditions declared once across the set.
 
 | Source                                                                                     | IR                                                                                                |
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |

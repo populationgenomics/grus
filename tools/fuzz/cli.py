@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from google.protobuf import text_format
 
 from grus import ir
+from grus.models import pedigree_pb2 as pb
 from tools.fuzz import corpus, diff, gen, minimize, shuffle, trees, workers
 
 
@@ -67,17 +68,30 @@ def _shuffle(args: argparse.Namespace) -> int:
     return 1 if shuffle.varying(results) else 0
 
 
+def _minimize_input(path: pathlib.Path) -> tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]:
+    """A ``--input`` file's pedigree and declarations: a bare ``Pedigree``, or a ``PedigreeSet`` of one pedigree."""
+    cases = [] if path.is_dir() else corpus.file_cases(path)
+    if len(cases) != 1:
+        raise SystemExit(f"minimize --input takes a file of one pedigree; {path} is not")
+    return cases[0].load()
+
+
 def _minimize(args: argparse.Namespace) -> int:
     if (args.input is None) == (args.seed is None):
         raise SystemExit("minimize takes exactly one of --input and --seed")
-    p = ir.load_pbtxt(args.input.read_text()) if args.input else gen.gen(args.seed, args.maxgen)
+    p, conditions = _minimize_input(args.input) if args.input else (gen.gen(args.seed, args.maxgen), ())
     specs = [args.tree] + ([args.tree_b] if args.tree_b else [])
     with trees.materialised(specs) as dirs, contextlib.ExitStack() as stack:
         pools = [stack.enter_context(workers.pool(d, args.jobs)) for d in dirs]
-        search = minimize.tree_search(args.predicate, pools, args.reason, args.shuffles, args.highs)
+        search = minimize.tree_search(args.predicate, pools, args.reason, args.shuffles, args.highs, conditions)
         n = len(p.individuals)
         q, renumbered = minimize.minimize(p, search, batch=args.jobs)
-    args.output.write_text(ir.dump_pbtxt(q))
+    referenced = {c.condition_id for ind in q.individuals for c in ind.conditions}
+    if referenced:  # declarations live at set level: write a one-pedigree set with those it still references
+        out = pb.PedigreeSet(conditions=[d for d in conditions if d.id in referenced], pedigrees=[q])
+        args.output.write_text(ir.dump_set_pbtxt(out))
+    else:
+        args.output.write_text(ir.dump_pbtxt(q))
     note = "" if renumbered else " (not renumbered: renumbering lost the failure)"
     print(f"{args.output}: {n} -> {len(q.individuals)} individuals{note}")
     return 0
@@ -118,7 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("predicate", choices=sorted(minimize.PREDICATES))
     p.add_argument("tree", help="a git ref or a directory holding grus/")
     p.add_argument("tree_b", nargs="?", help="the second tree, for regress and bytes")
-    p.add_argument("--input", type=pathlib.Path, help="a Pedigree pbtxt to minimise")
+    p.add_argument("--input", type=pathlib.Path, help="a Pedigree pbtxt, or a PedigreeSet of one pedigree, to minimise")
     p.add_argument("--seed", type=int, help="minimise this fuzz seed instead of --input")
     p.add_argument("--maxgen", type=int, default=4, help="generations for --seed (default 4)")
     p.add_argument("-o", "--output", type=pathlib.Path, required=True, help="where to write the minimised pbtxt")

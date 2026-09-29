@@ -10,6 +10,8 @@ from __future__ import annotations
 from grus import render
 from grus.models import pedigree_pb2 as pb
 
+_DEFS = [pb.ConditionDef(id="k1")]  # the trios' one condition, unnamed
+
 
 def _trio(title: str) -> pb.Pedigree:
     return pb.Pedigree(
@@ -21,7 +23,7 @@ def _trio(title: str) -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(status=pb.CONDITION_STATUS_AFFECTED)],
+                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -68,7 +70,7 @@ def test_empty_set_is_a_minimal_valid_svg() -> None:
 
 
 def test_set_stacks_each_pedigree_as_a_nested_svg_with_its_title() -> None:
-    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("Family 1"), _trio("Family 2")]))
+    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("Family 1"), _trio("Family 2")], conditions=_DEFS))
     assert svg.count("<svg") == 3  # one root + two nested tiles
     assert svg.count("</svg>") == 3
     assert "Family 1" in svg and "Family 2" in svg  # titles drawn
@@ -76,22 +78,22 @@ def test_set_stacks_each_pedigree_as_a_nested_svg_with_its_title() -> None:
 
 def test_tile_body_preserves_the_single_render_content() -> None:
     ped = _trio("Family 1")
-    single = render.render_svg(ped)
-    figure = render.render_set_svg(pb.PedigreeSet(pedigrees=[ped]))
+    single = render.render_svg(ped, conditions=_DEFS)
+    figure = render.render_set_svg(pb.PedigreeSet(pedigrees=[ped], conditions=_DEFS))
     # the symbols are the same drawing, just wrapped in a nested <svg>: same square/circle counts.
     assert figure.count("<rect") == single.count("<rect")
     assert figure.count("<circle") == single.count("<circle")
 
 
 def test_deferred_pedigree_becomes_a_placeholder_and_others_still_render() -> None:
-    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("ok"), _two_parented()]))
+    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("ok"), _two_parented()], conditions=_DEFS))
     assert "deferred" in svg  # the tier-3 family is a placeholder box, not a crashed figure
     assert "stroke-dasharray" in svg
     assert "ok" in svg  # the renderable family rendered alongside it
 
 
 def test_render_svgs_returns_one_document_per_pedigree() -> None:
-    svgs = render.render_svgs(pb.PedigreeSet(pedigrees=[_trio("Family 1"), _trio("Family 2")]))
+    svgs = render.render_svgs(pb.PedigreeSet(pedigrees=[_trio("Family 1"), _trio("Family 2")], conditions=_DEFS))
     assert [title for title, _ in svgs] == ["Family 1", "Family 2"]
     for _title, svg in svgs:  # each is its own standalone document, not a composed canvas
         assert svg.startswith("<svg") and svg.rstrip().endswith("</svg>")
@@ -99,7 +101,7 @@ def test_render_svgs_returns_one_document_per_pedigree() -> None:
 
 
 def test_render_svgs_defers_per_pedigree_without_dropping_others() -> None:
-    svgs = render.render_svgs(pb.PedigreeSet(pedigrees=[_trio("ok"), _two_parented()]))
+    svgs = render.render_svgs(pb.PedigreeSet(pedigrees=[_trio("ok"), _two_parented()], conditions=_DEFS))
     assert len(svgs) == 2
     assert "deferred" not in svgs[0][1] and svgs[0][1].count("<rect")  # the drawable family drew normally
     assert "deferred" in svgs[1][1]  # the deferred family is its own placeholder document
@@ -110,12 +112,12 @@ def test_render_svgs_empty_set_is_empty_list() -> None:
 
 
 def test_render_set_is_deterministic() -> None:
-    s = pb.PedigreeSet(pedigrees=[_trio("A"), _trio("B")])
+    s = pb.PedigreeSet(pedigrees=[_trio("A"), _trio("B")], conditions=_DEFS)
     assert render.render_set_svg(s) == render.render_set_svg(s)
 
 
 def test_title_is_xml_escaped() -> None:
-    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("A & B <x>")]))
+    svg = render.render_set_svg(pb.PedigreeSet(pedigrees=[_trio("A & B <x>")], conditions=_DEFS))
     assert "A &amp; B &lt;x&gt;" in svg
     assert "A & B <x>" not in svg  # the raw ampersand / angle brackets never leak into the SVG
 
@@ -127,9 +129,9 @@ def test_title_comes_from_family_panel_or_other_labels_only() -> None:
     del p.labels[:]
     p.labels.add(text="Bone Cancer", kind=pb.LABEL_KIND_PHENOTYPE)
     p.labels.add(text="DRP2", kind=pb.LABEL_KIND_GENE)
-    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == ""
-    assert "Bone Cancer</text>" not in render.render_set_svg(pb.PedigreeSet(pedigrees=[p]))
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p], conditions=_DEFS))[0][0] == ""
+    assert "Bone Cancer</text>" not in render.render_set_svg(pb.PedigreeSet(pedigrees=[p], conditions=_DEFS))
     p.labels.add(text="Figure 2B", kind=pb.LABEL_KIND_PANEL)
-    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == "Figure 2B"
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p], conditions=_DEFS))[0][0] == "Figure 2B"
     p.labels.add(text="Family 3", kind=pb.LABEL_KIND_FAMILY)
-    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p]))[0][0] == "Family 3"
+    assert render.render_svgs(pb.PedigreeSet(pedigrees=[p], conditions=_DEFS))[0][0] == "Family 3"

@@ -1,5 +1,10 @@
-id: "carrier-inheritance"
-labels { text: "Carriers by inheritance: AR and X-linked alike under PARTITION_FILL, a dot for X-linked under INHERITANCE_GLYPH" kind: LABEL_KIND_OTHER }
-individuals { generation: 1 index: 1 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE } }
-individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
-individuals { generation: 1 index: 3 gender: GENDER_WOMAN conditions { status: CONDITION_STATUS_AFFECTED } }
+conditions { id: "cf" name: "CF" inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE }
+conditions { id: "dmd" name: "DMD" inheritance: INHERITANCE_X_LINKED_RECESSIVE }
+conditions { id: "unnamed" }
+pedigrees {
+  id: "carrier-inheritance"
+  labels { text: "Carriers by inheritance: AR and X-linked alike under PARTITION_FILL, a dot for X-linked under INHERITANCE_GLYPH" kind: LABEL_KIND_OTHER }
+  individuals { generation: 1 index: 1 gender: GENDER_WOMAN conditions { condition_id: "cf" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { condition_id: "dmd" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 1 index: 3 gender: GENDER_WOMAN conditions { condition_id: "unnamed" status: CONDITION_STATUS_AFFECTED } }
+}

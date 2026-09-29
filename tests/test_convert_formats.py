@@ -16,6 +16,12 @@ def _by_ext(ped: pb.Pedigree) -> dict[str, pb.Individual]:
     return {i.external_id: i for i in ped.individuals}
 
 
+def _named(ps: pb.PedigreeSet, ind: pb.Individual) -> list[tuple[str, int]]:
+    """``ind``'s conditions as ``(declared name, status)``."""
+    name = {d.id: d.name for d in ps.conditions}
+    return [(name[c.condition_id], c.status) for c in ind.conditions]
+
+
 def _mating_of(ped: pb.Pedigree, child_ext: str) -> pb.Mating:
     pos = _by_ext(ped)[child_ext]
     for m in ped.matings:
@@ -127,12 +133,11 @@ def test_kinship2_sex_words_shifted_codes_and_terminated() -> None:
 
 def test_kinship2_multi_trait_affected_matrix() -> None:
     text = "id,dadid,momid,sex,affected.bc,affected.oc\n1,NA,NA,1,1,0\n2,NA,NA,2,NA,1\n"
-    ext = _by_ext(convert.import_text(text, "kinship2").pedigrees[0])
-    assert [(c.name, c.status) for c in ext["1"].conditions] == [
-        ("bc", pb.CONDITION_STATUS_AFFECTED),
-        ("oc", pb.CONDITION_STATUS_UNAFFECTED),
-    ]
-    assert [(c.name, c.status) for c in ext["2"].conditions] == [("oc", pb.CONDITION_STATUS_AFFECTED)]
+    ps = convert.import_text(text, "kinship2")
+    ext = _by_ext(ps.pedigrees[0])
+    assert [(d.id, d.name) for d in ps.conditions] == [("k1", "bc"), ("k2", "oc")], "declared once, by first use"
+    assert _named(ps, ext["1"]) == [("bc", pb.CONDITION_STATUS_AFFECTED), ("oc", pb.CONDITION_STATUS_UNAFFECTED)]
+    assert _named(ps, ext["2"]) == [("oc", pb.CONDITION_STATUS_AFFECTED)]
 
 
 def test_kinship2_missing_required_column() -> None:
@@ -163,7 +168,7 @@ def test_phenopackets_family_mapping() -> None:
     ext = _by_ext(ped)
     assert ext["ch1"].proband
     (cf,) = ext["ch1"].conditions  # diseases win over the bare affectedStatus
-    assert (cf.name, cf.status, cf.onset_age) == ("cystic fibrosis", pb.CONDITION_STATUS_AFFECTED, "P2Y")
+    assert _named(ps, ext["ch1"]) == [("cystic fibrosis", pb.CONDITION_STATUS_AFFECTED)] and cf.onset_age == "P2Y"
     assert ext["m11"].deceased
     assert [(a.type, a.text) for a in ext["m11"].annotations] == [(pb.ANNOTATION_TYPE_AGE_AT_DEATH, "P72Y")]
     assert ext["f11"].conditions[0].status == pb.CONDITION_STATUS_UNAFFECTED
@@ -198,7 +203,7 @@ def test_openpedigree_simple_json_mapping() -> None:
     ext = _by_ext(ped)
     assert ps.provenance.source_format == "openpedigree"
     assert ext["f11"].deceased and ext["ch1"].proband and ext["ch1"].documented_evaluation
-    assert [c.name for c in ext["f12"].conditions] == ["603235", "142763", "custom disorder"]
+    assert [n for n, _ in _named(ps, ext["f12"])] == ["603235", "142763", "custom disorder"]
     assert ext["ch5"].conditions[0].status == pb.CONDITION_STATUS_CARRIER
     assert ext["ch4"].reproductive_outcome == pb.REPRODUCTIVE_OUTCOME_MISCARRIAGE
     assert ext["ch4"].annotations[0].type == pb.ANNOTATION_TYPE_GESTATIONAL_AGE
@@ -248,3 +253,22 @@ def test_infer_format_sniffs_json_and_rejects_unknown(tmp_path: pathlib.Path) ->
         convert.infer_format(_FIX / "kinship2.csv")
     with pytest.raises(convert.UnknownFormatError, match="unknown format"):
         convert.import_text("", "gedcom")
+
+
+def test_families_of_one_file_share_the_declarations() -> None:
+    # Two Phenopackets families naming one disease: one declaration, referenced from both pedigrees.
+    person = '{{"familyId": "{f}", "individualId": "x", "paternalId": "0", "maternalId": "0", "sex": "MALE"}}'
+    packet = '{{"subject": {{"id": "x"}}, "diseases": [{{"term": {{"id": "OMIM:219700", "label": "CF"}}}}]}}'
+    fam = '{{"id": "{f}", "proband": ' + packet + ', "pedigree": {{"persons": [' + person + "]}}}}"
+    ps = convert.import_text("[" + fam.format(f="A") + ", " + fam.format(f="B") + "]", "phenopackets")
+    assert [(d.id, d.name) for d in ps.conditions] == [("k1", "CF")]
+    assert [c.condition_id for p in ps.pedigrees for c in p.individuals[0].conditions] == ["k1", "k1"]
+
+
+def test_a_person_stating_one_condition_twice_fails_loud() -> None:
+    # kinship2's carrier and asymptomatic columns both state the sole, unnamed condition: one entry per condition.
+    text = "id,dadid,momid,sex,carrier,asymptomatic\n1,NA,NA,1,1,1\n"
+    with pytest.raises(
+        convert.PedigreeImportError, match=r"individual '1' states condition\(s\) \[''\] more than once"
+    ):
+        convert.import_text(text, "kinship2")

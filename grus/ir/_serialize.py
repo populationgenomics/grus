@@ -8,23 +8,28 @@ as-is (no validation) so an in-progress or deliberately-broken IR can still be w
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from google.protobuf import json_format, text_format
 
 from grus.ir._validate import validate, validate_set
 from grus.models import pedigree_pb2 as pb
 
 
-def load_pbtxt(text: str) -> pb.Pedigree:
-    """Parse canonical pbtxt into a validated ``Pedigree`` (raises on parse or invariant failure)."""
+def load_pbtxt(text: str, conditions: Sequence[pb.ConditionDef] = ()) -> pb.Pedigree:
+    """Parse canonical pbtxt into a validated ``Pedigree`` (raises on parse or invariant failure).
+
+    Conditions are declared at set level: ``conditions`` are the declarations its entries reference, if it has any.
+    """
     p = text_format.Parse(text, pb.Pedigree())
-    validate(p)
+    validate(p, conditions)
     return p
 
 
-def load_json(text: str) -> pb.Pedigree:
-    """Parse proto3-JSON (the LLM emission surface) into a validated ``Pedigree``."""
+def load_json(text: str, conditions: Sequence[pb.ConditionDef] = ()) -> pb.Pedigree:
+    """Parse proto3-JSON (the LLM emission surface) into a validated ``Pedigree``; ``conditions`` as for pbtxt."""
     p = json_format.Parse(text, pb.Pedigree())
-    validate(p)
+    validate(p, conditions)
     return p
 
 
