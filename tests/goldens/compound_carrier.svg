@@ -11,15 +11,12 @@
 <text x="20" y="156" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">II</text>
 </g>
 <g class="mating" data-partners="I-1 I-2">
-<line x1="180" y1="66" x2="200" y2="66" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="180" y1="66" x2="200" y2="66" stroke="#000000" stroke-width="2"/>
 <line class="hit" x1="180" y1="66" x2="200" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2 II-3">
-<line x1="190" y1="66" x2="190" y2="116" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
-<line x1="106" y1="116" x2="274" y2="116" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
-<line x1="106" y1="116" x2="106" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
-<line x1="190" y1="116" x2="190" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
-<line x1="274" y1="116" x2="274" y2="138" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="190" y1="66" x2="190" y2="116" stroke="#000000" stroke-width="2"/>
+<path d="M106,138L106,116L274,116L274,138M190,116L190,138" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g id="ind-I-1" class="individual carrier" data-position="I-1" data-generation="1" data-index="1" data-gender="man" data-condition-0="carrier">
 <rect class="backing" x="144" y="48" width="36" height="36" fill="#ffffff"/>
@@ -54,7 +51,7 @@
 <circle class="fill" data-condition="0" data-status="affected" transform="translate(194.5 156)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="190" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
-<line x1="146.544" y1="199.456" x2="172" y2="174" stroke="#000000" stroke-width="2" stroke-linecap="square"/>
+<line x1="146.544" y1="199.456" x2="172" y2="174" stroke="#000000" stroke-width="2"/>
 <path class="head" d="M169.671,182.693L172,174L163.307,176.329" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 <text x="138.544" y="203.456" font-family="sans-serif" font-size="15" fill="#000000" text-anchor="middle" dominant-baseline="central">P</text>
 </g>

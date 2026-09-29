@@ -1070,14 +1070,7 @@ class _Draw:
             out = [_rounded_path(corners, self.geom.elbow_gap / 2)]
         if lone:
             return out
-        if len(groups) > 1:
-            out.append(_line(min(attach), bar_y, max(attach), bar_y))
-        for group, ax in zip(groups, attach, strict=True):
-            if len(group) == 1:
-                out.append(_line(ax, bar_y, ax, top))
-            else:
-                out += self._twins(level, group, bar_y, top)
-        return out
+        return out + self._bar_and_legs(level, groups, attach, bar_y, top)
 
     def _founder_sibships(self) -> list[str]:
         """A sib bar + implied hanger stub for each sibship whose parent couple is undrawn (Bennett).
@@ -1100,15 +1093,34 @@ class _Draw:
         groups = self._child_groups(level, cols)
         attach = [sum(self.px(self.lay.pos[level][k]) for k in g) / len(g) for g in groups]
         hx = (min(attach) + max(attach)) / 2
-        out = [
-            _line(min(attach), bar_y, max(attach), bar_y),  # the sibship bar
-            _line(hx, bar_y - self.geom.sib_stub, hx, bar_y),  # the implied hanger up to a point (no parents)
-        ]
+        hanger = _line(hx, bar_y - self.geom.sib_stub, hx, bar_y)  # the implied hanger up to a point (no parents)
+        return [hanger, *self._bar_and_legs(level, groups, attach, bar_y, top)]
+
+    def _bar_and_legs(
+        self, level: int, groups: list[list[int]], attach: list[float], bar_y: float, top: float
+    ) -> list[str]:
+        """The sib bar and every child's leg (a stub, or a twin's converging line) as one mitred path.
+
+        The bar and its two outermost legs are one polyline, so its corners are mitred rather than notched where two
+        butt-ended lines met; a lone twin group's outer legs are one polyline through their shared point. Every other
+        leg meets the bar in a T, a subpath of the same path. Twin marks (the MZ bar, ``?``) follow it.
+        """
+        legs = [[(self.px(self.lay.pos[level][k]), top) for k in group] for group in groups]
+        subpaths: list[list[tuple[float, float]]] = []
+        if len(groups) > 1:
+            subpaths.append([legs[0][0], (attach[0], bar_y), (attach[-1], bar_y), legs[-1][-1]])
+            outer = {(0, 0), (len(groups) - 1, len(legs[-1]) - 1)}
+        elif len(legs[0]) > 1:
+            subpaths.append([legs[0][0], (attach[0], bar_y), legs[0][-1]])
+            outer = {(0, 0), (0, len(legs[0]) - 1)}
+        else:
+            outer = set()
+        for i, ends in enumerate(legs):
+            subpaths += [[(attach[i], bar_y), end] for j, end in enumerate(ends) if (i, j) not in outer]
+        out = [_mitred_path(subpaths)]
         for group, ax in zip(groups, attach, strict=True):
-            if len(group) == 1:
-                out.append(_line(ax, bar_y, ax, top))
-            else:
-                out += self._twins(level, group, bar_y, top)
+            if len(group) > 1:
+                out += self._twin_marks(level, group, ax, bar_y, top)
         return out
 
     def _child_groups(self, level: int, cols: list[int]) -> list[list[int]]:
@@ -1127,11 +1139,10 @@ class _Draw:
                 groups.append(list(tg.columns))
         return groups
 
-    def _twins(self, level: int, members: list[int], bar_y: float, top: float) -> list[str]:
-        """Converge a twin group's stubs to one point on the bar; MZ adds a joining bar, ? if unknown."""
+    def _twin_marks(self, level: int, members: list[int], gmid: float, bar_y: float, top: float) -> list[str]:
+        """A twin group's marks between its legs, which converge on ``gmid``: MZ a joining bar, ``?`` if unknown."""
         xs = [self.px(self.lay.pos[level][k]) for k in members]
-        gmid = sum(xs) / len(xs)
-        out = [_line(gmid, bar_y, x, top) for x in xs]
+        out: list[str] = []
         kind = self._twin_group[(level, members[0])].zygosity
         if kind == int(pb.ZYGOSITY_TYPE_MONOZYGOTIC):
             y = bar_y + 0.55 * (top - bar_y)
@@ -1289,7 +1300,7 @@ class _Draw:
             out += _presymptomatic_mark(cx, cy, self.half, _PRESYMPTOMATIC_INSET, cls="mark presymptomatic")
         if ind.deceased:
             d = self.half * 1.4
-            out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased", square=False))
+            out.append(_line(cx - d, cy + d, cx + d, cy - d, cls="mark deceased"))
         if ind.proband:
             out += ['<g class="mark proband">', *self._arrow(cx, cy, label="P"), "</g>"]
         elif ind.consultand:
@@ -1532,19 +1543,19 @@ def _cls(cls: str) -> str:
     return f'class="{cls}" ' if cls else ""
 
 
-def _line(
-    x1: float, y1: float, x2: float, y2: float, cls: str = "", width: float = _WIDTH, *, square: bool = True
-) -> str:
-    """A straight stroke, square-capped unless ``square`` is false.
-
-    Square caps extend each end by half the width, so two lines meeting end to end at a corner (a sib bar's end and
-    its child's stub) fill the corner instead of leaving a notch; an end inside a symbol lies under its backing. A
-    free-standing mark (the deceased slash) keeps butt caps at its drawn length.
-    """
-    cap = ' stroke-linecap="square"' if square else ""
+def _line(x1: float, y1: float, x2: float, y2: float, cls: str = "", width: float = _WIDTH) -> str:
     return (
         f'<line {_cls(cls)}x1="{_num(x1)}" y1="{_num(y1)}" x2="{_num(x2)}" y2="{_num(y2)}" '
-        f'stroke="{_STROKE}" stroke-width="{_num(width)}"{cap}/>'
+        f'stroke="{_STROKE}" stroke-width="{_num(width)}"/>'
+    )
+
+
+def _mitred_path(subpaths: list[list[tuple[float, float]]], cls: str = "") -> str:
+    """One stroked path of open polylines, mitred where each turns, so a corner is filled rather than notched."""
+    d = "".join("M" + "L".join(f"{_num(x)},{_num(y)}" for x, y in points) for points in subpaths if len(points) > 1)
+    return (
+        f'<path {_cls(cls)}d="{d}" fill="none" stroke="{_STROKE}" stroke-width="{_num(_WIDTH)}" '
+        'stroke-linejoin="miter"/>'
     )
 
 

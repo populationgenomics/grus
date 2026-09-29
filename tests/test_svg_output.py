@@ -455,11 +455,22 @@ def test_ghost_hit_rect_has_no_arrow_extension_and_links_follow_layout_order() -
 
 
 def _segments(group: ET.Element) -> list[tuple[float, float, float, float]]:
-    return [
-        tuple(float(e.get(a)) for a in ("x1", "y1", "x2", "y2"))  # type: ignore[misc]
+    """Every drawn stroke in ``group`` as straight segments: each line, and each path's runs point to point.
+
+    A path's ``Q`` corner is taken as a straight run to its end point, which joins the same points the curve does.
+    """
+    out: list[tuple[float, float, float, float]] = [
+        (float(e.get("x1", "0")), float(e.get("y1", "0")), float(e.get("x2", "0")), float(e.get("y2", "0")))
         for e in group.iter(f"{_SVG}line")
         if "hit" not in (e.get("class") or "")
     ]
+    for e in group.iter(f"{_SVG}path"):
+        for run in re.findall(r"M[^M]+", e.get("d", "")):
+            # Each command's last coordinate pair is where it ends (a Q's first pair is its control point).
+            ends = [args.split()[-1].split(",") for args in re.findall(r"[MLQ]([^MLQ]+)", run)]
+            pts = [(float(x), float(y)) for x, y in ends]
+            out += [(a[0], a[1], b[0], b[1]) for a, b in itertools.pairwise(pts)]
+    return out
 
 
 def _touch(p: tuple[float, float], s: tuple[float, float, float, float], eps: float = 1e-6) -> bool:
@@ -742,16 +753,17 @@ def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
 
 
 @pytest.mark.parametrize("name", _NAMES)
-def test_connector_corners_are_filled_and_the_arrow_tip_is_a_point(name: str) -> None:
-    # Butt-capped lines meeting at a corner left a notch on its outside; square caps fill it. The deceased slash is a
-    # mark with a drawn length, so it keeps butt caps. An arrowhead is one mitred path, not two notched lines.
+def test_sib_bar_corners_and_the_arrow_tip_are_mitred(name: str) -> None:
+    # Two butt-ended lines meeting at a corner leave a notch on its outside. A sib bar and its outermost legs (or a
+    # lone twin pair's two legs) are one polyline, mitred where it turns; an arrowhead is one path through its tip.
     root = _parse((_GOLDENS / f"{name}.svg").read_text())
-    presymptomatic = {id(line) for g in root.iter(f"{_SVG}g") if "presymptomatic" in _classes(g) for line in g}
-    for line in root.iter(f"{_SVG}line"):
-        if "hit" in _classes(line) or id(line) in presymptomatic:
-            continue
-        cap = line.get("stroke-linecap")
-        assert cap == (None if "deceased" in _classes(line) else "square"), (_classes(line), cap)
+    for g in _groups(root, "sibship"):
+        bars = [c for c in g.iter(f"{_SVG}path") if c.get("stroke-linejoin") == "miter"]
+        if len(g.get("data-children", "").split()) > 1:  # a lone child's drop runs straight to it: no bar
+            assert bars, f"{name}: a sibship draws its bar and legs as one mitred path"
+        for bar in bars:
+            first = re.findall(r"M[^M]+", bar.get("d", ""))[0]
+            assert len(re.findall(r"[ML]", first)) >= 3, "the corners are turns of one run, not ends of two lines"
     for g in _groups(root, "mark"):
         if not {"proband", "consultand"} & set(_classes(g)):
             continue
