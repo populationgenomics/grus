@@ -26,8 +26,7 @@
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2">
 <line x1="253" y1="66" x2="253" y2="116" stroke="#000000" stroke-width="2"/>
-<line x1="253" y1="116" x2="162" y2="138" stroke="#000000" stroke-width="2"/>
-<line x1="253" y1="116" x2="344" y2="138" stroke="#000000" stroke-width="2"/>
+<path d="M162,138L253,116L344,138" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 <line x1="202.95" y1="128.1" x2="303.05" y2="128.1" stroke="#000000" stroke-width="2"/>
 </g>
 <g class="sibship" data-parents="II-3 II-1" data-children="III-1">
@@ -35,9 +34,7 @@
 </g>
 <g class="sibship" data-parents="II-4 II-2" data-children="III-2 III-3">
 <line x1="302" y1="156" x2="302" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="218" y1="206" x2="302" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="218" y1="206" x2="218" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="302" y1="206" x2="302" y2="228" stroke="#000000" stroke-width="2"/>
+<path d="M218,228L218,206L302,206L302,228" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-2 II-5" data-children="III-4">
 <line x1="386" y1="156" x2="386" y2="228" stroke="#000000" stroke-width="2"/>

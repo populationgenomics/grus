@@ -40,24 +40,18 @@
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2 II-3">
 <line x1="320.667" y1="66" x2="320.667" y2="123" stroke="#000000" stroke-width="2"/>
-<line x1="260" y1="123" x2="442" y2="123" stroke="#000000" stroke-width="2"/>
-<line x1="260" y1="123" x2="218" y2="145" stroke="#000000" stroke-width="2"/>
-<line x1="260" y1="123" x2="302" y2="145" stroke="#000000" stroke-width="2"/>
-<line x1="442" y1="123" x2="442" y2="145" stroke="#000000" stroke-width="2"/>
+<path d="M218,145L260,123L442,123L442,145M260,123L302,145" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-5 II-1" data-children="III-3">
 <line x1="162" y1="163" x2="162" y2="242" stroke="#000000" stroke-width="2"/>
 </g>
 <g class="sibship" data-parents="II-2 II-6" data-children="III-4 III-5">
 <path d="M330,163L330,200Q330,204 334,204L452,204Q456,204 456,208L456,220" fill="none" stroke="#000000" stroke-width="2"/>
-<line x1="456" y1="220" x2="414" y2="242" stroke="#000000" stroke-width="2"/>
-<line x1="456" y1="220" x2="498" y2="242" stroke="#000000" stroke-width="2"/>
+<path d="M414,242L456,220L498,242" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-3 II-4" data-children="III-2 III-1">
 <path d="M470,163L470,208Q470,212 466,212L306,212Q302,212 302,216L302,220" fill="none" stroke="#000000" stroke-width="2"/>
-<line x1="218" y1="220" x2="302" y2="220" stroke="#000000" stroke-width="2"/>
-<line x1="218" y1="220" x2="218" y2="242" stroke="#000000" stroke-width="2"/>
-<line x1="302" y1="220" x2="302" y2="242" stroke="#000000" stroke-width="2"/>
+<path d="M218,242L218,220L302,220L302,242" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g id="ind-I-1" class="individual" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="274.667" y="48" width="36" height="36" fill="#ffffff"/>

@@ -91,6 +91,12 @@ parent cell, so the sib bar hangs from a short vertical stub rising to a point i
 stub from the mating midpoint down to a short horizontal bar — one bar for `CHILDLESSNESS_BY_CHOICE`, two parallel bars
 for `CHILDLESSNESS_INFERTILITY` — drawn instead of a descent).
 
+A sibship's bar and its children's legs are **one mitred path**: the bar and its two outermost legs (a stub, or a twin's
+converging line) are one polyline, so each corner is a mitred turn rather than two butt-ended lines leaving a notch on
+its outside; a lone twin group's two outer legs are one polyline through their shared point. Every other leg, the drop
+and the founder hanger meet the bar in a T, which needs no join. The proband arrow's head is likewise one open path
+through its tip, so the tip is a point.
+
 Not yet drawn (extracted and diffed, but no glyph): relationship `status` (separation / divorce slashes on the mating
 line).
 

@@ -35,9 +35,7 @@
 </g>
 <g class="sibship" data-parents="II-1" data-children="III-1 III-2">
 <line x1="186" y1="156" x2="186" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="144" y1="206" x2="228" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="144" y1="206" x2="144" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="228" y1="206" x2="228" y2="228" stroke="#000000" stroke-width="2"/>
+<path d="M144,228L144,206L228,206L228,228" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-1" data-children="III-3">
 <line x1="312" y1="156" x2="312" y2="228" stroke="#000000" stroke-width="2"/>
@@ -65,8 +63,7 @@
 <circle class="symbol" cx="249" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="205.544" y1="199.456" x2="231" y2="174" stroke="#000000" stroke-width="2"/>
-<line x1="231" y1="174" x2="228.671" y2="182.693" stroke="#000000" stroke-width="2"/>
-<line x1="231" y1="174" x2="222.307" y2="176.329" stroke="#000000" stroke-width="2"/>
+<path class="head" d="M228.671,182.693L231,174L222.307,176.329" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 <text x="197.544" y="203.456" font-family="sans-serif" font-size="15" fill="#000000" text-anchor="middle" dominant-baseline="central">P</text>
 </g>
 <text class="label" x="249" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>

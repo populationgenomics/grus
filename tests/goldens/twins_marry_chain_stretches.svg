@@ -38,31 +38,22 @@
 </g>
 <g class="sibship" data-parents="I-1 I-2" data-children="II-2 II-1">
 <line x1="372" y1="66" x2="372" y2="116" stroke="#000000" stroke-width="2"/>
-<line x1="204" y1="116" x2="540" y2="116" stroke="#000000" stroke-width="2"/>
-<line x1="204" y1="116" x2="204" y2="138" stroke="#000000" stroke-width="2"/>
-<line x1="540" y1="116" x2="540" y2="138" stroke="#000000" stroke-width="2"/>
+<path d="M204,138L204,116L540,116L540,138" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-2 II-3" data-children="III-1 III-2">
 <line x1="232" y1="156" x2="232" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="232" y1="206" x2="190" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="232" y1="206" x2="274" y2="228" stroke="#000000" stroke-width="2"/>
+<path d="M190,228L232,206L274,228" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="II-1 II-4" data-children="III-3 III-4">
 <line x1="568" y1="156" x2="568" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="568" y1="206" x2="526" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="568" y1="206" x2="610" y2="228" stroke="#000000" stroke-width="2"/>
+<path d="M526,228L568,206L610,228" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="III-6 III-1" data-children="IV-7">
 <line x1="148" y1="246" x2="148" y2="318" stroke="#000000" stroke-width="2"/>
 </g>
 <g class="sibship" data-parents="III-2 III-3" data-children="IV-2 IV-3 IV-4 IV-5 IV-6">
 <line x1="400" y1="246" x2="400" y2="296" stroke="#000000" stroke-width="2"/>
-<line x1="232" y1="296" x2="568" y2="296" stroke="#000000" stroke-width="2"/>
-<line x1="232" y1="296" x2="232" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="316" y1="296" x2="316" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="400" y1="296" x2="400" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="484" y1="296" x2="484" y2="318" stroke="#000000" stroke-width="2"/>
-<line x1="568" y1="296" x2="568" y2="318" stroke="#000000" stroke-width="2"/>
+<path d="M232,318L232,296L568,296L568,318M316,296L316,318M400,296L400,318M484,296L484,318" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g class="sibship" data-parents="III-4 III-5" data-children="IV-1">
 <line x1="652" y1="246" x2="652" y2="318" stroke="#000000" stroke-width="2"/>

@@ -24,9 +24,7 @@
 </g>
 <g class="sibship" data-parents="II-1 II-2" data-children="III-1 III-2">
 <line x1="162" y1="156" x2="162" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="120" y1="206" x2="204" y2="206" stroke="#000000" stroke-width="2"/>
-<line x1="120" y1="206" x2="120" y2="228" stroke="#000000" stroke-width="2"/>
-<line x1="204" y1="206" x2="204" y2="228" stroke="#000000" stroke-width="2"/>
+<path d="M120,228L120,206L204,206L204,228" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 </g>
 <g id="ind-I-1" class="individual deceased" data-position="I-1" data-generation="1" data-index="1" data-gender="man">
 <rect class="backing" x="88" y="48" width="36" height="36" fill="#ffffff"/>
@@ -66,8 +64,7 @@
 <circle class="symbol" cx="204" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="160.544" y1="289.456" x2="186" y2="264" stroke="#000000" stroke-width="2"/>
-<line x1="186" y1="264" x2="183.671" y2="272.693" stroke="#000000" stroke-width="2"/>
-<line x1="186" y1="264" x2="177.307" y2="266.329" stroke="#000000" stroke-width="2"/>
+<path class="head" d="M183.671,272.693L186,264L177.307,266.329" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
 <text x="152.544" y="293.456" font-family="sans-serif" font-size="15" fill="#000000" text-anchor="middle" dominant-baseline="central">P</text>
 </g>
 <text class="label" x="204" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-2</text>
