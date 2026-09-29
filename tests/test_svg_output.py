@@ -594,29 +594,28 @@ def _vertical(line: ET.Element | _Ray) -> bool:
     return line.get("x1") == line.get("x2")
 
 
-def test_one_condition_draws_only_a_filled_sections_inner_edge() -> None:
-    # A lone carrier's half has a visible edge inside the symbol: the thin centre line, as the two rays that bound
-    # its section. The rest of its boundary is the outline, drawn once; a wholly filled or empty symbol has none.
+def test_a_symbol_showing_one_condition_is_not_divided() -> None:
+    # NSGC 2022 §4.5: affected or carrier, one condition's fill covers the whole shape, with no line inside it.
     p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("A", _CAR)), _person(3)])
     affected, carrier, plain = _groups(_parse(_render(p)), "individual")
-    (whole,) = _fills(affected)
-    assert whole.tag == f"{_SVG}rect" and whole.get("clip-path") is None and whole.get("width") == "36"
-    assert not _dividers(affected) and not _dividers(plain)
-    edges = _dividers(carrier)
-    assert len(edges) == 2 and all(_vertical(e) and e.get("stroke-width") == "1" for e in edges)
+    for g, status in ((affected, "affected"), (carrier, "carrier")):
+        (whole,) = _fills(g)
+        assert whole.tag == f"{_SVG}rect" and whole.get("clip-path") is None and whole.get("width") == "36"
+        assert whole.get("fill") == f"url(#fill-{status}-0)" and not _dividers(g)
+    assert not _dividers(plain)
 
 
 def test_two_conditions_border_only_filled_halves() -> None:
-    # Only a filled region is bordered: no lines in an empty symbol, none inside a wholly filled one.
+    # Only a divided symbol is bordered: no lines in an empty symbol, none inside one showing a single condition.
     p = pb.Pedigree(
         individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3), _person(4, ("A", _AFF), ("B", _CAR))]
     )
     whole, carrier, plain, both = _groups(_parse(_render(p)), "individual")
-    assert [f.get("width") for f in _fills(whole)] == ["36"] and not _dividers(whole)
+    for g in (whole, carrier):
+        assert [f.get("width") for f in _fills(g)] == ["36"] and not _dividers(g)
     assert not _dividers(plain)
-    for g in (carrier, both):
-        edges = _dividers(g)
-        assert len(edges) == 2 and all(_vertical(e) and e.get("stroke-width") == "1" for e in edges)
+    edges = _dividers(both)
+    assert len(edges) == 2 and all(_vertical(e) and e.get("stroke-width") == "1" for e in edges)
 
 
 def test_three_or_four_conditions_divide_into_quadrants() -> None:
@@ -733,7 +732,8 @@ def test_a_count_moves_beside_a_symbol_only_when_it_has_borders() -> None:
 
     assert count_classes() == ["mark", "count"]
     assert count_classes(("A", _AFF)) == ["mark", "count"], "wholly filled: no border"
-    assert count_classes(("B", _CAR)) == ["mark", "count", "outside"]
+    assert count_classes(("B", _CAR)) == ["mark", "count"], "wholly hatched: no border"
+    assert count_classes(("A", _AFF), ("B", _CAR)) == ["mark", "count", "outside"]
     one = _person(1, ("A", _AFF))
     one.count = 3
     (g,) = _groups(_parse(_render(pb.Pedigree(individuals=[one]))), "individual")
@@ -752,7 +752,7 @@ def _presymptomatic(g: ET.Element) -> tuple[ET.Element, ET.Element]:
 def test_presymptomatic_line_is_heavy_round_capped_haloed_and_inset() -> None:
     # Twice the outline's width with round caps, over a white halo that parts it from any fill and from a filled
     # half's thin border it may lie on; inset from the outline so the child's stub above does not run into it.
-    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR))
+    ind = _person(1, ("A", pb.CONDITION_STATUS_PRESYMPTOMATIC), ("B", _CAR), ("C", _CAR))
     (g,) = _groups(_parse(_render(pb.Pedigree(individuals=[ind]))), "individual")
     halo, line = _presymptomatic(g)
     borders = _dividers(g)
@@ -836,10 +836,11 @@ def test_a_phenotype_label_no_condition_carries_takes_no_index() -> None:
 def test_a_label_orders_the_conditions_it_names() -> None:
     # A matching phenotype label still sets the order; a second real condition still divides.
     labels = [pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in ("B", "unused", "A")]
-    people = [_person(1, ("A", _CAR)), _person(2, ("B", _CAR))]
+    people = [_person(1, ("A", _CAR), ("B", _CAR))]
     root = _parse(_render(pb.Pedigree(labels=labels, individuals=people)))
     assert json.loads(root.get("data-conditions", "null")) == ["B", "A"]
-    assert all(_dividers(g) for g in _groups(root, "individual")), "two conditions: halves"
+    (g,) = _groups(root, "individual")
+    assert _dividers(g), "two conditions: halves"
 
 
 def _segments_of(d: str) -> list[tuple[tuple[float, float], tuple[float, float]]]:
@@ -883,10 +884,13 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
                 continue
             tile, thick, segments = hatches[ref.group(1)]
             tx, ty = _translate(part)
-            if part.tag == f"{_SVG}polygon":  # a sixth's wedge, whose far edges lie outside the shape
+            if part.tag == f"{_SVG}polygon":  # a sixth's wedge (far edges outside the shape), or a whole diamond
                 corners = [(float(a), float(b)) for a, b in (xy.split(",") for xy in part.get("points", "").split())]
                 xs, ys = [c[0] for c in corners], [c[1] for c in corners]
                 x, y, w, h = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+            elif part.tag == f"{_SVG}circle":  # a whole circle: its only edge is the outline (the chord check below)
+                x = y = w = h = 0.0
+                corners = []
             else:
                 x, y = float(part.get("x", "0")), float(part.get("y", "0"))
                 w, h = float(part.get("width", "0")), float(part.get("height", "0"))
@@ -920,7 +924,7 @@ def _hatch_gaps(svg: str) -> list[tuple[str, float]]:
             scy = sum(py for _, py in shape) / len(shape) if circle is None else circle[1]
             bound = max(math.hypot(px - scx, py - scy) for px, py in shape) + 1.0
             # A section edge counts only where it passes through the shape; one wholly outside is clipped away.
-            for a, b in itertools.pairwise([*corners, corners[0]]):
+            for a, b in itertools.pairwise([*corners, *corners[:1]]):
                 elen = math.hypot(b[0] - a[0], b[1] - a[1])
                 if abs((b[0] - a[0]) * (a[1] - scy) - (b[1] - a[1]) * (a[0] - scx)) / elen < bound:
                     edges.append((a, b))
@@ -958,11 +962,36 @@ def _all_hatches(names: str = "ABCD") -> pb.Pedigree:
     return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
 
 
+def _too_close(gaps: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """The gaps under their limit: an outline's stroke width (2 px) from an edge, 1.25 px for a circle's chord.
+
+    A circle's outermost chords pass 1.35 px inside its outline, clear of it by close to a hatch line's width; that is
+    the price of keeping the deceased slash midway between two lines (test_the_deceased_slash_never_covers_a_hatch).
+    """
+    return sorted(g for g in gaps if g[1] < (1.25 if g[0].endswith("chord") else 2.0) - 1e-6)
+
+
+@pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
+def test_the_deceased_slash_never_covers_a_hatch(gender: pb.Gender) -> None:
+    # The slash runs along "/" through the centre; a "/" hatch keeps it midway between two lines on every shape.
+    ind = _person(1, ("A", _CAR), gender=gender)
+    ind.deceased = True
+    (g,) = _groups(_parse(_render(pb.Pedigree(individuals=[ind]))), "individual")
+    (fill,) = _fills(g)
+    assert fill.get("fill") == "url(#fill-carrier-0)", "condition 0 is hatched along /"
+    (slash,) = [c for c in g if "deceased" in _classes(c)]
+    tx, ty = _translate(fill)
+    s = float(slash.get("x1", "0")) - tx + float(slash.get("y1", "0")) - ty  # x + y along the slash, fill frame
+    c = render.DEFAULT_GEOMETRY.symbol_size / 4  # the hatch lattice: "/" lines on x + y = c/2 (mod c)
+    assert abs((s % c) - 0.0) < 1e-6 or abs((s % c) - c) < 1e-6, f"the slash lies at x + y = {s}, not midway"
+
+
 @pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "sixths", "halves", "undivided"])
 def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
     # Every carrier stroke is diagonal and each fill part is drawn in its symbol's own frame (a swatch from its
-    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, a square's or
-    # diamond's outline edge, or close inside a circle's outline, where it would read as a thicker edge or a mark.
+    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, or a square's or
+    # diamond's outline edge, where it would read as a thicker edge or a mark. A circle's near-tangent chords have a
+    # smaller limit (_too_close).
     if name == "all_hatches":
         svg = _render(_all_hatches())
     elif name == "sixths":
@@ -978,8 +1007,7 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
     else:
         svg = (_GOLDENS / f"{name}.svg").read_text()
     gaps = _hatch_gaps(svg)
-    stroke = 2.0  # the outline's stroke width
-    assert all(gap >= stroke - 1e-6 for _, gap in gaps), sorted(g for g in gaps if g[1] < stroke - 1e-6)[:5]
+    assert not _too_close(gaps), _too_close(gaps)[:5]
     if name in ("all_hatches", "sixths", "halves", "undivided"):
         kinds = {what.split()[0] for what, _ in gaps}
         want = {
@@ -1150,7 +1178,7 @@ def test_colour_mode_changes_only_the_tones() -> None:
 @pytest.mark.parametrize("name", ["six_conditions", "condition_fills", "compound_carrier"])
 def test_colour_mode_keeps_the_hatch_clear_of_edges(name: str) -> None:
     gaps = _hatch_gaps(_svg(name, _COLOUR))
-    assert gaps and all(gap >= 2.0 - 1e-6 for _, gap in gaps)
+    assert gaps and not _too_close(gaps)
 
 
 # --- no tile seams ----------------------------------------------------------------------------------------------

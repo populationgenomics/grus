@@ -413,8 +413,8 @@ _GLYPH = dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.Carri
 
 def test_carrier_style_controls_the_x_linked_glyph() -> None:
     # The carrier convention is a render option, not IR meaning. Under the default PARTITION_FILL (NSGC 2022, dot
-    # retired) every carrier is a hatched section whatever its inheritance; under INHERITANCE_GLYPH an unaffected
-    # X-linked carrier is a central dot, and any other carrier is still a section.
+    # retired) every carrier is a hatched fill whatever its inheritance; under INHERITANCE_GLYPH an unaffected
+    # X-linked carrier is a central dot, and any other carrier is still a hatched fill.
     assert render.DEFAULT_GEOMETRY.carrier_style is render.CarrierStyle.PARTITION_FILL
     p = _one(pb.CONDITION_STATUS_CARRIER)
     xl = [_decl(inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)]
@@ -424,7 +424,7 @@ def test_carrier_style_controls_the_x_linked_glyph() -> None:
         render.render_svg(p, conditions=ar),
         render.render_svg(p, _GLYPH, conditions=ar),
     ):
-        assert 'fill="url(#fill-carrier-0)" clip-path="url(#' in svg and 'class="fill dot"' not in svg
+        assert 'fill="url(#fill-carrier-0)"' in svg and 'class="fill dot"' not in svg
     dotted = render.render_svg(p, _GLYPH, conditions=xl)
     assert 'class="fill dot"' in dotted and "<clipPath" not in dotted and "<pattern" not in dotted
     assert 'id="key-carrier-dot-0"' in dotted, "the dot is a fill, so the key defines it"
@@ -441,9 +441,9 @@ def test_inheritance_glyph_draws_the_other_carriers_beside_the_dot() -> None:
 
 
 def test_carrier_fill_keyed_to_named_variant() -> None:
-    # The filled half is keyed to WHICH condition the carrier carries: two carriers of different named
-    # variants fill opposite halves (a compound het reads as opposite sides), two of the same variant share
-    # a side. So the second carrier's fill shifts right by a half-symbol when its variant differs.
+    # The fill is keyed to WHICH condition the carrier carries: two carriers of different named variants take
+    # different fills (each its variant's tone under the hatch), two of the same variant share one. Each shows one
+    # condition, so each symbol is wholly hatched, not divided (NSGC 2022 §4.5).
     def two(name_a: str, name_b: str) -> pb.Pedigree:
         def c(i: int, name: str) -> pb.Individual:
             return pb.Individual(
@@ -455,16 +455,16 @@ def test_carrier_fill_keyed_to_named_variant() -> None:
 
         return pb.Pedigree(individuals=[c(1, name_a), c(2, name_b)])
 
-    def rect_xs(svg: str) -> list[float]:
-        return sorted(
-            float(x) for x in re.findall(r'<rect class="fill" data-condition="\d+" [^>]*?x="([-0-9.]+)"', svg)
-        )
+    def fills(svg: str) -> list[str]:
+        assert "clip-path" not in svg, "one condition per symbol: undivided"
+        return re.findall(r'class="fill" data-condition="\d+" data-status="carrier" [^>]*?fill="url\(#([^)]+)\)"', svg)
 
-    different = rect_xs(render.render_svg(p := two("varA", "varB"), conditions=_declared(p)))
-    same = rect_xs(render.render_svg(p := two("varA", "varA"), conditions=_declared(p)))
-    assert max(different) - max(same) == render.DEFAULT_GEOMETRY.symbol_size / 2, (
-        "a carrier of a different variant fills the opposite half"
-    )
+    different, same = two("varA", "varB"), two("varA", "varA")
+    assert fills(render.render_svg(different, conditions=_declared(different))) == [
+        "fill-carrier-0",
+        "fill-carrier-1",
+    ], "a carrier of a different variant takes the other variant's fill"
+    assert fills(render.render_svg(same, conditions=_declared(same))) == ["fill-carrier-0"] * 2
 
 
 # --- deferral: detect, do not mislay out ----------------------------------------------------------
