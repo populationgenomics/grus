@@ -54,14 +54,14 @@
 </g>
 <g id="ind-I-2" class="individual affected" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="277" cy="66" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(281.5 66)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(277 66)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="277" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="277" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
 <rect class="hit" x="259" y="48" width="36" height="53" fill="none" pointer-events="all"/>
 </g>
 <g id="ind-II-1" class="individual affected proband" data-position="II-1" data-generation="2" data-index="1" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="249" cy="156" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(253.5 156)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(249 156)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="249" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark proband">
 <line x1="205.544" y1="199.456" x2="231" y2="174" stroke="#000000" stroke-width="2"/>
@@ -74,7 +74,7 @@
 </g>
 <g id="ind-III-1" class="individual affected" data-position="III-1" data-generation="3" data-index="1" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="144" cy="246" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(148.5 246)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(144 246)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="144" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="144" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-1</text>
 <rect class="hit" x="126" y="228" width="36" height="53" fill="none" pointer-events="all"/>
@@ -87,7 +87,7 @@
 </g>
 <g id="ind-III-3" class="individual affected" data-position="III-3" data-generation="3" data-index="3" data-gender="woman" data-condition-0="affected">
 <circle class="backing" cx="312" cy="246" r="18" fill="#ffffff"/>
-<circle class="fill" data-condition="0" data-status="affected" transform="translate(316.5 246)" cx="-4.5" cy="0" r="18" fill="url(#fill-affected-0)"/>
+<circle class="fill" data-condition="0" data-status="affected" transform="translate(312 246)" cx="0" cy="0" r="18" fill="url(#fill-affected-0)"/>
 <circle class="symbol" cx="312" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="312" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-3</text>
 <rect class="hit" x="294" y="228" width="36" height="53" fill="none" pointer-events="all"/>

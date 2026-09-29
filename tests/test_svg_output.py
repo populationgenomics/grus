@@ -962,11 +962,36 @@ def _all_hatches(names: str = "ABCD") -> pb.Pedigree:
     return pb.Pedigree(labels=[pb.Label(text=t, kind=pb.LABEL_KIND_PHENOTYPE) for t in names], individuals=people)
 
 
+def _too_close(gaps: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """The gaps under their limit: an outline's stroke width (2 px) from an edge, 1.25 px for a circle's chord.
+
+    A circle's outermost chords pass 1.35 px inside its outline, clear of it by close to a hatch line's width; that is
+    the price of keeping the deceased slash midway between two lines (test_the_deceased_slash_never_covers_a_hatch).
+    """
+    return sorted(g for g in gaps if g[1] < (1.25 if g[0].endswith("chord") else 2.0) - 1e-6)
+
+
+@pytest.mark.parametrize("gender", [pb.GENDER_MAN, pb.GENDER_WOMAN, pb.GENDER_NONBINARY])
+def test_the_deceased_slash_never_covers_a_hatch(gender: pb.Gender) -> None:
+    # The slash runs along "/" through the centre; a "/" hatch keeps it midway between two lines on every shape.
+    ind = _person(1, ("A", _CAR), gender=gender)
+    ind.deceased = True
+    (g,) = _groups(_parse(_render(pb.Pedigree(individuals=[ind]))), "individual")
+    (fill,) = _fills(g)
+    assert fill.get("fill") == "url(#fill-carrier-0)", "condition 0 is hatched along /"
+    (slash,) = [c for c in g if "deceased" in _classes(c)]
+    tx, ty = _translate(fill)
+    s = float(slash.get("x1", "0")) - tx + float(slash.get("y1", "0")) - ty  # x + y along the slash, fill frame
+    c = render.DEFAULT_GEOMETRY.symbol_size / 4  # the hatch lattice: "/" lines on x + y = c/2 (mod c)
+    assert abs((s % c) - 0.0) < 1e-6 or abs((s % c) - c) < 1e-6, f"the slash lies at x + y = {s}, not midway"
+
+
 @pytest.mark.parametrize("name", [*_NAMES, "all_hatches", "sixths", "halves", "undivided"])
 def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) -> None:
     # Every carrier stroke is diagonal and each fill part is drawn in its symbol's own frame (a swatch from its
-    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, a square's or
-    # diamond's outline edge, or close inside a circle's outline, where it would read as a thicker edge or a mark.
+    # corner), so each hatch has one phase per shape: no stroke runs along a section edge, a divider, or a square's or
+    # diamond's outline edge, where it would read as a thicker edge or a mark. A circle's near-tangent chords have a
+    # smaller limit (_too_close).
     if name == "all_hatches":
         svg = _render(_all_hatches())
     elif name == "sixths":
@@ -982,8 +1007,7 @@ def test_no_hatch_line_runs_within_a_stroke_width_of_a_region_edge(name: str) ->
     else:
         svg = (_GOLDENS / f"{name}.svg").read_text()
     gaps = _hatch_gaps(svg)
-    stroke = 2.0  # the outline's stroke width
-    assert all(gap >= stroke - 1e-6 for _, gap in gaps), sorted(g for g in gaps if g[1] < stroke - 1e-6)[:5]
+    assert not _too_close(gaps), _too_close(gaps)[:5]
     if name in ("all_hatches", "sixths", "halves", "undivided"):
         kinds = {what.split()[0] for what, _ in gaps}
         want = {
@@ -1154,7 +1178,7 @@ def test_colour_mode_changes_only_the_tones() -> None:
 @pytest.mark.parametrize("name", ["six_conditions", "condition_fills", "compound_carrier"])
 def test_colour_mode_keeps_the_hatch_clear_of_edges(name: str) -> None:
     gaps = _hatch_gaps(_svg(name, _COLOUR))
-    assert gaps and all(gap >= 2.0 - 1e-6 for _, gap in gaps)
+    assert gaps and not _too_close(gaps)
 
 
 # --- no tile seams ----------------------------------------------------------------------------------------------

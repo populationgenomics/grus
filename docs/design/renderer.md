@@ -160,14 +160,16 @@ A pattern tiles from a fixed origin, so where its lines fall on a symbol depends
 arbitrary phase a line lies flush against a section edge or the outline and reads as a thicker edge, or a mark. Every
 fill is therefore drawn in its symbol's own frame and moved into place, so each pattern has one phase per shape. The
 lines lie on a diagonal lattice whose cell is a quarter of the symbol size. The diagonals run parallel to a diamond's
-edges, so a square or diamond is placed with its centre on the lattice's midpoint, putting a diamond's edges midway
-between two lines; a circle is placed with a lattice line through its centre, so that no line is a near-tangent chord
-hugging its outline. A key swatch is placed like a square. Each pattern is one tile, forty cells across and centred on
-the frame origin, so every fill part lies inside a single tile: a PDF renderer draws the seams between tiles as a faint
-grid (seen through rsvg-convert's PDF in MuPDF), and a fill that never crosses a seam cannot show one. The hatch lines
-therefore run unbroken across the tile. No line runs along a section edge, a divider or an outline; lines cross them.
-There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a placeholder, never a
-reused fill), with a message naming the supported range.
+edges, so every shape is placed with its centre on the lattice's midpoint, putting a diamond's edges midway between two
+lines, and the deceased slash, which runs along "/" through the centre, midway between two "/" lines: the slash never
+covers a hatch line. On a circle the outermost lines then run 1.35 px inside the outline (at the default size), a short
+chord near the edge; a lattice line through a circle's centre would keep every chord clear of the outline, but the slash
+would then lie on it and hide it. A key swatch is placed like a square. Each pattern is one tile, forty cells across and
+centred on the frame origin, so every fill part lies inside a single tile: a PDF renderer draws the seams between tiles
+as a faint grid (seen through rsvg-convert's PDF in MuPDF), and a fill that never crosses a seam cannot show one. The
+hatch lines therefore run unbroken across the tile. No line runs along a section edge, a divider or an outline; lines
+cross them. There is no seventh fill: a pedigree that would fill a condition at index 6 or above defers (a placeholder,
+never a reused fill), with a message naming the supported range.
 
 **Sections, dividers and sector edges.** A pedigree with two conditions in its legend divides every symbol into halves
 (index 0 left, 1 right); with three or four, into quadrants (top-left, top-right, bottom-left, bottom-right); with five

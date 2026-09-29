@@ -54,9 +54,9 @@
 </g>
 <g id="ind-I-2" class="individual carrier" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-4="carrier" data-condition-5="carrier">
 <circle class="backing" cx="269.333" cy="66" r="18" fill="#ffffff"/>
-<clipPath id="clip-I-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<polygon class="fill" data-condition="4" data-status="carrier" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(273.833 66)" fill="url(#fill-carrier-4)" clip-path="url(#clip-I-2)"/>
-<polygon class="fill" data-condition="5" data-status="carrier" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(273.833 66)" fill="url(#fill-carrier-5)" clip-path="url(#clip-I-2)"/>
+<clipPath id="clip-I-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<polygon class="fill" data-condition="4" data-status="carrier" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(269.333 66)" fill="url(#fill-carrier-4)" clip-path="url(#clip-I-2)"/>
+<polygon class="fill" data-condition="5" data-status="carrier" points="0,0 54,0 46.765,27 27,46.765" transform="translate(269.333 66)" fill="url(#fill-carrier-5)" clip-path="url(#clip-I-2)"/>
 <path class="divider" d="M287.333,66L269.333,66L278.333,81.588L269.333,66L260.333,81.588L269.333,66" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="269.333" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="269.333" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
@@ -73,9 +73,9 @@
 </g>
 <g id="ind-II-2" class="individual affected carrier" data-position="II-2" data-generation="2" data-index="2" data-gender="woman" data-condition-2="affected" data-condition-4="carrier">
 <circle class="backing" cx="176" cy="156" r="18" fill="#ffffff"/>
-<clipPath id="clip-II-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<polygon class="fill" data-condition="2" data-status="affected" points="-4.5,0 22.5,-46.765 42.265,-27 49.5,0" transform="translate(180.5 156)" fill="url(#fill-affected-2)" clip-path="url(#clip-II-2)"/>
-<polygon class="fill" data-condition="4" data-status="carrier" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(180.5 156)" fill="url(#fill-carrier-4)" clip-path="url(#clip-II-2)"/>
+<clipPath id="clip-II-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<polygon class="fill" data-condition="2" data-status="affected" points="0,0 27,-46.765 46.765,-27 54,0" transform="translate(176 156)" fill="url(#fill-affected-2)" clip-path="url(#clip-II-2)"/>
+<polygon class="fill" data-condition="4" data-status="carrier" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(176 156)" fill="url(#fill-carrier-4)" clip-path="url(#clip-II-2)"/>
 <path class="divider" d="M185,140.412L176,156L194,156L176,156L185,171.588L176,156L167,171.588L176,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="176" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="176" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
@@ -93,8 +93,8 @@
 </g>
 <g id="ind-II-5" class="individual carrier presymptomatic" data-position="II-5" data-generation="2" data-index="5" data-gender="woman" data-condition-5="carrier" data-condition-0="presymptomatic">
 <circle class="backing" cx="344" cy="156" r="18" fill="#ffffff"/>
-<clipPath id="clip-II-5"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<polygon class="fill" data-condition="5" data-status="carrier" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(348.5 156)" fill="url(#fill-carrier-5)" clip-path="url(#clip-II-5)"/>
+<clipPath id="clip-II-5"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<polygon class="fill" data-condition="5" data-status="carrier" points="0,0 54,0 46.765,27 27,46.765" transform="translate(344 156)" fill="url(#fill-carrier-5)" clip-path="url(#clip-II-5)"/>
 <path class="divider" d="M362,156L344,156L353,171.588L344,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="344" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <g class="mark presymptomatic">
@@ -135,13 +135,13 @@
 </g>
 <g id="ind-III-2" class="individual affected" data-position="III-2" data-generation="3" data-index="2" data-gender="woman" data-condition-0="affected" data-condition-1="affected" data-condition-2="affected" data-condition-3="affected" data-condition-4="affected" data-condition-5="affected">
 <circle class="backing" cx="190" cy="246" r="18" fill="#ffffff"/>
-<clipPath id="clip-III-2"><circle cx="-4.5" cy="0" r="18" fill="none"/></clipPath>
-<polygon class="fill" data-condition="0" data-status="affected" points="-4.5,0 -58.5,0 -51.265,-27 -31.5,-46.765" transform="translate(194.5 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-2)"/>
-<polygon class="fill" data-condition="1" data-status="affected" points="-4.5,0 -31.5,-46.765 -4.5,-54 22.5,-46.765" transform="translate(194.5 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-2)"/>
-<polygon class="fill" data-condition="2" data-status="affected" points="-4.5,0 22.5,-46.765 42.265,-27 49.5,0" transform="translate(194.5 246)" fill="url(#fill-affected-2)" clip-path="url(#clip-III-2)"/>
-<polygon class="fill" data-condition="3" data-status="affected" points="-4.5,0 -31.5,46.765 -51.265,27 -58.5,0" transform="translate(194.5 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-2)"/>
-<polygon class="fill" data-condition="4" data-status="affected" points="-4.5,0 22.5,46.765 -4.5,54 -31.5,46.765" transform="translate(194.5 246)" fill="url(#fill-affected-4)" clip-path="url(#clip-III-2)"/>
-<polygon class="fill" data-condition="5" data-status="affected" points="-4.5,0 49.5,0 42.265,27 22.5,46.765" transform="translate(194.5 246)" fill="url(#fill-affected-5)" clip-path="url(#clip-III-2)"/>
+<clipPath id="clip-III-2"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<polygon class="fill" data-condition="0" data-status="affected" points="0,0 -54,0 -46.765,-27 -27,-46.765" transform="translate(190 246)" fill="url(#fill-affected-0)" clip-path="url(#clip-III-2)"/>
+<polygon class="fill" data-condition="1" data-status="affected" points="0,0 -27,-46.765 0,-54 27,-46.765" transform="translate(190 246)" fill="url(#fill-affected-1)" clip-path="url(#clip-III-2)"/>
+<polygon class="fill" data-condition="2" data-status="affected" points="0,0 27,-46.765 46.765,-27 54,0" transform="translate(190 246)" fill="url(#fill-affected-2)" clip-path="url(#clip-III-2)"/>
+<polygon class="fill" data-condition="3" data-status="affected" points="0,0 -27,46.765 -46.765,27 -54,0" transform="translate(190 246)" fill="url(#fill-affected-3)" clip-path="url(#clip-III-2)"/>
+<polygon class="fill" data-condition="4" data-status="affected" points="0,0 27,46.765 0,54 -27,46.765" transform="translate(190 246)" fill="url(#fill-affected-4)" clip-path="url(#clip-III-2)"/>
+<polygon class="fill" data-condition="5" data-status="affected" points="0,0 54,0 46.765,27 27,46.765" transform="translate(190 246)" fill="url(#fill-affected-5)" clip-path="url(#clip-III-2)"/>
 <path class="divider" d="M199,230.412L190,246L208,246L190,246L199,261.588L190,246L181,261.588L190,246L172,246L190,246L181,230.412L190,246" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
 <circle class="symbol" cx="190" cy="246" r="18" fill="none" stroke="#000000" stroke-width="2"/>
 <text class="label" x="190" y="275.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">III-2</text>

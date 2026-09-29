@@ -131,9 +131,10 @@ _AFFECTED_TONES = ("#000000", "#484848", "#9c9c9c", "#dbdbdb", "#262626", "#b8b8
 _COLOUR_TONES = ("#000000", "#e69f00", "#0072b2", "#009e73", "#d55e00", "#cc79a7")
 # Fill phase: every fill part is drawn in its symbol's own frame (a key swatch about its centre), so a user-space tile
 # starts at the same place on each. The hatch lies on the lattice x + y, x - y = cell / 2 (mod cell), cell =
-# symbol_size / 4: a square's or diamond's frame is its centre, which puts a diamond's edges (parallel to the hatch)
-# midway between two lines; a circle's origin sits half a cell right of its centre, so a line passes through the
-# centre and none is a near-tangent chord (tests/test_svg_output.py pins both).
+# symbol_size / 4, with every shape's frame at its centre. That puts a diamond's edges (parallel to the hatch) midway
+# between two lines, and the deceased slash, which runs along "/" through the centre, midway between two "/" lines,
+# so it never covers one. On a circle the outermost lines then pass 1.35 px inside the outline (at the default size):
+# a short near-tangent chord, the price of the slash (tests/test_svg_output.py pins all three).
 _CELLS_PER_SYMBOL = 4
 _HATCH_LINE = 1.5  # stroke width (px) of a carrier hatch
 # One pattern tile, TILE_CELLS hatch cells across and centred on the frame origin, covers any symbol or swatch whole, so
@@ -1345,17 +1346,16 @@ class _Draw:
         sixths a wedge, for its condition index, clipped to the shape by reusing the shape as a clipPath, so there is
         no per-shape math. The X-linked dot, when drawn, sits over it.
         """
-        # Fill parts are drawn about the symbol's own origin and moved into place, so each pattern has one phase per
-        # symbol: the centre, or half a cell right of it for a circle (see _CELLS_PER_SYMBOL).
-        ox = self.geom.symbol_size / _CELLS_PER_SYMBOL / 2 if ind.gender == pb.GENDER_WOMAN else 0.0
-        at = f'transform="translate({_num(cx + ox)} {_num(cy)})"'
+        # Fill parts are drawn about the symbol's centre and moved into place, so each pattern has one phase, the
+        # same on every shape (see _CELLS_PER_SYMBOL).
+        at = f'transform="translate({_num(cx)} {_num(cy)})"'
         out: list[str] = []
         if plan.whole is not None:
             i, status = plan.whole
             out.append(
                 self._shape(
                     ind.gender,
-                    -ox,
+                    0.0,
                     0.0,
                     f"url(#{self._fill_id(i, status)})",
                     stroke=False,
@@ -1364,8 +1364,8 @@ class _Draw:
                 )
             )
         elif plan.sections:
-            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, -ox, 0.0, "none", stroke=False)}</clipPath>')
-            out += [self._section(i, status, clip_id, at, -ox) for i, status in plan.sections]
+            out.append(f'<clipPath id="{clip_id}">{self._shape(ind.gender, 0.0, 0.0, "none", stroke=False)}</clipPath>')
+            out += [self._section(i, status, clip_id, at, 0.0) for i, status in plan.sections]
         if plan.dot is not None:
             out.append(self._dot(cx, cy, plan.dot, cls="fill dot", radius=self.half * 0.26))
         return out
