@@ -174,26 +174,30 @@ message ConditionDef {                  // in PedigreeSet.conditions, the normal
   string name = 2;                      // as printed; "" = the figure's sole, unnamed condition
   optional Inheritance inheritance = 3; // the condition's mode, when the figure or its text states it
 }
-// Condition (a person's entry) gains  optional string condition_id;  its name and inheritance are deprecated.
-// Support gains  optional string condition_id;  its name-based `condition` is deprecated.
+message Condition {                     // a person's entry
+  string condition_id = 1;              // which declared condition
+  ConditionStatus status = 2;
+  optional string onset_age = 4;        // this person's age at onset, verbatim
+  reserved 3;                           // was inheritance: now on the declaration
+}
+// Support: `condition_id` replaces the name-based `condition`.
 ```
 
 - **Set level, not pedigree level.** A multi-family figure often shares one condition and one key ("EB phenotypes in
   families 1 and 2"); both families' people reference the same declaration, as two pedigrees may cite one caption.
 - **Unnamed conditions are declared too.** The common "filled = affected" figure is one declaration with an empty name,
   so every entry references an id and there is no special case.
-- **A person's entry is `{condition_id, status, onset_age}`**: which condition, and what is true of this person.
-- **One form per record.** A record without declarations keeps the per-entry name form (every record before this
-  change), and the loader accepts it. A record with declarations uses ids throughout: an entry or support with a name
-  instead of an id, or both, is rejected. Mixing is never valid, so each record has one encoding.
+- **A person's entry is `{condition_id, status, onset_age}`**: which condition, and what is true of this person. The
+  entry's old `name` and `inheritance` are gone, not deprecated: a breaking change, made with a major version bump and
+  every consumer and golden migrated in the same release.
 - **Checks** (loader, loud): declaration ids unique across the set and distinct from citation ids; declaration names
   unique across the set, so one condition cannot be declared twice; every `condition_id` resolves; no person has two
   entries for the same condition; a support's `condition_id` names a condition someone in its scope (or the pedigree)
-  has.
+  has; a declaration no entry references is an error (it would claim a condition the figure does not draw).
 - **Consumers read the declaration.** The renderer's condition legend is the declarations some entry references, in the
   existing order (phenotype labels naming a condition first, then first appearance), with the name and inheritance from
-  the declaration; `diff_set` compares a person's entries by the declared name, so a record in either form diffs against
-  the other; `match_individuals` fingerprints entries by declared name, likewise.
+  the declaration; `diff_set` and `match_individuals` compare a person's entries by the declared name, so ids assigned
+  differently in two records still match.
 - **Emission.** A model declares each condition once, usually from the figure's key or legend, then writes the short id
   on each symbol, which is easier to get right than repeating a long name.
 
@@ -209,8 +213,9 @@ for them. Covered: gender + sex-assigned-at-birth (incl. nonbinary, VSC via `con
 presymptomatic, multi-condition partition; deceased, proband, consultand; reproductive outcomes (pregnancy, stillbirth,
 SAB, TOP, ectopic) and count-collapsed sibships; consanguinity, separated/divorced, single parent, childlessness/
 infertility; twins (MZ/DZ/unknown); adoption (in/out, dashed vs solid descent); ART donor/surrogate; family/panel/gene
-labels. Evolution is additive-only from the first public release (`buf breaking`, FILE); the pre-release rewrites (slice
-22\) are history.
+labels. Evolution is additive by default (`buf breaking`, FILE, in CI); a breaking change is allowed only with a major
+version bump of the package in the same change, which the CI check recognises, with every consumer migrated in that
+release. The pre-release rewrites (slice 22) are history.
 
 ### Serialization
 
@@ -271,12 +276,15 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 
 - **A condition-centred table** (each declared condition listing the positions that have it, with their status), like
   matings listing partners. Rejected: a model transcribes a figure symbol by symbol, and this splits one person's fills
-  across condition rows referenced back by position, where dangling and duplicated references creep in; matching, diffs
-  and drawing are all per person and would rebuild the per-person view; and it is a second encoding of who has what,
-  where declarations are purely additive.
+  across condition rows referenced back by position, where dangling and duplicated references creep in; and matching,
+  diffs and drawing are all per person and would rebuild the per-person view.
 
 - **Name as the join key, with a check that entries agree on inheritance.** Smaller, but it keeps a free-text join
   (typos split a condition; renaming means editing every entry) and gives supports and the legend no entity to point at.
+
+- **Declarations alongside deprecated per-entry names** (an additive migration, both forms valid). Rejected once
+  breaking changes were allowed with a major version: two encodings of one fact, and a loader rule to forbid mixing
+  them, for no gain when every consumer can move at once.
 
 - **Citations as evidence lists on every entity** (case records' shape: `repeated string evidence` on each message).
   Rejected for grus: one sentence usually covers several people, so the same quote repeats across entities, and an id on
