@@ -65,7 +65,8 @@ once:
   figure states it** — never inferred from the pedigree pattern (see no-inference non-goal); the carrier *glyph* is a
   render choice, not implied by this field. `onset_age` is the as-drawn age at onset/diagnosis for **this** condition,
   verbatim ("42", "40s", "prenatal") — kept on the condition rather than as a floating annotation so the age↔condition
-  binding survives.
+  binding survives. A condition's own facts (its name, its mode of inheritance) are declared once, by id (next section);
+  a person's entry carries only what is about the person.
 - **Labels are `repeated Label{text, kind}`** (kind ∈ family/panel/gene/phenotype/other), not a single `title` — a
   pedigree often carries several at once, each a distinct fact for reasoning; the renderer picks the display title. The
   panel label lives here (as-drawn meaning), not in `Provenance`.
@@ -160,6 +161,45 @@ text is available (the store), as case records check theirs; the IR alone cannot
 A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
 a pedigree was read, never where anything sits in a rendering.
 
+### Conditions are declared once, by id
+
+A condition is one thing a figure's people have: its name and its mode of inheritance belong to it, not to each person.
+Stored per person, they repeat on every entry, a spelling difference silently splits one condition in two, entries can
+disagree on inheritance with nothing to check it, and a renderer legend or a citation `Support` can only find the
+condition by joining on a free-text name. So conditions are declared once, with local ids, as citations are:
+
+```proto
+message ConditionDef {                  // in PedigreeSet.conditions, the normalised list
+  string id = 1;                        // local ("k1"), unique in the set
+  string name = 2;                      // as printed; "" = the figure's sole, unnamed condition
+  optional Inheritance inheritance = 3; // the condition's mode, when the figure or its text states it
+}
+// Condition (a person's entry) gains  optional string condition_id;  its name and inheritance are deprecated.
+// Support gains  optional string condition_id;  its name-based `condition` is deprecated.
+```
+
+- **Set level, not pedigree level.** A multi-family figure often shares one condition and one key ("EB phenotypes in
+  families 1 and 2"); both families' people reference the same declaration, as two pedigrees may cite one caption.
+- **Unnamed conditions are declared too.** The common "filled = affected" figure is one declaration with an empty name,
+  so every entry references an id and there is no special case.
+- **A person's entry is `{condition_id, status, onset_age}`**: which condition, and what is true of this person.
+- **One form per record.** A record without declarations keeps the per-entry name form (every record before this
+  change), and the loader accepts it. A record with declarations uses ids throughout: an entry or support with a name
+  instead of an id, or both, is rejected. Mixing is never valid, so each record has one encoding.
+- **Checks** (loader, loud): declaration ids unique across the set and distinct from citation ids; declaration names
+  unique across the set, so one condition cannot be declared twice; every `condition_id` resolves; no person has two
+  entries for the same condition; a support's `condition_id` names a condition someone in its scope (or the pedigree)
+  has.
+- **Consumers read the declaration.** The renderer's condition legend is the declarations some entry references, in the
+  existing order (phenotype labels naming a condition first, then first appearance), with the name and inheritance from
+  the declaration; `diff_set` compares a person's entries by the declared name, so a record in either form diffs against
+  the other; `match_individuals` fingerprints entries by declared name, likewise.
+- **Emission.** A model declares each condition once, usually from the figure's key or legend, then writes the short id
+  on each symbol, which is easier to get right than repeating a long name.
+
+A condition-centred view (each condition with the people who have it, as a case-record `Assertion` with `applies_to`) is
+a mechanical projection of this form, so an export can produce it without storing it.
+
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
 The schema represents the **entire** Bennett/NSGC concept space (2008 Figs 1–4 + the 2022 revision), so no figure is
@@ -228,6 +268,15 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 - **A single opaque string id + parse "II-2" at use** — rejected: normalize once (numbers as numbers), don't re-parse.
 
 - **Keep `title` a single string** — rejected: a pedigree's family/panel/gene labels are distinct facts for reasoning.
+
+- **A condition-centred table** (each declared condition listing the positions that have it, with their status), like
+  matings listing partners. Rejected: a model transcribes a figure symbol by symbol, and this splits one person's fills
+  across condition rows referenced back by position, where dangling and duplicated references creep in; matching, diffs
+  and drawing are all per person and would rebuild the per-person view; and it is a second encoding of who has what,
+  where declarations are purely additive.
+
+- **Name as the join key, with a check that entries agree on inheritance.** Smaller, but it keeps a free-text join
+  (typos split a condition; renaming means editing every entry) and gives supports and the legend no entity to point at.
 
 - **Citations as evidence lists on every entity** (case records' shape: `repeated string evidence` on each message).
   Rejected for grus: one sentence usually covers several people, so the same quote repeats across entities, and an id on
