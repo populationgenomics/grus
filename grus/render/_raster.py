@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from grus.render import _extras
+
 
 def rasterize(svg: str, *, scale: float = 2.0) -> bytes:
     """Render an SVG document string to PNG bytes on white, scaled up ``scale``x for legibility.
@@ -22,7 +24,10 @@ def rasterize(svg: str, *, scale: float = 2.0) -> bytes:
     """
     if scale <= 0:
         raise ValueError(f"scale must be positive, got {scale}")
-    import resvg_py  # type: ignore[import-not-found]  # lazy: the optional `raster` extra
+    try:
+        import resvg_py  # type: ignore[import-not-found]
+    except ImportError as e:
+        raise _extras.MissingExtraError("rasterizing to PNG", "raster") from e
 
     svg_to_bytes: Any = resvg_py.svg_to_bytes
     return bytes(svg_to_bytes(svg_string=svg, zoom=scale, background="white"))

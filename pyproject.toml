@@ -22,9 +22,6 @@ requires-python = ">=3.13"
 dependencies = [
   "protobuf>=6,<7",
   "protovalidate>=1.0",
-  # The layout's x-solve: an exact lexicographic linear program (grus/render/_xsolve.py). Exact rationals keep
-  # positions bit-identical on every platform, which the byte-compared goldens rest on.
-  "z3-solver>=4.13",
 ]
 
 # PEP 735 dependency groups, installed on demand with `uv sync --group <name>`.
@@ -32,10 +29,23 @@ dependencies = [
 # Codegen: grpcio-tools' protoc emits the committed Python stubs (its bundled protoc pins the
 # generated-code version to the protobuf 6.x runtime). buf drives export/lint/breaking.
 codegen = ["grpcio-tools>=1.68"]
-# Lint + test toolchain. pillow decodes rasterized PNGs in the raster tests.
-lint = ["pre-commit>=4", "ruff>=0.15", "pyright>=1.1.390", "pytest>=8", "types-protobuf>=6", "pillow>=11"]
+# Lint + test toolchain. pillow decodes rasterized PNGs in the raster tests; z3-solver (the `render` extra) lays
+# out every golden.
+lint = [
+  "pre-commit>=4",
+  "ruff>=0.15",
+  "pyright>=1.1.390",
+  "pytest>=8",
+  "types-protobuf>=6",
+  "pillow>=11",
+  "z3-solver>=4.13",
+]
 
 [project.optional-dependencies]
+# Layout and drawing (`grus.render`, `grus render` / `grus layout`): the x-solve's exact lexicographic linear program
+# (grus/render/_xsolve.py). Exact rationals keep positions bit-identical on every platform, which the byte-compared
+# goldens rest on. A large native wheel, so a consumer that only reads and validates IR does not install it.
+render = ["z3-solver>=4.13"]
 # SVG -> PNG (`grus render --png`, the eval): resvg, a self-contained wheel.
 raster = ["resvg-py>=0.5"]
 # A floating-point alternative x-solve backend (Geometry(x_solver=XSolver.HIGHS)).
