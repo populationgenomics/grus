@@ -31,7 +31,8 @@ message PedigreeSetLayout {
 message LayoutKey {
   // grus's layout-algorithm version; bumped by any grus change that alters a layout.
   uint32 algorithm_version = 1 [(buf.validate.field).uint32.gt = 0];
-  // SHA-256 of the pedigree's canonical serialization (input-order independent; covers the whole pedigree).
+  // SHA-256 of the pedigree's canonical serialization (input-order independent; covers only what layout and
+  // drawing read).
   bytes pedigree_digest = 2 [(buf.validate.field).bytes.len = 32];
   LayoutGeometry geometry = 3 [(buf.validate.field).required = true];
 }

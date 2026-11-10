@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import protovalidate
-from google.protobuf.message import Message
+from google.protobuf import message
 
 from grus import ir
 from grus.ir import _migrate
@@ -51,6 +51,8 @@ class StaleLayoutError(Exception):
 # Every field of every message the digest reaches, classified: RENDERED fields are read by layout or drawing and
 # are hashed; NOT_RENDERED ones are cleared first, so editing them leaves a stored layout valid. A test fails when a
 # field is in neither, so a new IR field must be classified before it can be silently hashed or silently ignored.
+# Keys are the pre-1.0 messages the digest serializes (a Condition carries its declaration's name and inheritance),
+# plus ConditionDef, whose rendered fields reach the digest only through those entries.
 RENDERED: dict[str, frozenset[str]] = {
     "Pedigree": frozenset({"labels", "individuals", "matings"}),  # labels: the title and the condition legend
     "Label": frozenset({"text", "kind"}),
@@ -91,14 +93,14 @@ NOT_RENDERED: dict[str, frozenset[str]] = {
 }
 
 
-def _rendered_only(msg: Message) -> None:
+def _rendered_only(msg: message.Message) -> None:
     """Clear, in place and recursively, every field of ``msg`` that neither layout nor drawing reads."""
     name = msg.DESCRIPTOR.name
     for field, value in msg.ListFields():
         if field.name not in RENDERED[name]:
             msg.ClearField(field.name)
         elif field.message_type is not None:
-            for item in [value] if isinstance(value, Message) else value:
+            for item in [value] if isinstance(value, message.Message) else value:
                 _rendered_only(item)
 
 

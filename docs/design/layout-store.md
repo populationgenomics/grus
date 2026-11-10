@@ -110,9 +110,8 @@ input to the layout:
   declared once, by id"): a declaration's name and inheritance are drawn (the legend, the key's labels and widths, the
   X-linked dot and so a count's place), so each entry enters in the pre-1.0 encoding, its `condition_id` replaced by its
   declaration's `name` and `inheritance`, and the classification runs on that encoding. A declaration's own fields are
-  classified too: its `id` is not drawn, so renaming it leaves the digest, and a pedigree migrated from 0.x has the
-  digest of its 0.x source. `store_layout`, `load_layout` and drawing from a stored layout take the declarations
-  alongside the pedigree (`conditions=`).
+  classified too: its `id` is not drawn, so renaming it leaves the digest. `store_layout`, `load_layout` and drawing
+  from a stored layout take the declarations alongside the pedigree (`conditions=`).
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
@@ -193,9 +192,11 @@ and a record that sets it is refused. Version 2 also defers a mating whose partn
 - **Store the front end's synthetic `Position`s verbatim** (phantoms and pass-throughs have stable negative indices).
   Rejected: negative indices fail the IR's field rules, and the encoding is an implementation detail a version bump
   would have to track; semantic keys state what the cell is.
-- **Hash a layout-relevant projection of the pedigree.** Fewer spurious invalidations. Rejected: it has to track every
-  field any future layout reads, and a missed field is a silently stale drawing — the one failure this key exists to
-  prevent.
+- **Hash the whole pedigree.** No classification to maintain. Rejected: every edit to provenance, an id or meaning with
+  no drawn form marks stored layouts stale, and a harness edits exactly those after the fact. The risk the projection
+  carries instead — a drawn field left out, so a silently stale drawing — is closed by tests rather than by hashing
+  everything: a field in neither class fails, an edit to a cleared field must leave the drawing byte-identical, and an
+  edit to a hashed one must move the digest.
 - **Recompute on a stale key.** Friendlier for a caller who does not care. Rejected: it turns a cache bug into a slow
   path nobody notices; a caller can catch the error and recompute.
 

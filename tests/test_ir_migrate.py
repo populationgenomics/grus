@@ -6,8 +6,8 @@
   described now describes the declaration, so it scopes the whole pedigree.
 * **Loud** — entries of one name that state different inheritance, two entries of one name on one person, and a
   support naming a condition no one has all fail.
-* **Continuity** — a migrated record keeps its stored-layout digest: the digest reads entries through their
-  declarations in the pre-1.0 encoding, so a declaration's id never enters it.
+* **Ids are the record's own** — the stored-layout digest reads entries through their declarations in the pre-1.0
+  encoding, so a declaration's id never enters it; its name and inheritance do.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ def test_what_has_no_1_0_form_fails_loud(old: str, new: str, match: str) -> None
         ir.migrate_pbtxt(_OLD_SET.replace(old, new, 1))
 
 
-def test_a_migrated_record_keeps_its_layout_digest() -> None:
+def test_a_declaration_id_never_enters_the_layout_digest() -> None:
     # The digest reads each entry through its declaration, so ids are the record's own business.
     p, defs = test_render._golden("compound_carrier")
     renamed = pb.Pedigree()

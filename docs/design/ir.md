@@ -215,9 +215,8 @@ A removed field's number and name are reserved, never reused: `condition_id` tak
   that states no inheritance takes its name's stated one; entries of one name stating different modes, or one person
   with two entries of one name (pre-1.0 allowed affected and carrier together), have no 1.0 form and raise
   `MigrationError`; so does a support naming a condition no one has. The result is validated.
-- **Stored layouts keep their key.** The stored-layout digest (`layout-store.md`) reads each entry through its
-  declaration in the pre-1.0 encoding, so a migrated pedigree has the digest it had, and a declaration's id never enters
-  it; its name and inheritance do.
+- **Stored layouts read entries through declarations.** The stored-layout digest (`layout-store.md`) reads each entry
+  through its declaration in the pre-1.0 encoding, so a declaration's id never enters it; its name and inheritance do.
 
 A condition-centred view (each condition with the people who have it, as a case-record `Assertion` with `applies_to`) is
 a mechanical projection of this form, so an export can produce it without storing it.

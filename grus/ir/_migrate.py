@@ -112,8 +112,8 @@ def _legacy_classes() -> tuple[type[Message], type[Message]]:
 def legacy_pedigree(p: pb.Pedigree, conditions: Iterable[pb.ConditionDef]) -> Message:
     """``p`` in the 0.x schema: each entry carries its declaration's name and inheritance, as before 1.0.
 
-    A support's ``condition_id`` does not carry over. The stored-layout digest serializes this form, so a pedigree
-    migrated from 0.x keeps the digest it had and a declaration's id never enters it.
+    A support's ``condition_id`` does not carry over. The stored-layout digest serializes this form, so a declaration's
+    id never enters it.
 
     Raises:
         UndeclaredConditionError: an entry names a ``condition_id`` no declaration has.
