@@ -4,7 +4,7 @@ A **meaning-only pedigree IR** (protobuf), a **deterministic renderer** that dra
 pedigree, and **importers** from the pedigree file formats people already have. Python 3.13, MIT.
 
 ```sh
-uv add 'grus[render]'  # or: pip install 'grus[render]'; plain `grus` reads, validates and imports IR, no renderer
+uv add 'grus[render]'  # or: pip install 'grus[render]'; plain `grus` reads, validates and imports IR, no layout solver
 grus import family.fam -o family.pbtxt      # PLINK/LINKAGE PED, kinship2 tables, Phenopackets Family, Open Pedigree JSON
 grus validate family.pbtxt
 grus render family.pbtxt -o family.svg      # --png with the `raster` extra

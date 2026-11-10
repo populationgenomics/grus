@@ -198,8 +198,8 @@ def _solve_highs(model: Model) -> dict[int, float]:
     try:
         import highspy
         import numpy as np
-    except ImportError as e:  # pragma: no cover - depends on the optional extra
-        raise RuntimeError("XSolver.HIGHS needs the optional 'highs' extra: pip install 'grus[highs]'") from e
+    except ImportError as e:
+        raise _extras.MissingExtraError("XSolver.HIGHS", "highs") from e
 
     inf = highspy.kHighsInf
     col = {c: k for k, c in enumerate(model.cells)}

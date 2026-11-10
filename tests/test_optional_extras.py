@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 import subprocess
 import sys
@@ -47,6 +48,13 @@ def test_laying_out_without_z3_names_the_render_extra(monkeypatch: pytest.Monkey
     monkeypatch.setitem(sys.modules, "z3", None)
     with pytest.raises(render.MissingExtraError, match=r"pip install 'grus\[render\]'"):
         render.render_svg(_trio())
+
+
+def test_the_highs_solver_without_highspy_names_the_highs_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "highspy", None)
+    geom = dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS)
+    with pytest.raises(render.MissingExtraError, match=r"pip install 'grus\[highs\]'"):
+        render.render_svg(_trio(), geom)
 
 
 @pytest.mark.parametrize("command", ["render", "layout"])

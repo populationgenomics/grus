@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 class MissingExtraError(ImportError):
-    """A renderer path needs an optional extra (``render``, ``raster``) that is not installed.
+    """A renderer path needs an optional extra (``render``, ``raster``, ``highs``) that is not installed.
 
     An ``ImportError``, so a caller already guarding the optional import keeps working; the message names the
     ``pip install`` line that supplies it.
