@@ -5,8 +5,8 @@
 * **Order-independent** — shuffling a pedigree's individuals and matings leaves the stored bytes unchanged, because
   cells are keyed by identity and the digest is canonical.
 * **Exact** — drawing from a stored layout is byte-identical to a fresh render.
-* **Rendering only** — the digest covers every field layout or drawing reads and no other: an edit to a cleared field
-  leaves the digest and the drawing unchanged, an edit to a hashed scalar moves the digest.
+* **Layout only** — the digest covers every field layout reads and no other: an edit to a cleared field leaves the
+  stored layout unchanged and draws from it as a fresh render does, an edit to a hashed scalar moves the digest.
 * **Never stale** — a stored layout of other pedigree content, under other layout geometry, or from another layout
   algorithm version is refused, and a golden whose layout changes without a version bump fails.
 """
@@ -419,7 +419,7 @@ def test_citation_supports_leave_a_stored_layout_valid() -> None:
     assert render.render_svg(cited, stored_layout=stored, conditions=defs) == render.render_svg(p, conditions=defs)
 
 
-# --- the digest covers what layout and drawing read, and only that ------------------------------------------------
+# --- the digest covers what layout reads, and only that -----------------------------------------------------------
 
 # The encoding the digest serializes; Message.DESCRIPTOR is typed as the C (upb) or Python descriptor.
 _DIGESTED = cast(descriptor.Descriptor, _migrate.legacy_pedigree(pb.Pedigree(), ()).DESCRIPTOR)
@@ -428,27 +428,32 @@ _DIGESTED = cast(descriptor.Descriptor, _migrate.legacy_pedigree(pb.Pedigree(), 
 def _reachable(
     desc: descriptor.Descriptor, seen: dict[str, descriptor.Descriptor] | None = None
 ) -> dict[str, descriptor.Descriptor]:
-    """Every message descriptor the digest walks into from ``desc``, through RENDERED message fields."""
+    """Every message descriptor the digest walks into from ``desc``, through LAYOUT_READS message fields."""
     seen = {} if seen is None else seen
     seen[desc.name] = desc
     for field in desc.fields:
-        rendered = field.name in _store.RENDERED.get(desc.name, ())
-        if rendered and field.message_type is not None and field.message_type.name not in seen:
+        read = field.name in _store.LAYOUT_READS.get(desc.name, ())
+        if read and field.message_type is not None and field.message_type.name not in seen:
             _reachable(field.message_type, seen)
     return seen
 
 
+def _classified() -> dict[str, descriptor.Descriptor]:
+    """Every classified message: those the digest walks into, and the declarations their entries are resolved by."""
+    return _reachable(_DIGESTED) | {"ConditionDef": cast(descriptor.Descriptor, pb.ConditionDef.DESCRIPTOR)}
+
+
 def test_every_digested_field_is_classified() -> None:
     reached = _classified()
-    assert set(reached) == set(_store.RENDERED) == set(_store.NOT_RENDERED)
+    assert set(reached) == set(_store.LAYOUT_READS) == set(_store.LAYOUT_IGNORES)
     for name, desc in reached.items():
-        rendered, not_rendered = _store.RENDERED[name], _store.NOT_RENDERED[name]
-        assert not rendered & not_rendered, f"{name}: {sorted(rendered & not_rendered)} classified twice"
-        assert {f.name for f in desc.fields} == rendered | not_rendered, f"{name}: unclassified fields"
+        read, ignored = _store.LAYOUT_READS[name], _store.LAYOUT_IGNORES[name]
+        assert not read & ignored, f"{name}: {sorted(read & ignored)} classified twice"
+        assert {f.name for f in desc.fields} == read | ignored, f"{name}: unclassified fields"
 
 
 def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
-    """A golden with a condition on every person, plus a mating with children and an annotation to edit in place."""
+    """A golden with a condition on every person, plus a mating with children, an annotation and a count to edit."""
     p, defs = test_render._golden("condition_fills")
     p.matings.add(
         partner_a=pb.Position(generation=1, index=1),
@@ -456,6 +461,7 @@ def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
         offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
     )
     p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
+    p.individuals[2].count = 3  # drawn inside its symbol, whose shape is its gender
     return p, list(defs)
 
 
@@ -467,12 +473,17 @@ def _rename_declaration(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
                 c.condition_id = "renamed"
 
 
-# One edit per NOT_RENDERED field, made to _sample(): the digest and the drawing must not move.
-_UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
+# One edit per LAYOUT_IGNORES field, made to _sample(): the digest and the stored layout must not move.
+_IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
     ("Pedigree", "id"): lambda p, defs: setattr(p, "id", "another-id"),
     ("Pedigree", "provenance"): lambda p, defs: setattr(p.provenance, "doi", "10.1/x"),
     ("Pedigree", "evidence"): lambda p, defs: p.evidence.append("c1"),
     ("Pedigree", "supports"): lambda p, defs: p.supports.add(citations=["c1"], field="labels"),
+    ("Pedigree", "labels"): lambda p, defs: setattr(p.labels[0], "text", "Another title"),
+    ("Individual", "gender"): lambda p, defs: setattr(p.individuals[2], "gender", pb.GENDER_MAN),
+    ("Individual", "proband"): lambda p, defs: setattr(p.individuals[-1], "proband", True),
+    ("Individual", "consultand"): lambda p, defs: setattr(p.individuals[0], "consultand", True),
+    ("Individual", "external_id"): lambda p, defs: setattr(p.individuals[0], "external_id", "S-17"),
     ("Individual", "sex_assigned_at_birth"): lambda p, defs: setattr(
         p.individuals[0], "sex_assigned_at_birth", pb.SEX_ASSIGNED_AT_BIRTH_FEMALE
     ),
@@ -499,16 +510,23 @@ _UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.Conditio
 }
 
 
-def test_every_unrendered_field_has_an_edit() -> None:
-    assert set(_UNRENDERED_EDITS) == {(m, f) for m, fs in _store.NOT_RENDERED.items() for f in fs}
+def test_every_ignored_field_has_an_edit() -> None:
+    assert set(_IGNORED_EDITS) == {(m, f) for m, fs in _store.LAYOUT_IGNORES.items() for f in fs}
 
 
-@pytest.mark.parametrize("key", sorted(_UNRENDERED_EDITS))
-def test_an_edit_to_an_unrendered_field_leaves_the_digest(key: tuple[str, str]) -> None:
+@pytest.mark.parametrize("key", sorted(_IGNORED_EDITS))
+def test_an_edit_to_an_ignored_field_leaves_the_stored_layout(key: tuple[str, str]) -> None:
+    # The stored record is byte-identical, and the edited pedigree drawn from the unedited one's record is its fresh
+    # render, alone and in a set: a field layout comes to read fails here until it moves to LAYOUT_READS.
     base, base_defs = _sample()
     edited, defs = _sample()
-    _UNRENDERED_EDITS[key](edited, defs)
-    assert _store.pedigree_digest(edited, defs) == _store.pedigree_digest(base, base_defs)
+    _IGNORED_EDITS[key](edited, defs)
+    stored = render.store_layout(base, conditions=base_defs)
+    assert render.store_layout(edited, conditions=defs) == stored
+    fresh = render.render_svg(edited, conditions=defs)
+    assert render.render_svg(edited, stored_layout=stored, conditions=defs) == fresh
+    edited_set = pb.PedigreeSet(pedigrees=[edited], conditions=defs)
+    assert render.render_set_svg(edited_set, stored_layouts=[stored]) == render.render_set_svg(edited_set)
 
 
 def _declared_name(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
@@ -519,20 +537,14 @@ def _declared_inheritance(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
     defs[0].inheritance = pb.INHERITANCE_X_LINKED_RECESSIVE
 
 
-# One edit per RENDERED scalar field, made to _sample(): the digest must move. A declaration's name and
+# One edit per LAYOUT_READS scalar field, made to _sample(): the digest must move. A declaration's name and
 # inheritance reach the digest only as an entry's (pre-1.0 Condition), so each is keyed both ways.
-_RENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
-    ("Label", "text"): lambda p, defs: setattr(p.labels[0], "text", p.labels[0].text + "!"),
-    ("Label", "kind"): lambda p, defs: setattr(p.labels[0], "kind", pb.LABEL_KIND_PANEL),
+_READ_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
     ("Individual", "generation"): lambda p, defs: setattr(p.individuals[-1], "generation", 9),
     ("Individual", "index"): lambda p, defs: setattr(p.individuals[-1], "index", 99),
-    ("Individual", "gender"): lambda p, defs: setattr(p.individuals[0], "gender", pb.GENDER_UNKNOWN),
     ("Individual", "deceased"): lambda p, defs: setattr(p.individuals[0], "deceased", True),
-    ("Individual", "proband"): lambda p, defs: setattr(p.individuals[0], "proband", True),
-    ("Individual", "consultand"): lambda p, defs: setattr(p.individuals[0], "consultand", True),
     ("Individual", "count"): lambda p, defs: setattr(p.individuals[0], "count", 3),
     ("Individual", "count_unspecified"): lambda p, defs: setattr(p.individuals[0], "count_unspecified", True),
-    ("Individual", "external_id"): lambda p, defs: setattr(p.individuals[0], "external_id", "S-17"),
     ("Condition", "name"): _declared_name,
     ("Condition", "status"): lambda p, defs: setattr(
         p.individuals[0].conditions[0], "status", pb.CONDITION_STATUS_UNKNOWN
@@ -540,7 +552,7 @@ _RENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionD
     ("Condition", "inheritance"): _declared_inheritance,
     ("ConditionDef", "name"): _declared_name,
     ("ConditionDef", "inheritance"): _declared_inheritance,
-    ("Annotation", "text"): lambda p, defs: setattr(p.individuals[0].annotations[0], "text", "M/M"),
+    ("Annotation", "text"): lambda p, defs: setattr(p.individuals[0].annotations[0], "text", "a much wider label line"),
     ("Mating", "consanguineous"): lambda p, defs: setattr(p.matings[-1], "consanguineous", True),
     ("Mating", "childlessness"): lambda p, defs: setattr(p.matings[-1], "childlessness", pb.CHILDLESSNESS_BY_CHOICE),
     ("Mating", "partner_a"): lambda p, defs: p.matings[-1].ClearField("partner_a"),
@@ -557,35 +569,18 @@ _RENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionD
 }
 
 
-def _classified() -> dict[str, descriptor.Descriptor]:
-    """Every classified message: those the digest walks into, and the declarations their entries are resolved by."""
-    return _reachable(_DIGESTED) | {"ConditionDef": cast(descriptor.Descriptor, pb.ConditionDef.DESCRIPTOR)}
-
-
-def test_every_rendered_scalar_has_an_edit() -> None:
+def test_every_read_scalar_has_an_edit() -> None:
     scalars = {
         (m, f.name)
         for m, desc in _classified().items()
         for f in desc.fields
-        if f.name in _store.RENDERED[m] and f.message_type is None
+        if f.name in _store.LAYOUT_READS[m] and f.message_type is None
     }
-    assert scalars <= set(_RENDERED_EDITS), f"no edit for {sorted(scalars - set(_RENDERED_EDITS))}"
+    assert scalars <= set(_READ_EDITS), f"no edit for {sorted(scalars - set(_READ_EDITS))}"
 
 
-@pytest.mark.parametrize("key", sorted(_RENDERED_EDITS))
-def test_an_edit_to_a_rendered_scalar_moves_the_digest(key: tuple[str, str]) -> None:
+@pytest.mark.parametrize("key", sorted(_READ_EDITS))
+def test_an_edit_to_a_read_scalar_moves_the_digest(key: tuple[str, str]) -> None:
     edited, defs = _sample()
-    _RENDERED_EDITS[key](edited, defs)
+    _READ_EDITS[key](edited, defs)
     assert _store.pedigree_digest(edited, defs) != _store.pedigree_digest(*_sample())
-
-
-@pytest.mark.parametrize("key", sorted(_UNRENDERED_EDITS))
-def test_an_edit_to_an_unrendered_field_leaves_the_drawing(key: tuple[str, str]) -> None:
-    # Checked against the drawer itself, alone and in a set: a field that gains a drawn form fails until it moves to
-    # RENDERED.
-    base, base_defs = _sample()
-    edited, defs = _sample()
-    _UNRENDERED_EDITS[key](edited, defs)
-    assert render.render_svg(edited, conditions=defs) == render.render_svg(base, conditions=base_defs)
-    sets = [pb.PedigreeSet(pedigrees=[q], conditions=d) for q, d in ((edited, defs), (base, base_defs))]
-    assert render.render_set_svg(sets[0]) == render.render_set_svg(sets[1])
