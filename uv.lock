@@ -104,13 +104,12 @@ wheels = [
 
 [[package]]
 name = "grus"
-version = "1.0.0"
+version = "0.2.0"
 source = { editable = "." }
 default-groups = ["codegen", "lint"]
 dependencies = [
     { name = "protobuf" },
     { name = "protovalidate" },
-    { name = "z3-solver" },
 ]
 
 [package.optional-dependencies]
@@ -119,6 +118,9 @@ highs = [
 ]
 raster = [
     { name = "resvg-py" },
+]
+render = [
+    { name = "z3-solver" },
 ]
 
 [package.dev-dependencies]
@@ -132,6 +134,7 @@ lint = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-protobuf" },
+    { name = "z3-solver" },
 ]
 
 [package.metadata]
@@ -140,9 +143,9 @@ requires-dist = [
     { name = "protobuf", specifier = ">=6,<7" },
     { name = "protovalidate", specifier = ">=1.0" },
     { name = "resvg-py", marker = "extra == 'raster'", specifier = ">=0.5" },
-    { name = "z3-solver", specifier = ">=4.13" },
+    { name = "z3-solver", marker = "extra == 'render'", specifier = ">=4.13" },
 ]
-provides-extras = ["raster", "highs"]
+provides-extras = ["render", "raster", "highs"]
 
 [package.metadata.requires-dev]
 codegen = [{ name = "grpcio-tools", specifier = ">=1.68" }]
@@ -153,6 +156,7 @@ lint = [
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.15" },
     { name = "types-protobuf", specifier = ">=6" },
+    { name = "z3-solver", specifier = ">=4.13" },
 ]
 
 [[package]]

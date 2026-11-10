@@ -234,7 +234,8 @@ infertility; twins (MZ/DZ/unknown); adoption (in/out, dashed vs solid descent); 
 labels. Evolution is additive by default: CI runs `buf breaking` (FILE) against the baseline, through
 `tools/schema/compat.py`, which passes a break only when the same change raises the major version in `pyproject.toml`
 above the baseline's — the breaking release, with every consumer migrated in it. A removed field's number and name are
-reserved, never reused. Downstream pins a major (`grus>=1,<2`). The pre-release rewrites (slice 22) are history.
+reserved, never reused. Downstream bounds its pin below the next major (`grus>=0.2,<1`). The pre-release rewrites (slice
+22\) are history.
 
 ### Serialization
 

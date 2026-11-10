@@ -17,7 +17,9 @@ same text surfaces, chosen by the output suffix; ``render --layout`` draws from 
 
 Exit status: 0 on success; 1 when an input file cannot be used — an IR file that is unreadable, not UTF-8,
 unparseable or invalid, or a ``--layout`` file that is any of those, the wrong kind for the input (a set's layout for a
-single pedigree or the reverse), or stale — reported as one line naming the file and the cause; 2 for a usage error.
+single pedigree or the reverse), or stale — reported as one line naming the file and the cause; 1 also when
+``render`` or ``layout`` needs an optional extra that is not installed (``render`` for the layout, ``raster`` for
+``--png``), reported as one line naming it; 2 for a usage error.
 """
 
 from __future__ import annotations
@@ -328,7 +330,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Run the CLI on ``argv`` (default ``sys.argv[1:]``) and return the process exit code."""
     args = build_parser().parse_args(argv)
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except render.MissingExtraError as e:
+        print(f"grus {args.command}: error: {e}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

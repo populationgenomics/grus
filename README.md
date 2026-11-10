@@ -4,7 +4,7 @@ A **meaning-only pedigree IR** (protobuf), a **deterministic renderer** that dra
 pedigree, and **importers** from the pedigree file formats people already have. Python 3.13, MIT.
 
 ```sh
-uv add grus            # or: pip install grus
+uv add 'grus[render]'  # or: pip install 'grus[render]'; plain `grus` reads, validates and imports IR, no layout solver
 grus import family.fam -o family.pbtxt      # PLINK/LINKAGE PED, kinship2 tables, Phenopackets Family, Open Pedigree JSON
 grus validate family.pbtxt
 grus render family.pbtxt -o family.svg      # --png with the `raster` extra
@@ -33,10 +33,10 @@ Phenopackets / GA4GH Pedigree as alternatives: [`docs/design/ir.md`](docs/design
 ## What the renderer does
 
 Ranks generations, orders each row to minimise crossings while keeping couples adjacent and sibships contiguous, solves
-x as an exact linear program (z3), and draws standard symbols and connectors — deterministically, so the same IR always
-yields the same bytes on every platform. `Geometry(x_solver=XSolver.HIGHS)` with the `highs` extra swaps in a
-floating-point solver. Consanguineous loops, multiple mates and cross-lineage marriages route as edges rather than
-failing; the few shapes it still cannot draw raise `DeferredFeatureError` instead of drawing something wrong.
+x as an exact linear program (z3, the `render` extra), and draws standard symbols and connectors — deterministically, so
+the same IR always yields the same bytes on every platform. `Geometry(x_solver=XSolver.HIGHS)` with the `highs` extra
+swaps in a floating-point solver. Consanguineous loops, multiple mates and cross-lineage marriages route as edges rather
+than failing; the few shapes it still cannot draw raise `DeferredFeatureError` instead of drawing something wrong.
 [`docs/design/renderer.md`](docs/design/renderer.md), [`docs/design/layout-v2.md`](docs/design/layout-v2.md).
 
 ## Importers

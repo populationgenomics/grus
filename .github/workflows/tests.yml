@@ -58,7 +58,8 @@ jobs:
   wheel:
     # The installed package, not the source tree: the wheel lists its files one by one (only-include), and a module
     # left out of that list passes every test above while breaking every install. Build the wheel, install it alone
-    # into a fresh environment, import every module in it, and draw a golden through the CLI.
+    # into a fresh environment without extras, import every module in it, then add the `render` extra and draw a golden
+    # through the CLI.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     permissions:
@@ -75,7 +76,7 @@ jobs:
         working-directory: /tmp
         run: |
           /tmp/wheel-env/bin/python - <<'PY'
-          import importlib, pkgutil
+          import importlib, importlib.util, pkgutil
           import grus
           names = [m.name for m in pkgutil.walk_packages(grus.__path__, "grus.")]
           import grus.models  # a namespace package (no __init__), which walk_packages does not descend into
@@ -83,10 +84,12 @@ jobs:
           for name in names:
               importlib.import_module(name)
           assert "grus.render" in names and "grus.models.layout_pb2" in names, names
+          assert importlib.util.find_spec("z3") is None, "z3 installed without the render extra"
           print(f"imported {len(names)} modules")
           PY
       - name: lay out and draw a golden through the installed CLI
         run: |-
+          uv pip install --python /tmp/wheel-env "$(ls dist/*.whl)[render]"
           /tmp/wheel-env/bin/grus layout tests/goldens/trio.pbtxt -o /tmp/trio.layout.pbtxt
           /tmp/wheel-env/bin/grus render tests/goldens/trio.pbtxt --layout /tmp/trio.layout.pbtxt -o /tmp/trio.svg
           test -s /tmp/trio.svg

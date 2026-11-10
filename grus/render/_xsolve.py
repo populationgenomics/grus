@@ -38,10 +38,10 @@ without moving any child relative to its parents, and iterative sweeps drifted a
 pass cap. Stating compactness as an objective below centring removes the freedom by construction, and the result no
 longer depends on an iteration budget.
 
-Two backends solve the same model. ``Z3`` (the default) optimises over exact rationals, so positions are bit-identical
-on every platform — what the byte-compared goldens rest on. ``HIGHS`` (the optional ``highs`` extra) solves the five
-objectives as successive floating-point linear programs, each earlier optimum held as a constraint; it agrees with
-Z3 up to solver tolerance.
+Two backends solve the same model. ``Z3`` (the default; the optional ``render`` extra) optimises over exact
+rationals, so positions are bit-identical on every platform — what the byte-compared goldens rest on. ``HIGHS`` (the
+optional ``highs`` extra) solves the five objectives as successive floating-point linear programs, each earlier
+optimum held as a constraint; it agrees with Z3 up to solver tolerance.
 
 Both backends solve the levels one at a time, each earlier optimum held as a constraint on the next. For Z3 this is
 several times faster than its built-in lexicographic mode on the same model (about 3 s against 20 s for a 267-person
@@ -55,6 +55,8 @@ import enum
 import fractions
 import hashlib
 from collections.abc import Sequence
+
+from grus.render import _extras
 
 
 class XSolver(enum.Enum):
@@ -125,7 +127,10 @@ def _q(v: float) -> fractions.Fraction:
 
 
 def _solve_z3(model: Model) -> dict[int, float]:
-    import z3
+    try:
+        import z3
+    except ImportError as e:
+        raise _extras.MissingExtraError("laying out a pedigree (the z3 x-solve)", "render") from e
 
     # A private context per solve: z3's default context is process-global and not thread-safe, so two layouts
     # solving at once in one process would otherwise mix their terms ("context mismatch").
@@ -193,8 +198,8 @@ def _solve_highs(model: Model) -> dict[int, float]:
     try:
         import highspy
         import numpy as np
-    except ImportError as e:  # pragma: no cover - depends on the optional extra
-        raise RuntimeError("XSolver.HIGHS needs the optional 'highs' extra: pip install 'grus[highs]'") from e
+    except ImportError as e:
+        raise _extras.MissingExtraError("XSolver.HIGHS", "highs") from e
 
     inf = highspy.kHighsInf
     col = {c: k for k, c in enumerate(model.cells)}
