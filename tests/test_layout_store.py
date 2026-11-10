@@ -453,7 +453,10 @@ def test_every_digested_field_is_classified() -> None:
 
 
 def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
-    """A golden with a condition on every person, plus a mating with children, an annotation and a count to edit."""
+    """A golden with a condition on every person, plus a mating with children, an annotation and a count to edit.
+
+    A fifth condition puts it in sixths, where any one fill has borders, so the count sits beside its symbol.
+    """
     p, defs = test_render._golden("condition_fills")
     p.matings.add(
         partner_a=pb.Position(generation=1, index=1),
@@ -461,8 +464,15 @@ def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
         offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
     )
     p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
-    p.individuals[2].count = 3  # drawn inside its symbol, whose shape is its gender
-    return p, list(defs)
+    p.individuals[2].count = 3
+    p.individuals[3].conditions.add(condition_id="k5", status=pb.CONDITION_STATUS_AFFECTED)
+    return p, [*defs, pb.ConditionDef(id="k5", name="E")]
+
+
+def _reverse_phenotype_labels(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
+    labels = [label for label in p.labels if label.kind == pb.LABEL_KIND_PHENOTYPE]
+    for label, text in zip(labels, reversed([label.text for label in labels]), strict=True):
+        label.text = text
 
 
 def _rename_declaration(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
@@ -479,9 +489,9 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDe
     ("Pedigree", "provenance"): lambda p, defs: setattr(p.provenance, "doi", "10.1/x"),
     ("Pedigree", "evidence"): lambda p, defs: p.evidence.append("c1"),
     ("Pedigree", "supports"): lambda p, defs: p.supports.add(citations=["c1"], field="labels"),
-    ("Pedigree", "labels"): lambda p, defs: setattr(p.labels[0], "text", "Another title"),
+    ("Pedigree", "labels"): _reverse_phenotype_labels,  # reorders the legend
     ("Individual", "gender"): lambda p, defs: setattr(p.individuals[2], "gender", pb.GENDER_MAN),
-    ("Individual", "proband"): lambda p, defs: setattr(p.individuals[-1], "proband", True),
+    ("Individual", "proband"): lambda p, defs: setattr(p.individuals[1], "proband", True),  # B becomes primary
     ("Individual", "consultand"): lambda p, defs: setattr(p.individuals[0], "consultand", True),
     ("Individual", "external_id"): lambda p, defs: setattr(p.individuals[0], "external_id", "S-17"),
     ("Individual", "sex_assigned_at_birth"): lambda p, defs: setattr(

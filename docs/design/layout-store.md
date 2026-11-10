@@ -193,12 +193,16 @@ and a record that sets it is refused. Version 2 also defers a mating whose partn
   would have to track; semantic keys state what the cell is.
 - **Hash the whole pedigree.** No classification to maintain. Rejected: every edit to provenance, an id or meaning with
   no drawn form marks stored layouts stale, and a harness edits exactly those after the fact. The risk the projection
-  carries instead — a field layout reads left out, so a silently stale drawing — is closed by tests rather than by
-  hashing everything: a field in neither class fails, an edit to a cleared field must leave the stored layout
-  byte-identical and draw from it exactly as a fresh render does, and an edit to a hashed scalar must move the digest.
-- **Hash what layout or drawing reads.** One question per field — is it drawn at all — which is easier to answer than
-  whether layout reads it. Rejected: drawing re-reads the pedigree, so a drawing-only field cannot make a stored layout
-  wrong, and hashing it buys only stale layouts when a title or an external id is edited.
+  carries instead — a field layout reads left out, so a silently stale drawing — is accepted and guarded by tests: a
+  field in neither class fails, an edit to a cleared field must leave the stored layout byte-identical and draw from it
+  exactly as a fresh render does, and an edit to a hashed scalar must move the digest. One edit per field on one sample
+  catches a regression only along the paths that sample exercises; the sample is chosen to reach the legend's order,
+  sixths and a count beside its symbol, the paths the cleared drawn fields come nearest to.
+- **Hash what layout or drawing reads.** One question per field — is it drawn at all — answered at a glance, where
+  whether layout reads a field has to be traced through the label and count helpers, and a wrong answer is a silently
+  wrong drawing rather than a needless relayout. Rejected: drawing re-reads the pedigree, so a drawing-only field cannot
+  make a stored layout wrong, and hashing it buys only stale layouts when a title, the proband or an external id is
+  edited.
 - **Recompute on a stale key.** Friendlier for a caller who does not care. Rejected: it turns a cache bug into a slow
   path nobody notices; a caller can catch the error and recompute.
 

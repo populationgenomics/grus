@@ -72,11 +72,12 @@ LAYOUT_READS: dict[str, frozenset[str]] = {
     "Position": frozenset({"generation", "index"}),
 }
 LAYOUT_IGNORES: dict[str, frozenset[str]] = {
-    "Pedigree": frozenset({"id", "provenance", "evidence", "supports", "labels"}),  # labels order the legend only
+    # labels: the legend's order, never its length
+    "Pedigree": frozenset({"id", "provenance", "evidence", "supports", "labels"}),
     "Individual": frozenset(
         {
             "gender",  # sizes a count inside its symbol, never its reach
-            "proband",  # orders the legend only
+            "proband",  # the legend's order, never its length
             "consultand",
             "external_id",
             "sex_assigned_at_birth",
