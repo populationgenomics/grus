@@ -64,6 +64,7 @@ only-include = [
   "grus/models/pedigree_pb2.pyi",
   "grus/models/layout_pb2.py",
   "grus/models/layout_pb2.pyi",
+  "grus/models/py.typed",
   "buf/validate",
 ]
 exclude = ["**/__pycache__"]
