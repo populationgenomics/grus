@@ -5,6 +5,8 @@
 * **Order-independent** — shuffling a pedigree's individuals and matings leaves the stored bytes unchanged, because
   cells are keyed by identity and the digest is canonical.
 * **Exact** — drawing from a stored layout is byte-identical to a fresh render.
+* **Rendering only** — the digest covers every field layout or drawing reads and no other: an edit to a cleared field
+  leaves the digest and the drawing unchanged, an edit to a hashed scalar moves the digest.
 * **Never stale** — a stored layout of other pedigree content, under other layout geometry, or from another layout
   algorithm version is refused, and a golden whose layout changes without a version bump fails.
 """
@@ -437,8 +439,6 @@ def _reachable(
 
 
 def test_every_digested_field_is_classified() -> None:
-    # A new IR field fails here until it is marked rendered (hashed) or not (cleared), so a provenance-like field
-    # cannot silently mark layouts stale and a drawn one cannot silently be ignored.
     reached = _classified()
     assert set(reached) == set(_store.RENDERED) == set(_store.NOT_RENDERED)
     for name, desc in reached.items():
@@ -448,7 +448,14 @@ def test_every_digested_field_is_classified() -> None:
 
 
 def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
+    """A golden with a condition on every person, plus a mating with children and an annotation to edit in place."""
     p, defs = test_render._golden("condition_fills")
+    p.matings.add(
+        partner_a=pb.Position(generation=1, index=1),
+        partner_b=pb.Position(generation=1, index=2),
+        offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
+    )
+    p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
     return p, list(defs)
 
 
@@ -460,16 +467,7 @@ def _rename_declaration(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
                 c.condition_id = "renamed"
 
 
-def _mating_with_children(p: pb.Pedigree) -> pb.Mating:
-    p.matings.add(
-        partner_a=pb.Position(generation=1, index=1),
-        partner_b=pb.Position(generation=1, index=2),
-        offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
-    )
-    return p.matings[-1]
-
-
-# One edit per NOT_RENDERED field: the digest must not move.
+# One edit per NOT_RENDERED field, made to _sample(): the digest and the drawing must not move.
 _UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
     ("Pedigree", "id"): lambda p, defs: setattr(p, "id", "another-id"),
     ("Pedigree", "provenance"): lambda p, defs: setattr(p.provenance, "doi", "10.1/x"),
@@ -479,7 +477,9 @@ _UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.Conditio
         p.individuals[0], "sex_assigned_at_birth", pb.SEX_ASSIGNED_AT_BIRTH_FEMALE
     ),
     ("Individual", "reproductive_outcome"): lambda p, defs: setattr(
-        p.individuals[0], "reproductive_outcome", pb.REPRODUCTIVE_OUTCOME_STILLBIRTH
+        p.individuals[-1],
+        "reproductive_outcome",
+        pb.REPRODUCTIVE_OUTCOME_STILLBIRTH,  # not a mating partner
     ),
     ("Individual", "reproductive_role"): lambda p, defs: setattr(
         p.individuals[0], "reproductive_role", pb.REPRODUCTIVE_ROLE_GAMETE_DONOR
@@ -487,43 +487,28 @@ _UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.Conditio
     ("Individual", "documented_evaluation"): lambda p, defs: setattr(p.individuals[0], "documented_evaluation", True),
     ("ConditionDef", "id"): _rename_declaration,
     ("Condition", "onset_age"): lambda p, defs: setattr(p.individuals[0].conditions[0], "onset_age", "40s"),
-    ("Annotation", "type"): lambda p, defs: p.individuals[0].annotations.add(
-        text="N/M", type=pb.ANNOTATION_TYPE_GENOTYPE
+    ("Annotation", "type"): lambda p, defs: setattr(
+        p.individuals[0].annotations[0], "type", pb.ANNOTATION_TYPE_GENOTYPE
     ),
-    ("Mating", "status"): lambda p, defs: setattr(_mating_with_children(p), "status", pb.RELATIONSHIP_STATUS_DIVORCED),
-    ("Mating", "annotations"): lambda p, defs: _mating_with_children(p).annotations.add(
+    ("Mating", "status"): lambda p, defs: setattr(p.matings[-1], "status", pb.RELATIONSHIP_STATUS_DIVORCED),
+    ("Mating", "annotations"): lambda p, defs: p.matings[-1].annotations.add(
         text="vasectomy", type=pb.ANNOTATION_TYPE_OTHER
     ),
-    ("Offspring", "parentage"): lambda p, defs: setattr(
-        _mating_with_children(p).offspring[0], "parentage", pb.PARENTAGE_ADOPTIVE
-    ),
-    ("Offspring", "adoption"): lambda p, defs: setattr(
-        _mating_with_children(p).offspring[0], "adoption", pb.ADOPTION_IN
-    ),
+    ("Offspring", "parentage"): lambda p, defs: setattr(p.matings[-1].offspring[0], "parentage", pb.PARENTAGE_ADOPTIVE),
+    ("Offspring", "adoption"): lambda p, defs: setattr(p.matings[-1].offspring[0], "adoption", pb.ADOPTION_IN),
 }
 
 
-def test_edits_to_unrendered_fields_leave_the_digest() -> None:
+def test_every_unrendered_field_has_an_edit() -> None:
     assert set(_UNRENDERED_EDITS) == {(m, f) for m, fs in _store.NOT_RENDERED.items() for f in fs}
-    for (message, field), edit in _UNRENDERED_EDITS.items():
-        base, base_defs = _sample()
-        if message in ("Mating", "Offspring"):
-            _mating_with_children(base)  # the edit's mating, unedited
-        edited, defs = _sample()
-        edit(edited, defs)
-        if message == "Annotation":
-            base.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)  # same line, other type
-        assert _store.pedigree_digest(edited, defs) == _store.pedigree_digest(base, base_defs), (
-            f"{message}.{field} moved the digest"
-        )
 
 
-def _rendered_sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
-    """The sample with a mating with children and an annotation, so each rendered edit changes only its one field."""
-    p, defs = _sample()
-    _mating_with_children(p)
-    p.individuals[0].annotations.add(text="N/M")
-    return p, defs
+@pytest.mark.parametrize("key", sorted(_UNRENDERED_EDITS))
+def test_an_edit_to_an_unrendered_field_leaves_the_digest(key: tuple[str, str]) -> None:
+    base, base_defs = _sample()
+    edited, defs = _sample()
+    _UNRENDERED_EDITS[key](edited, defs)
+    assert _store.pedigree_digest(edited, defs) == _store.pedigree_digest(base, base_defs)
 
 
 def _declared_name(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
@@ -534,7 +519,7 @@ def _declared_inheritance(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
     defs[0].inheritance = pb.INHERITANCE_X_LINKED_RECESSIVE
 
 
-# One edit per RENDERED scalar field, made to _rendered_sample(): the digest must move. A declaration's name and
+# One edit per RENDERED scalar field, made to _sample(): the digest must move. A declaration's name and
 # inheritance reach the digest only as an entry's (pre-1.0 Condition), so each is keyed both ways.
 _RENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
     ("Label", "text"): lambda p, defs: setattr(p.labels[0], "text", p.labels[0].text + "!"),
@@ -577,7 +562,7 @@ def _classified() -> dict[str, descriptor.Descriptor]:
     return _reachable(_DIGESTED) | {"ConditionDef": cast(descriptor.Descriptor, pb.ConditionDef.DESCRIPTOR)}
 
 
-def test_edits_to_rendered_fields_move_the_digest() -> None:
+def test_every_rendered_scalar_has_an_edit() -> None:
     scalars = {
         (m, f.name)
         for m, desc in _classified().items()
@@ -585,26 +570,22 @@ def test_edits_to_rendered_fields_move_the_digest() -> None:
         if f.name in _store.RENDERED[m] and f.message_type is None
     }
     assert scalars <= set(_RENDERED_EDITS), f"no edit for {sorted(scalars - set(_RENDERED_EDITS))}"
-    base = _store.pedigree_digest(*_rendered_sample())
-    for (message, field), edit in _RENDERED_EDITS.items():
-        edited, defs = _rendered_sample()
-        edit(edited, defs)
-        assert _store.pedigree_digest(edited, defs) != base, f"{message}.{field} did not move the digest"
 
 
-def test_edits_to_unrendered_fields_leave_the_drawing() -> None:
-    # "Not rendered" checked against the drawer itself, not just the digest: the same one edit per NOT_RENDERED field
-    # must leave the SVG byte-identical, alone and in a set. A field that gains a drawn form fails here until it moves
-    # to RENDERED.
-    for (message, field), edit in _UNRENDERED_EDITS.items():
-        base, base_defs = _sample()
-        if message in ("Mating", "Offspring"):
-            _mating_with_children(base)
-        edited, defs = _sample()
-        edit(edited, defs)
-        if message == "Annotation":
-            base.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
-        drawn = render.render_svg(edited, conditions=defs)
-        assert drawn == render.render_svg(base, conditions=base_defs), f"{message}.{field} changed the drawing"
-        sets = [pb.PedigreeSet(pedigrees=[q], conditions=d) for q, d in ((edited, defs), (base, base_defs))]
-        assert render.render_set_svg(sets[0]) == render.render_set_svg(sets[1]), f"{message}.{field} changed a set"
+@pytest.mark.parametrize("key", sorted(_RENDERED_EDITS))
+def test_an_edit_to_a_rendered_scalar_moves_the_digest(key: tuple[str, str]) -> None:
+    edited, defs = _sample()
+    _RENDERED_EDITS[key](edited, defs)
+    assert _store.pedigree_digest(edited, defs) != _store.pedigree_digest(*_sample())
+
+
+@pytest.mark.parametrize("key", sorted(_UNRENDERED_EDITS))
+def test_an_edit_to_an_unrendered_field_leaves_the_drawing(key: tuple[str, str]) -> None:
+    # Checked against the drawer itself, alone and in a set: a field that gains a drawn form fails until it moves to
+    # RENDERED.
+    base, base_defs = _sample()
+    edited, defs = _sample()
+    _UNRENDERED_EDITS[key](edited, defs)
+    assert render.render_svg(edited, conditions=defs) == render.render_svg(base, conditions=base_defs)
+    sets = [pb.PedigreeSet(pedigrees=[q], conditions=d) for q, d in ((edited, defs), (base, base_defs))]
+    assert render.render_set_svg(sets[0]) == render.render_set_svg(sets[1])
