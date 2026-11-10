@@ -48,11 +48,9 @@ class StaleLayoutError(Exception):
     """
 
 
-# Every field of every message the digest reaches, classified: RENDERED fields are read by layout or drawing and
-# are hashed; NOT_RENDERED ones are cleared first, so editing them leaves a stored layout valid. A test fails when a
-# field is in neither, so a new IR field must be classified before it can be silently hashed or silently ignored.
-# Keys are the pre-1.0 messages the digest serializes (a Condition carries its declaration's name and inheritance),
-# plus ConditionDef, whose rendered fields reach the digest only through those entries.
+# Every field of every message the digest reaches: RENDERED is hashed, NOT_RENDERED cleared first. Keys are the
+# pre-1.0 messages the digest serializes (a Condition carries its declaration's name and inheritance), plus
+# ConditionDef, whose rendered fields reach the digest only through those entries.
 RENDERED: dict[str, frozenset[str]] = {
     "Pedigree": frozenset({"labels", "individuals", "matings"}),  # labels: the title and the condition legend
     "Label": frozenset({"text", "kind"}),
