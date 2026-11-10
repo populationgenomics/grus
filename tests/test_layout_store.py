@@ -26,6 +26,7 @@ import test_render
 import test_svg_output
 
 from grus import ir, render
+from grus.ir import _migrate
 from grus.models import layout_pb2 as lpb
 from grus.models import pedigree_pb2 as pb
 from grus.render import _store
@@ -412,3 +413,161 @@ def test_citation_supports_leave_a_stored_layout_valid() -> None:
     cited.supports.add(citations=["cap"], field="proband", individuals=[pb.Position(generation=2, index=1)])
     assert _store.pedigree_digest(cited, defs) == _store.pedigree_digest(p, defs)
     assert render.render_svg(cited, stored_layout=stored, conditions=defs) == render.render_svg(p, conditions=defs)
+
+
+# --- the digest covers what layout and drawing read, and only that ------------------------------------------------
+
+_DIGESTED = _migrate.legacy_pedigree(pb.Pedigree(), ()).DESCRIPTOR  # the encoding the digest serializes
+
+
+def _reachable(desc, seen=None):  # type: ignore[no-untyped-def]
+    """Every message descriptor the digest walks into from ``desc``, through RENDERED message fields."""
+    seen = {} if seen is None else seen
+    seen[desc.name] = desc
+    for field in desc.fields:
+        rendered = field.name in _store.RENDERED.get(desc.name, ())
+        if rendered and field.message_type is not None and field.message_type.name not in seen:
+            _reachable(field.message_type, seen)
+    return seen
+
+
+def test_every_digested_field_is_classified() -> None:
+    # A new IR field fails here until it is marked rendered (hashed) or not (cleared), so a provenance-like field
+    # cannot silently mark layouts stale and a drawn one cannot silently be ignored.
+    reached = _reachable(_DIGESTED) | {"ConditionDef": pb.ConditionDef.DESCRIPTOR}
+    assert set(reached) == set(_store.RENDERED) == set(_store.NOT_RENDERED)
+    for name, desc in reached.items():
+        rendered, not_rendered = _store.RENDERED[name], _store.NOT_RENDERED[name]
+        assert not rendered & not_rendered, f"{name}: {sorted(rendered & not_rendered)} classified twice"
+        assert {f.name for f in desc.fields} == rendered | not_rendered, f"{name}: unclassified fields"
+
+
+def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
+    p, defs = test_render._golden("condition_fills")
+    return p, list(defs)
+
+
+def _rename_declaration(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
+    old, defs[0].id = defs[0].id, "renamed"
+    for ind in p.individuals:
+        for c in ind.conditions:
+            if c.condition_id == old:
+                c.condition_id = "renamed"
+
+
+def _mating_with_children(p: pb.Pedigree) -> pb.Mating:
+    p.matings.add(
+        partner_a=pb.Position(generation=1, index=1),
+        partner_b=pb.Position(generation=1, index=2),
+        offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
+    )
+    return p.matings[-1]
+
+
+# One edit per NOT_RENDERED field: the digest must not move.
+_UNRENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
+    ("Pedigree", "id"): lambda p, defs: setattr(p, "id", "another-id"),
+    ("Pedigree", "provenance"): lambda p, defs: setattr(p.provenance, "doi", "10.1/x"),
+    ("Pedigree", "evidence"): lambda p, defs: p.evidence.append("c1"),
+    ("Pedigree", "supports"): lambda p, defs: p.supports.add(citations=["c1"], field="labels"),
+    ("Individual", "sex_assigned_at_birth"): lambda p, defs: setattr(
+        p.individuals[0], "sex_assigned_at_birth", pb.SEX_ASSIGNED_AT_BIRTH_FEMALE
+    ),
+    ("Individual", "reproductive_outcome"): lambda p, defs: setattr(
+        p.individuals[0], "reproductive_outcome", pb.REPRODUCTIVE_OUTCOME_STILLBIRTH
+    ),
+    ("Individual", "reproductive_role"): lambda p, defs: setattr(
+        p.individuals[0], "reproductive_role", pb.REPRODUCTIVE_ROLE_GAMETE_DONOR
+    ),
+    ("Individual", "documented_evaluation"): lambda p, defs: setattr(p.individuals[0], "documented_evaluation", True),
+    ("ConditionDef", "id"): _rename_declaration,
+    ("Condition", "onset_age"): lambda p, defs: setattr(p.individuals[0].conditions[0], "onset_age", "40s"),
+    ("Annotation", "type"): lambda p, defs: p.individuals[0].annotations.add(
+        text="N/M", type=pb.ANNOTATION_TYPE_GENOTYPE
+    ),
+    ("Mating", "status"): lambda p, defs: setattr(_mating_with_children(p), "status", pb.RELATIONSHIP_STATUS_DIVORCED),
+    ("Mating", "annotations"): lambda p, defs: _mating_with_children(p).annotations.add(
+        text="vasectomy", type=pb.ANNOTATION_TYPE_OTHER
+    ),
+    ("Offspring", "parentage"): lambda p, defs: setattr(
+        _mating_with_children(p).offspring[0], "parentage", pb.PARENTAGE_ADOPTIVE
+    ),
+    ("Offspring", "adoption"): lambda p, defs: setattr(
+        _mating_with_children(p).offspring[0], "adoption", pb.ADOPTION_IN
+    ),
+}
+
+
+def test_edits_to_unrendered_fields_leave_the_digest() -> None:
+    assert set(_UNRENDERED_EDITS) == {(m, f) for m, fs in _store.NOT_RENDERED.items() for f in fs}
+    for (message, field), edit in _UNRENDERED_EDITS.items():
+        base, base_defs = _sample()
+        if message in ("Mating", "Offspring"):
+            _mating_with_children(base)  # the edit's mating, unedited
+        edited, defs = _sample()
+        edit(edited, defs)
+        if message == "Annotation":
+            base.individuals[0].annotations.add(text="N/M")  # the same line, typed or not
+        assert _store.pedigree_digest(edited, defs) == _store.pedigree_digest(base, base_defs), (
+            f"{message}.{field} moved the digest"
+        )
+
+
+# One edit per RENDERED scalar field (message-typed ones are covered by their contents): the digest must move.
+_RENDERED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
+    ("Label", "text"): lambda p, defs: setattr(p.labels[0], "text", p.labels[0].text + "!"),
+    ("Label", "kind"): lambda p, defs: setattr(p.labels[0], "kind", pb.LABEL_KIND_PANEL),
+    ("Individual", "generation"): lambda p, defs: setattr(p.individuals[-1], "generation", 9),
+    ("Individual", "index"): lambda p, defs: setattr(p.individuals[-1], "index", 99),
+    ("Individual", "gender"): lambda p, defs: setattr(p.individuals[0], "gender", pb.GENDER_UNKNOWN),
+    ("Individual", "deceased"): lambda p, defs: setattr(p.individuals[0], "deceased", True),
+    ("Individual", "proband"): lambda p, defs: setattr(p.individuals[0], "proband", True),
+    ("Individual", "consultand"): lambda p, defs: setattr(p.individuals[0], "consultand", True),
+    ("Individual", "count"): lambda p, defs: setattr(p.individuals[0], "count", 3),
+    ("Individual", "count_unspecified"): lambda p, defs: setattr(p.individuals[0], "count_unspecified", True),
+    ("Individual", "external_id"): lambda p, defs: setattr(p.individuals[0], "external_id", "S-17"),
+    ("Condition", "name"): lambda p, defs: setattr(defs[0], "name", "Z"),
+    ("Condition", "status"): lambda p, defs: setattr(
+        p.individuals[0].conditions[0], "status", pb.CONDITION_STATUS_UNKNOWN
+    ),
+    ("Condition", "inheritance"): lambda p, defs: setattr(defs[0], "inheritance", pb.INHERITANCE_X_LINKED_RECESSIVE),
+    ("Annotation", "text"): lambda p, defs: p.individuals[0].annotations.add(text="N/M"),
+    ("Mating", "consanguineous"): lambda p, defs: setattr(_mating_with_children(p), "consanguineous", True),
+    ("Mating", "childlessness"): lambda p, defs: setattr(
+        p.matings.add(partner_a=pb.Position(generation=1, index=1), partner_b=pb.Position(generation=1, index=2)),
+        "childlessness",
+        pb.CHILDLESSNESS_BY_CHOICE,
+    ),
+    ("Mating", "partner_a"): lambda p, defs: _mating_with_children(p),
+    ("Mating", "partner_b"): lambda p, defs: _mating_with_children(p).ClearField("partner_b"),
+    ("Offspring", "child"): lambda p, defs: (
+        _mating_with_children(p).offspring[0].child.CopyFrom(pb.Position(generation=2, index=2))
+    ),
+    ("Offspring", "twin_group"): lambda p, defs: setattr(_mating_with_children(p).offspring[0], "twin_group", 1),
+    ("Offspring", "twin_type"): lambda p, defs: setattr(
+        _mating_with_children(p).offspring[0], "twin_type", pb.ZYGOSITY_TYPE_MONOZYGOTIC
+    ),
+    ("Position", "generation"): lambda p, defs: setattr(_mating_with_children(p).partner_a, "generation", 3),
+    ("Position", "index"): lambda p, defs: setattr(_mating_with_children(p).partner_a, "index", 7),
+}
+
+
+def test_edits_to_rendered_fields_move_the_digest() -> None:
+    scalars = {
+        (m, f.name)
+        for m, desc in _reachable(_DIGESTED).items()
+        for f in desc.fields
+        if f.name in _store.RENDERED[m] and f.message_type is None
+    }
+    assert scalars <= set(_RENDERED_EDITS), f"no edit for {sorted(scalars - set(_RENDERED_EDITS))}"
+    base = _store.pedigree_digest(*_sample())
+    for (message, field), edit in _RENDERED_EDITS.items():
+        edited, defs = _sample()
+        edit(edited, defs)
+        assert _store.pedigree_digest(edited, defs) != base, f"{message}.{field} did not move the digest"
+
+
+def test_a_declaration_enters_the_digest_through_its_entries() -> None:
+    # legacy_pedigree copies a declaration's name and inheritance onto each entry: those are the declaration's rendered
+    # fields, and a field classified rendered here must be copied there too.
+    assert _store.RENDERED["ConditionDef"] == {"name", "inheritance"}

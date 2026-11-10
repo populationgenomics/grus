@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import protovalidate
+from google.protobuf.message import Message
 
 from grus import ir
 from grus.ir import _migrate
@@ -47,22 +48,74 @@ class StaleLayoutError(Exception):
     """
 
 
-def pedigree_digest(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> bytes:
-    """SHA-256 of ``p``'s canonical serialization: independent of the order of its individuals and matings.
+# Every field of every message the digest reaches, classified: RENDERED fields are read by layout or drawing and
+# are hashed; NOT_RENDERED ones are cleared first, so editing them leaves a stored layout valid. A test fails when a
+# field is in neither, so a new IR field must be classified before it can be silently hashed or silently ignored.
+RENDERED: dict[str, frozenset[str]] = {
+    "Pedigree": frozenset({"labels", "individuals", "matings"}),  # labels: the title and the condition legend
+    "Label": frozenset({"text", "kind"}),
+    "Individual": frozenset(
+        {
+            "generation",
+            "index",
+            "gender",
+            "conditions",
+            "deceased",
+            "proband",
+            "consultand",
+            "count",
+            "count_unspecified",
+            "annotations",
+            "external_id",  # the individual's data-external-id attribute
+        }
+    ),
+    "Condition": frozenset({"name", "status", "inheritance"}),  # inheritance: the X-linked carrier dot
+    "ConditionDef": frozenset({"name", "inheritance"}),  # reaches the digest through each entry it declares
+    "Annotation": frozenset({"text"}),  # each annotation is a label line
+    "Mating": frozenset({"partner_a", "partner_b", "consanguineous", "childlessness", "offspring"}),
+    "Offspring": frozenset({"child", "twin_group", "twin_type"}),
+    "Position": frozenset({"generation", "index"}),
+}
+NOT_RENDERED: dict[str, frozenset[str]] = {
+    "Pedigree": frozenset({"id", "provenance", "evidence", "supports"}),  # identity and provenance
+    "Label": frozenset(),
+    "Individual": frozenset(  # recorded meaning with no drawn form yet
+        {"sex_assigned_at_birth", "reproductive_outcome", "reproductive_role", "documented_evaluation"}
+    ),
+    "Condition": frozenset({"onset_age"}),
+    "ConditionDef": frozenset({"id"}),
+    "Annotation": frozenset({"type"}),
+    "Mating": frozenset({"status", "annotations"}),  # separation / divorce is not drawn yet
+    "Offspring": frozenset({"parentage", "adoption"}),
+    "Position": frozenset(),
+}
 
-    Individuals sort by ``Position``, matings by their own serialized bytes; everything else, offspring (birth) order
-    included, is kept as is. The whole pedigree is covered, not only what the layout reads today, except its
-    citations' evidence and supports: provenance the layout never reads, so adding or editing them leaves a stored
-    layout valid. A condition entry enters resolved through ``conditions``, the set's declarations, in the 0.x encoding
-    (its declaration's name and inheritance in place of its ``condition_id``): renaming a declaration or changing its
-    inheritance changes the digest; renaming its id does not, and a pedigree migrated from 0.x keeps its digest.
+
+def _rendered_only(msg: Message) -> None:
+    """Clear, in place and recursively, every field of ``msg`` that neither layout nor drawing reads."""
+    name = msg.DESCRIPTOR.name
+    for field, value in msg.ListFields():
+        if field.name not in RENDERED[name]:
+            msg.ClearField(field.name)
+        elif field.message_type is not None:
+            for item in [value] if isinstance(value, Message) else value:
+                _rendered_only(item)
+
+
+def pedigree_digest(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> bytes:
+    """SHA-256 of what layout and drawing read of ``p``, canonically: independent of individual and mating order.
+
+    Only the ``RENDERED`` fields are hashed; provenance and meaning with no drawn form (``NOT_RENDERED``) are cleared
+    first, so editing them leaves a stored layout valid. Individuals sort by ``Position``, matings by their own
+    serialized bytes; offspring (birth) order is kept. A condition entry enters resolved through ``conditions``, the
+    set's declarations, in the 0.x encoding (its declaration's name and inheritance in place of its ``condition_id``):
+    renaming a declaration or changing its inheritance changes the digest; renaming its id does not.
 
     Raises:
         grus.ir.UndeclaredConditionError: an entry names a ``condition_id`` no declaration has.
     """
     canon: Any = _migrate.legacy_pedigree(p, conditions)
-    canon.ClearField("evidence")
-    canon.ClearField("supports")
+    _rendered_only(canon)
     # Copies, so clearing the repeated fields below cannot touch them.
     individuals = [copy.deepcopy(ind) for ind in sorted(canon.individuals, key=lambda i: (i.generation, i.index))]
     matings = [copy.deepcopy(m) for m in sorted(canon.matings, key=lambda m: m.SerializeToString(deterministic=True))]
