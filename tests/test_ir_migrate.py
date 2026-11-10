@@ -6,8 +6,8 @@
   described now describes the declaration, so it scopes the whole pedigree.
 * **Loud** — entries of one name that state different inheritance, two entries of one name on one person, and a
   support naming a condition no one has all fail.
-* **Continuity** — a migrated record keeps its stored-layout digest: the digest reads entries through their
-  declarations in the pre-1.0 encoding, so a declaration's id never enters it.
+* **Ids are the record's own** — the stored-layout digest reads entries through their declarations in the pre-1.0
+  encoding, so a declaration's id never enters it; its name and inheritance do.
 """
 
 from __future__ import annotations
@@ -107,9 +107,8 @@ def test_what_has_no_1_0_form_fails_loud(old: str, new: str, match: str) -> None
         ir.migrate_pbtxt(_OLD_SET.replace(old, new, 1))
 
 
-def test_a_migrated_record_keeps_its_layout_digest() -> None:
-    # The layout pins hold the pre-1.0 digests; every golden migrated by grouping kept its pin (see layout_pins.json).
-    # Here: the digest reads each entry through its declaration, so ids are the record's own business.
+def test_a_declaration_id_never_enters_the_layout_digest() -> None:
+    # The digest reads each entry through its declaration, so ids are the record's own business.
     p, defs = test_render._golden("compound_carrier")
     renamed = pb.Pedigree()
     renamed.CopyFrom(p)
@@ -123,16 +122,3 @@ def test_a_migrated_record_keeps_its_layout_digest() -> None:
     assert _store.pedigree_digest(p, edited) != _store.pedigree_digest(p, defs), "a declared name is content"
     stated = [pb.ConditionDef(id=d.id, name=d.name, inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE) for d in defs]
     assert _store.pedigree_digest(p, stated) != _store.pedigree_digest(p, defs), "so is a declared inheritance"
-
-
-# Pedigree digests pinned before 1.0 (layout_pins.json, LAYOUT_VERSION 6): the migrated goldens still have them.
-_PRE_1_0_DIGESTS = {
-    "trio": "c9ff32d81e2c4fb568c8acfcf43bff2bbf3319cccb5faaeb73fc5eb8408a24fe",
-    "six_conditions": "7e5309774d590a3809fd9b6ec7829b5294a09d1a908b7f96b31157a599c0d83f",
-}
-
-
-@pytest.mark.parametrize("name", sorted(_PRE_1_0_DIGESTS))
-def test_the_digest_is_the_pre_1_0_one(name: str) -> None:
-    p, defs = test_render._golden(name)
-    assert _store.pedigree_digest(p, defs).hex() == _PRE_1_0_DIGESTS[name]

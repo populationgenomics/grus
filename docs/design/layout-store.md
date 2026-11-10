@@ -95,20 +95,22 @@ their individuals or matings produce byte-identical records.
 A stored layout is valid for a pedigree and a geometry only if a fresh layout would produce it. The key captures every
 input to the layout:
 
-- **a content digest of the pedigree** — SHA-256 over a canonical serialization: individuals sorted by `Position`,
-  matings sorted by their own serialized bytes, the whole message serialized deterministically. Offspring order, which
-  the IR gives meaning (birth order), is kept. The digest covers the whole pedigree, not only the fields the layout
-  reads today: annotations change label widths, which change spacing, and tracking which fields matter would be one more
-  thing every layout change must keep in step. A change to a title then invalidates a layout it did not affect; that
-  costs one recomputation and never a wrong drawing. The one exclusion is a pedigree's citation `evidence` and
-  `supports` (`ir.md`, Citations): provenance, never read by layout or drawing, which a harness adds or edits after the
-  fact, so they must not mark a stored layout stale. The set-level citation list is outside the pedigree and so outside
-  the digest already. The set-level condition declarations are not (`ir.md`, "Conditions are declared once, by id"): a
-  declaration's name and inheritance are pedigree content (the legend, the key's labels and widths, the X-linked dot and
-  so a count's place), so each entry enters in the pre-1.0 encoding, its `condition_id` replaced by its declaration's
-  `name` and `inheritance`. Renaming a declaration or changing its inheritance changes the digest; renaming its id does
-  not; and a pedigree migrated from 0.x keeps the digest, and so the stored layouts, it had. `store_layout`,
-  `load_layout` and drawing from a stored layout take the declarations alongside the pedigree (`conditions=`).
+- **a content digest of what layout reads** — SHA-256 over a canonical serialization of the pedigree with every field
+  layout does not read cleared first: individuals sorted by `Position`, matings sorted by their own serialized bytes,
+  the rest serialized deterministically. Offspring order, which the IR gives meaning (birth order), is kept. Drawing
+  re-reads the pedigree whether or not the layout was stored, so a field only drawing reads — a title, the proband
+  arrow, the symbol's shape, an external id — cannot make a stored layout wrong and does not enter. What layout reads is
+  the structure (positions, matings, offspring and twins, which the stored cells record) and what sets a label's or a
+  count's reach, and so the spacing: annotation text, a count, and the marks that push a count beside its symbol (the
+  deceased slash and the conditions' statuses, names and inheritance). Every field of every message the digest reaches
+  is classified in `grus.render._store` as read (hashed) or ignored (cleared), and a test fails on a field in neither,
+  so a new IR field cannot silently mark stored layouts stale nor silently be ignored when layout reads it. The
+  set-level citation list is outside the pedigree and so outside the digest. The set-level condition declarations are
+  not (`ir.md`, "Conditions are declared once, by id"): a declaration's name and inheritance are read through each
+  entry, so each entry enters in the pre-1.0 encoding, its `condition_id` replaced by its declaration's `name` and
+  `inheritance`, and the classification runs on that encoding. A declaration's own fields are classified too: its `id`
+  is not read, so renaming it leaves the digest. `store_layout`, `load_layout` and drawing from a stored layout take the
+  declarations alongside the pedigree (`conditions=`).
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`
@@ -189,9 +191,18 @@ and a record that sets it is refused. Version 2 also defers a mating whose partn
 - **Store the front end's synthetic `Position`s verbatim** (phantoms and pass-throughs have stable negative indices).
   Rejected: negative indices fail the IR's field rules, and the encoding is an implementation detail a version bump
   would have to track; semantic keys state what the cell is.
-- **Hash a layout-relevant projection of the pedigree.** Fewer spurious invalidations. Rejected: it has to track every
-  field any future layout reads, and a missed field is a silently stale drawing — the one failure this key exists to
-  prevent.
+- **Hash the whole pedigree.** No classification to maintain. Rejected: every edit to provenance, an id or meaning with
+  no drawn form marks stored layouts stale, and a harness edits exactly those after the fact. The risk the projection
+  carries instead — a field layout reads left out, so a silently stale drawing — is accepted and guarded by tests: a
+  field in neither class fails, an edit to a cleared field must leave the stored layout byte-identical and draw from it
+  exactly as a fresh render does, and an edit to a hashed scalar must move the digest. One edit per field on one sample
+  catches a regression only along the paths that sample exercises; the sample is chosen to reach the legend's order,
+  sixths and a count beside its symbol, the paths the cleared drawn fields come nearest to.
+- **Hash what layout or drawing reads.** One question per field — is it drawn at all — answered at a glance, where
+  whether layout reads a field has to be traced through the label and count helpers, and a wrong answer is a silently
+  wrong drawing rather than a needless relayout. Rejected: drawing re-reads the pedigree, so a drawing-only field cannot
+  make a stored layout wrong, and hashing it buys only stale layouts when a title, the proband or an external id is
+  edited.
 - **Recompute on a stale key.** Friendlier for a caller who does not care. Rejected: it turns a cache bug into a slow
   path nobody notices; a caller can catch the error and recompute.
 
