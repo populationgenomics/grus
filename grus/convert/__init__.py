@@ -92,7 +92,7 @@ def import_file(path: pathlib.Path | str, fmt: str | None = None, *, genotypes: 
     if genotypes:
         if fmt != _ped.FORMAT or path.suffix.lower() != ".ped":
             raise PedigreeImportError(f"genotypes are read from a PLINK .ped only, not {path.name!r}")
-        sidecar = path.with_suffix(".map")
+        sidecar = path.with_suffix(".MAP" if path.suffix.isupper() else ".map")
         if not sidecar.exists():
             raise PedigreeImportError(f"genotypes need the .map beside {path.name!r}; {sidecar.name!r} is missing")
         return _ped.import_ped(text, map_text=sidecar.read_text())

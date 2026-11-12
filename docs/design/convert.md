@@ -103,7 +103,9 @@ Genotypes are opt-in because a PLINK `.ped` is usually genome-wide: hundreds of 
 dataset, not a pedigree record, and nothing downstream wants that many loci on every person. Asked for, the importer
 needs the `.map` beside the `.ped`, since it is the only place a marker is named; it names a locus by the marker's id,
 or `chr:bp` where the id is missing, and declares a locus only for a marker someone is called at. The file states no
-reference allele, so none is marked. LINKAGE `.pre` marker columns are not read: their layout depends on a separate
+reference allele, so none is marked. PLINK writes a haploid call as a doubled pair, so on chrY and chrMT, and on chrX
+for a man, `A A` is read as the one copy it encodes, and a heterozygous call there fails loud rather than being kept as
+a second copy PLINK itself would discard. LINKAGE `.pre` marker columns are not read: their layout depends on a separate
 locus file, so the columns after the phenotype cannot be split into allele pairs from the `.pre` alone.
 
 Not expressible: deceased, proband, twins, consanguinity, adoption, outcomes, counts, relationship status.
@@ -140,14 +142,20 @@ names or ints; fixture `family.phenopackets.json`). An array's families are buil
 | packet variant interpretations (`variationDescriptor`, `allelicState`)                     | a locus per distinct variant (alleles `ref`, `alt`); a genotype by allelic state (below)          |
 | phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                           |
 
-Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct variant, identified by
-the most specific thing its descriptor states (a VRS id, an HGVS expression, the VCF record, the label), and named by
-its label. The allelic state gives the copies: heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]`.
-Heterozygous at a single variant site means the other copy is the reference there, so `ref` is what the term states, not
-an inference. Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so their
-phase is not recorded. A variant with no allelic state, or another term, states no genotype and is dropped. An
-interpretation naming a biosample is the packet's subject's. A packet whose subject is not in `persons` fails loud. Not
-expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity on any other couple.
+Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct variant. Two descriptors
+are the same variant when they share something that pins one down — a VRS id, the VCF record, or a genomic, coding or
+other non-protein HGVS expression — since different packets describe one variant in different ways. A protein change
+does not pin a variant (several DNA changes give one), so it, the label and the descriptor id identify a variant, with
+its gene, only when nothing stronger is given; two different variants printed alike with nothing to tell them apart fail
+loud. A locus is named by the label, else the coding, genomic or other HGVS, else the VCF record. The allelic state
+gives the copies: heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]` (the X- and Y-linked subtypes
+too). Heterozygous says one copy is the variant; the importer records the other as the reference, the reading the GA4GH
+examples use, which is wrong only at a multiallelic site where the other copy is a second variant, and one descriptor
+cannot state that. Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so
+their phase is not recorded. An absent or unspecified allelic state states no genotype and the variant is dropped; an
+unknown term fails loud. An interpretation naming a biosample is that biosample's individual's (the subject's when it
+names none), and one naming neither a person nor a biosample fails loud. A packet whose subject is not in `persons`
+fails loud. Not expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity on any other couple.
 
 **Open Pedigree / PhenoTips simple JSON** (`_openpedigree.py`; a JSON array of person and relationship objects, keys
 case-insensitive; fixture `simple.openpedigree.json`)

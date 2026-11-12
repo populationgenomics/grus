@@ -94,19 +94,26 @@ def _conditions_from_diseases(diseases: list[dict[str, Any]]) -> list[_core.Cond
     return out
 
 
-# GENO allelic states -> the genotype's alt copies (with ref for heterozygous): by id, else by label.
+# GENO allelic states -> the genotype's copies of ``alt`` (with ``ref`` for heterozygous).
 _ALLELIC_STATE = {
     "GENO:0000135": ("ref", "alt"),  # heterozygous
+    "GENO:0000458": ("ref", "alt"),  # simple heterozygous
     "GENO:0000402": ("ref", "alt"),  # compound heterozygous: heterozygous at each variant; phase is not stated
     "GENO:0000136": ("alt", "alt"),  # homozygous
     "GENO:0000134": ("alt",),  # hemizygous
+    "GENO:0000604": ("alt",),  # hemizygous X-linked
+    "GENO:0000605": ("alt",),  # hemizygous Y-linked
 }
 _ALLELIC_LABEL = {
     "heterozygous": "GENO:0000135",
+    "simple heterozygous": "GENO:0000458",
     "compound heterozygous": "GENO:0000402",
     "homozygous": "GENO:0000136",
     "hemizygous": "GENO:0000134",
+    "hemizygous x-linked": "GENO:0000604",
+    "hemizygous y-linked": "GENO:0000605",
 }
+_UNSTATED_STATE = {"", "GENO:0000137"}  # absent, or "unspecified zygosity": no genotype
 # Expression syntax prefix -> identifier scheme; any other syntax is OTHER.
 _SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI, "vrs": pb.IDENTIFIER_SCHEME_VRS}
 
@@ -114,85 +121,175 @@ _SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI,
 class _Loci:
     """The loci a file's variant descriptors declare: one per distinct variant, ids ``l1``, ``l2``, … by first sight.
 
-    A variant is identified by what its descriptor states, most specific first: the VRS id, an HGVS expression, the
-    VCF record, the label, the descriptor's own id.
+    Two descriptors are one variant when they share an identifying statement (``_tokens``): a VRS id, the VCF record,
+    or a genomic, coding or other non-protein HGVS expression. One describing a variant by none of those falls back to
+    its gene with its label, protein HGVS or id.
     """
 
     def __init__(self) -> None:
         self.declared: list[pb.Locus] = []
-        self._by_key: dict[str, str] = {}
+        self._by_token: dict[str, str] = {}
+        self._by_name: dict[tuple[str | None, str], str] = {}
 
     def locus_id(self, vd: dict[str, Any]) -> str:
-        key = _variant_key(vd)
-        if key not in self._by_key:
-            self._by_key[key] = f"l{len(self.declared) + 1}"
-            self.declared.append(_locus(self._by_key[key], vd))
-        return self._by_key[key]
+        """The id of ``vd``'s locus, declaring it on first sight.
+
+        Raises:
+            PedigreeImportError: ``vd`` shares identifying statements with two loci, or is named as another is.
+        """
+        tokens = _tokens(vd)
+        found = sorted({self._by_token[t] for t in tokens if t in self._by_token})
+        if len(found) > 1:
+            raise _core.PedigreeImportError(f"a variationDescriptor matches two variants ({', '.join(found)})")
+        if found:
+            locus_id = found[0]
+        else:
+            locus_id = f"l{len(self.declared) + 1}"
+            locus = _locus(locus_id, vd)
+            name = (locus.gene if locus.HasField("gene") else None, locus.name)
+            if locus.name and name in self._by_name:
+                raise _core.PedigreeImportError(
+                    f"two different variants are both named {locus.name!r} (gene {name[0]!r}); "
+                    "they share no VRS id, VCF record or HGVS expression to tell whether they are one"
+                )
+            self._by_name[name] = locus_id
+            self.declared.append(locus)
+        self._by_token.update(dict.fromkeys(tokens, locus_id))
+        return locus_id
 
 
 def _expressions(vd: dict[str, Any]) -> list[tuple[str, str]]:
-    return [(str(_get(e, "syntax", "")), str(_get(e, "value", ""))) for e in _get(vd, "expressions", []) or []]
+    """``vd``'s expressions as (lower-cased syntax, value), those with a value."""
+    out = [(str(_get(e, "syntax", "")).lower(), str(_get(e, "value", ""))) for e in _get(vd, "expressions", []) or []]
+    return [(s, v) for s, v in out if v]
 
 
 def _vrs_id(vd: dict[str, Any]) -> str:
+    """The VRS id of ``vd``'s variation, whichever member of the Variation oneof carries it."""
     variation = _get(vd, "variation", {}) or {}
-    for allele in (variation, _get(variation, "allele", {}) or {}):
-        for name in ("_id", "id"):
-            if value := allele.get(name):
+    for candidate in (variation, *(v for v in variation.values() if isinstance(v, dict))):
+        for name in ("_id", "id", "Id"):
+            if value := candidate.get(name):
                 return str(value)
     return ""
 
 
-def _variant_key(vd: dict[str, Any]) -> str:
+def _vcf(vd: dict[str, Any]) -> dict[str, Any]:
+    return _get(vd, "vcfRecord", {}) or {}
+
+
+def _gene(vd: dict[str, Any]) -> str:
+    return str(_get(_get(vd, "geneContext", {}) or {}, "symbol", "") or "")
+
+
+def _tokens(vd: dict[str, Any]) -> list[str]:
+    """The statements that identify ``vd``'s variant, strongest first; a weak fallback when there are none.
+
+    Raises:
+        PedigreeImportError: ``vd`` states nothing that identifies a variant.
+    """
+    tokens = []
     if vrs := _vrs_id(vd):
-        return f"vrs:{vrs}"
-    for syntax, value in _expressions(vd):
-        if syntax.lower().startswith("hgvs") and value:
-            return f"hgvs:{value}"
-    if vcf := _get(vd, "vcfRecord"):
+        tokens.append(f"vrs:{vrs}")
+    if vcf := _vcf(vd):
         fields = ("genomeAssembly", "chrom", "pos", "ref", "alt")
-        return "vcf:" + ":".join(str(_get(vcf, f, "")) for f in fields)
-    if label := _get(vd, "label"):
-        return f"label:{label}"
-    if vid := _get(vd, "id"):
-        return f"id:{vid}"
+        tokens.append("vcf:" + ":".join(str(_get(vcf, f, "")) for f in fields))
+    tokens += [f"{s}:{v}" for s, v in _expressions(vd) if s.startswith("hgvs") and s != "hgvs.p"]
+    if tokens:
+        return tokens
+    gene = _gene(vd)
+    protein = next((v for s, v in _expressions(vd) if s == "hgvs.p"), "")
+    for kind, value in (("label", _get(vd, "label")), ("hgvs.p", protein), ("id", _get(vd, "id"))):
+        if value:
+            return [f"{kind}:{gene}:{value}"]
     raise _core.PedigreeImportError(
-        "a variationDescriptor identifies no variant (no VRS, expression, VCF, label or id)"
+        "a variationDescriptor identifies no variant (no VRS id, VCF record, expression, label or id)"
     )
 
 
-def _locus(locus_id: str, vd: dict[str, Any]) -> pb.Locus:
-    """The locus of one variant: named by its label (else its first expression), alleles ``ref`` and ``alt``."""
-    expressions = [(s, v) for s, v in _expressions(vd) if v]
-    name = str(_get(vd, "label", "") or (expressions[0][1] if expressions else ""))
-    identifiers = [
-        pb.Identifier(
-            scheme=next((v for k, v in _SYNTAX.items() if s.lower().startswith(k)), pb.IDENTIFIER_SCHEME_OTHER),
-            value=value,
-        )
-        for s, value in expressions
+def _name(vd: dict[str, Any]) -> str:
+    """``vd``'s printed name: its label, else its coding, genomic or other HGVS, else its VCF record, else protein."""
+    if label := _get(vd, "label"):
+        return str(label)
+    expressions = dict(reversed(_expressions(vd)))  # the first expression of each syntax
+    for syntax in ("hgvs.c", "hgvs.g", "hgvs"):
+        if syntax in expressions:
+            return expressions[syntax]
+    if vcf := _vcf(vd):
+        return f"{_get(vcf, 'chrom', '')}:{_get(vcf, 'pos', '')} {_get(vcf, 'ref', '')}>{_get(vcf, 'alt', '')}"
+    return expressions.get("hgvs.p", "")
+
+
+def _identifiers(vd: dict[str, Any]) -> list[pb.Identifier]:
+    """The resolvable names ``vd`` prints, once each: its expressions, VRS id and rsIDs."""
+    stated = [
+        (next((v for k, v in _SYNTAX.items() if s.startswith(k)), pb.IDENTIFIER_SCHEME_OTHER), value)
+        for s, value in _expressions(vd)
     ]
     if vrs := _vrs_id(vd):
-        identifiers.append(pb.Identifier(scheme=pb.IDENTIFIER_SCHEME_VRS, value=vrs))
-    vcf = _get(vd, "vcfRecord", {}) or {}
-    rsid = str(_get(vcf, "id", ""))
-    if rsid.startswith("rs"):
-        identifiers.append(pb.Identifier(scheme=pb.IDENTIFIER_SCHEME_RSID, value=rsid))
+        stated.append((pb.IDENTIFIER_SCHEME_VRS, vrs))
+    for rsid in str(_get(_vcf(vd), "id", "")).split(";"):
+        if rsid.startswith("rs"):
+            stated.append((pb.IDENTIFIER_SCHEME_RSID, rsid))
+    return [pb.Identifier(scheme=scheme, value=value) for scheme, value in dict.fromkeys(stated)]
+
+
+def _locus(locus_id: str, vd: dict[str, Any]) -> pb.Locus:
+    """The locus of one variant (``_name``), alleles ``ref`` (named by the VCF REF, when stated) and ``alt``."""
+    name = _name(vd)
     locus = pb.Locus(
         id=locus_id,
         name=name,
         alleles=[
-            pb.Allele(symbol="ref", name=str(_get(vcf, "ref", "")), reference=True),
-            pb.Allele(symbol="alt", name=name, identifiers=identifiers),
+            pb.Allele(symbol="ref", name=str(_get(_vcf(vd), "ref", "")), reference=True),
+            pb.Allele(symbol="alt", name=name, identifiers=_identifiers(vd)),
         ],
     )
-    if symbol := _get(_get(vd, "geneContext", {}) or {}, "symbol"):
-        locus.gene = str(symbol)
+    if gene := _gene(vd):
+        locus.gene = gene
     return locus
+
+
+def _copies(vd: dict[str, Any]) -> tuple[str, ...] | None:
+    """The copies ``vd``'s allelic state gives, or None when it states no zygosity.
+
+    Raises:
+        PedigreeImportError: the allelic state is a term this importer does not know.
+    """
+    state = _get(vd, "allelicState", {}) or {}
+    geno, label = str(_get(state, "id", "")), str(_get(state, "label", "")).lower()
+    geno = geno if geno in _ALLELIC_STATE else _ALLELIC_LABEL.get(label, geno)
+    if geno in _ALLELIC_STATE:
+        return _ALLELIC_STATE[geno]
+    if geno in _UNSTATED_STATE:
+        return None
+    raise _core.PedigreeImportError(f"unrecognised allelicState {geno!r} ({label!r})")
+
+
+def _owner(who: str, subject: str, known: set[str], biosamples: dict[str, str]) -> str:
+    """The person ``subjectOrBiosampleId`` names: a person, a biosample's individual, or (absent) the subject.
+
+    Raises:
+        PedigreeImportError: the id names neither a person nor one of the packet's biosamples, or the biosample's
+            individual is not in the pedigree.
+    """
+    if not who:
+        return subject
+    if who in known:
+        return who
+    if who in biosamples:
+        owner = biosamples[who] or subject
+        if owner not in known:
+            raise _core.PedigreeImportError(f"biosample {who!r} belongs to {owner!r}, who is not in pedigree.persons")
+        return owner
+    raise _core.PedigreeImportError(f"subjectOrBiosampleId {who!r} names neither a person nor a biosample")
 
 
 def _genotypes(packet: dict[str, Any], subject: str, known: set[str], loci: _Loci) -> dict[str, list[pb.Genotype]]:
     """The genotypes a packet's variant interpretations state, by person id."""
+    biosamples = {
+        str(_get(b, "id", "")): str(_get(b, "individualId", "") or "") for b in _get(packet, "biosamples", []) or []
+    }
     out: dict[str, list[pb.Genotype]] = {}
     for interpretation in _get(packet, "interpretations", []) or []:
         diagnosis = _get(interpretation, "diagnosis", {}) or {}
@@ -200,14 +297,11 @@ def _genotypes(packet: dict[str, Any], subject: str, known: set[str], loci: _Loc
             vd = _get(_get(gi, "variantInterpretation", {}) or {}, "variationDescriptor")
             if not vd:
                 continue  # a gene-level interpretation states no genotype
-            state = _get(vd, "allelicState", {}) or {}
-            geno = str(_get(state, "id", "")) or _ALLELIC_LABEL.get(str(_get(state, "label", "")).lower(), "")
-            if geno not in _ALLELIC_STATE:
+            copies = _copies(vd)
+            if copies is None:
                 continue
-            who = str(_get(gi, "subjectOrBiosampleId", ""))
-            out.setdefault(who if who in known else subject, []).append(
-                pb.Genotype(locus_id=loci.locus_id(vd), alleles=_ALLELIC_STATE[geno])
-            )
+            who = _owner(str(_get(gi, "subjectOrBiosampleId", "")), subject, known, biosamples)
+            out.setdefault(who, []).append(pb.Genotype(locus_id=loci.locus_id(vd), alleles=copies))
     return out
 
 
