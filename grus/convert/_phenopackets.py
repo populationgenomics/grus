@@ -27,7 +27,6 @@ dropped. Importing from Phenopackets does not require its Python package: the JS
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from typing import Any
 
 from grus.convert import _core
@@ -120,45 +119,41 @@ _SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI,
 
 
 class _Loci:
-    """The loci a file's variant descriptors declare: one per distinct variant, ids ``l1``, ``l2``, … by first sight.
+    """The loci a file's variant descriptors declare: one per distinct description, ids ``l1``, ``l2``, … in order.
 
-    Two descriptors are one variant when they share a statement that pins one down (``_tokens``): a VRS id, the VCF
-    record, an SPDI, or a DNA or RNA HGVS on a reference sequence. One stating none of those is matched by the most
-    specific thing it states that pins a variant within its stated gene — an HGVS without a reference sequence, else its
-    label, else its protein change — against every locus stating the same, and must match at most one.
+    Descriptors are compared exactly, as written, leaving out the allelic state (the person's, not the variant's) and
+    the descriptor id (local to its document): the same variant copied into several packets is one locus. Whether two
+    different descriptions are one variant is variant normalisation, which this importer does not attempt.
     """
 
     def __init__(self) -> None:
         self.declared: list[pb.Locus] = []
-        self._by_token: dict[str, set[str]] = defaultdict(set)
+        self._by_description: dict[str, str] = {}
         self._by_name: dict[tuple[str | None, str], str] = {}
 
     def locus_id(self, vd: dict[str, Any]) -> str:
         """The id of ``vd``'s locus, declaring it on first sight.
 
         Raises:
-            PedigreeImportError: ``vd`` identifies no variant, matches two loci, or is named as another variant is.
+            PedigreeImportError: ``vd`` states nothing to name its variant by, or a different description gives the same
+                (gene, name).
         """
-        tiers = _tokens(vd)
-        lookup = next(tier for tier in tiers if tier)
-        found = sorted({x for t in lookup for x in self._by_token.get(t, ())})
-        if len(found) > 1:
-            raise _core.PedigreeImportError(f"a variationDescriptor matches two variants ({', '.join(found)})")
-        if found:
-            locus_id = found[0]
-        else:
-            locus_id = f"l{len(self.declared) + 1}"
-            locus = _locus(locus_id, vd)
-            name = (locus.gene if locus.HasField("gene") else None, locus.name)
-            if locus.name and name in self._by_name:
-                raise _core.PedigreeImportError(
-                    f"two descriptors named {locus.name!r} (gene {name[0]!r}) are not shown to be one variant: they "
-                    "share no VRS id, VCF record, SPDI or HGVS on a reference sequence"
-                )
-            self._by_name[name] = locus_id
-            self.declared.append(locus)
-        for token in (t for tier in tiers for t in tier):
-            self._by_token[token].add(locus_id)
+        description = json.dumps(
+            {k: v for k, v in vd.items() if k not in ("allelicState", "allelic_state", "id")}, sort_keys=True
+        )
+        if description in self._by_description:
+            return self._by_description[description]
+        locus_id = f"l{len(self.declared) + 1}"
+        locus = _locus(locus_id, vd)
+        name = (locus.gene if locus.HasField("gene") else None, locus.name)
+        if name in self._by_name:
+            raise _core.PedigreeImportError(
+                f"variant {locus.name!r} (gene {name[0]!r}) is described two different ways; grus does not reconcile "
+                "variant representations: describe it one way, or normalise the descriptors before import"
+            )
+        self._by_name[name] = locus_id
+        self._by_description[description] = locus_id
+        self.declared.append(locus)
         return locus_id
 
 
@@ -186,68 +181,23 @@ def _gene(vd: dict[str, Any]) -> str:
     return str(_get(_get(vd, "geneContext", {}) or {}, "symbol", "") or "")
 
 
-def _is_protein(value: str) -> bool:
-    """Whether an HGVS describes a protein change (``p.``), whatever syntax the expression was filed under."""
-    return value.rsplit(":", 1)[-1].lstrip("(").startswith("p.")
-
-
-def _hgvs(vd: dict[str, Any]) -> tuple[list[tuple[str, str]], list[str]]:
-    """``vd``'s HGVS expressions: the DNA/RNA ones as (syntax, value), and the protein ones."""
-    hgvs = [(s, v) for s, v in _expressions(vd) if s.startswith("hgvs")]
-    return [(s, v) for s, v in hgvs if not _is_protein(v)], [v for _, v in hgvs if _is_protein(v)]
-
-
-def _tokens(vd: dict[str, Any]) -> list[list[str]]:
-    """What identifies ``vd``'s variant, most specific first, as a list per tier.
-
-    First the statements that pin it anywhere, then those that pin it within its gene: HGVS without a reference
-    sequence, the label, the protein change.
+def _name(vd: dict[str, Any]) -> str:
+    """``vd``'s variant as written: its label, else its first expression, else its VCF record, else its VRS id.
 
     Raises:
-        PedigreeImportError: ``vd`` states none: nothing pins it anywhere, and no gene or nothing within one.
-    """
-    dna, protein = _hgvs(vd)
-    strong = []
-    if vrs := _vrs_id(vd):
-        strong.append(f"vrs:{vrs}")
-    if vcf := _vcf(vd):
-        fields = ("genomeAssembly", "chrom", "pos", "ref", "alt")
-        strong.append("vcf:" + ":".join(str(_get(vcf, f, "")) for f in fields))
-    strong += [f"spdi:{v}" for s, v in _expressions(vd) if s.startswith("spdi")]
-    strong += [f"hgvs:{v}" for _, v in dna if ":" in v]  # on a reference sequence
-    # A descriptor's id is local to its document and names nothing, so it identifies no variant.
-    gene = _gene(vd)
-    label = str(_get(vd, "label", "") or "")
-    within = [[v for _, v in dna if ":" not in v], [label] if label else [], protein] if gene else []
-    tiers = [strong, *([f"weak:{gene}:{v}" for v in values] for values in within)]
-    if not any(tiers):
-        raise _core.PedigreeImportError(
-            "a variationDescriptor identifies no variant: no VRS id, VCF record, SPDI or HGVS on a reference "
-            "sequence, and no gene with an HGVS, label or protein change"
-        )
-    return tiers
-
-
-def _name(vd: dict[str, Any]) -> str:
-    """``vd``'s printed name.
-
-    Its label, else an HGVS (coding, genomic, then any other DNA/RNA one), else its SPDI, VCF record or VRS id, else its
-    protein change.
+        PedigreeImportError: ``vd`` states none of them.
     """
     if label := _get(vd, "label"):
         return str(label)
-    dna, protein = _hgvs(vd)
-    by_syntax = dict(reversed(dna))  # the first expression of each syntax
-    for syntax in ("hgvs.c", "hgvs.g"):
-        if syntax in by_syntax:
-            return by_syntax[syntax]
-    if dna:
-        return dna[0][1]
-    if spdi := next((v for s, v in _expressions(vd) if s.startswith("spdi")), ""):
-        return spdi
+    if expressions := _expressions(vd):
+        return expressions[0][1]
     if vcf := _vcf(vd):
         return f"{_get(vcf, 'chrom', '')}:{_get(vcf, 'pos', '')} {_get(vcf, 'ref', '')}>{_get(vcf, 'alt', '')}"
-    return _vrs_id(vd) or (protein[0] if protein else "")
+    if vrs := _vrs_id(vd):
+        return vrs
+    raise _core.PedigreeImportError(
+        "a variationDescriptor states no label, expression, VCF record or VRS id to name its variant by"
+    )
 
 
 def _identifiers(vd: dict[str, Any]) -> list[pb.Identifier]:

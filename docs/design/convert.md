@@ -143,15 +143,16 @@ names or ints; fixture `family.phenopackets.json`). An array's families are buil
 | packet variant interpretations (`variationDescriptor`, `allelicState`)                     | a locus per distinct variant (alleles `ref`, `alt`); a genotype by allelic state (below)          |
 | phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                           |
 
-Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct variant. Two descriptors
-are the same variant when they share something that pins one down — a VRS id, the VCF record, an SPDI, or a DNA or RNA
-HGVS on a reference sequence — since different packets describe one variant in different ways. An HGVS without a
-reference sequence, the label, or a protein change (several DNA changes give one, whatever syntax it is filed under)
-pins a variant only within its stated gene, so a descriptor stating nothing stronger is matched by the most specific of
-these against every locus stating the same, and must match at most one; two different variants printed alike with
-nothing to tell them apart fail loud. Without a gene, or with only a descriptor id (local to its document), a descriptor
-identifies no variant and fails loud. A locus is named by the label, else an HGVS (coding, genomic, then any other DNA
-or RNA one), else the SPDI, VCF record or VRS id, else the protein change. The allelic state gives the copies:
+Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct description: two
+descriptors are one locus when they are identical as written, leaving out the allelic state (the person's, not the
+variant's) and the descriptor id (local to its document). So a variant copied into several packets is one locus. The
+importer does not decide whether two *different* descriptions are one variant — a VRS id in one packet and an HGVS
+string in another, say. That is variant normalisation: it needs a reference genome and a normaliser to do correctly, and
+any rule short of that (matching on shared fragments, reading an HGVS string's shape) is order-dependent and wrong at
+the edges. grus leaves it to the caller, who has those tools. A locus is named by what the descriptor writes: its label,
+else its first expression, else its VCF record, else its VRS id; a descriptor stating none of them fails loud. Two
+different descriptions that give one (gene, name) — one variant written two ways, or two variants written alike — fail
+loud too, since the IR identifies a locus by that pair and cannot tell which it is. The allelic state gives the copies:
 heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]` (the X- and Y-linked subtypes too). Heterozygous
 says one copy is the variant; the importer records the other as the reference, the reading the GA4GH examples use, which
 is wrong only at a multiallelic site where the other copy is a second variant, and one descriptor cannot state that.

@@ -343,35 +343,20 @@ def test_phenopackets_allelic_state_by_label() -> None:
     assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": ["alt", "alt"]}
 
 
-def test_phenopackets_variants_identified_by_what_they_share() -> None:
-    # One variant described two ways (a VRS id and its HGVS; the HGVS alone) is one locus; two variants with the same
-    # protein change are two.
-    by_vrs = _variant(variation={"allele": {"_id": "ga4gh:VA.x"}}, vcfRecord=None)
-    by_hgvs = _variant("GENO:0000136", label=None, vcfRecord=None)
-    ps = _import(("c", by_vrs), ("m", by_hgvs))
-    assert len(ps.loci) == 1 and ps.loci[0].name == "c.1521_1523del"
-    protein = [{"syntax": "hgvs.p", "value": "p.Arg2His"}]
-    a = _variant(label=None, vcfRecord=None, expressions=[*protein, {"syntax": "hgvs.c", "value": "c.5G>A"}])
-    b = _variant(label=None, vcfRecord=None, expressions=[*protein, {"syntax": "hgvs.c", "value": "c.5G>T"}])
-    assert [locus.name for locus in _import(("c", a), ("m", b)).loci] == ["c.5G>A", "c.5G>T"]
-    # An HGVS with no reference sequence pins a variant only within its gene.
-    c = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.c", "value": "c.100A>G"}])
-    other_gene = {**c, "geneContext": {"symbol": "GJB2"}}
-    assert [(locus.gene, locus.name) for locus in _import(("c", c), ("m", other_gene)).loci] == [
-        ("CFTR", "c.100A>G"),
-        ("GJB2", "c.100A>G"),
-    ]
-    # ... and a descriptor that also pins it (a VCF record) is joined by one stating only that HGVS.
-    pinned = {**c, "vcfRecord": {"chrom": "7", "pos": "100", "ref": "A", "alt": "G"}}
-    assert len(_import(("c", pinned), ("m", c)).loci) == 1
-    # A protein change is not a pin, whatever syntax it is filed under.
-    generic = [{"syntax": "hgvs", "value": "NP_1.1:p.Arg2His"}]
-    a2 = _variant(label=None, vcfRecord=None, expressions=[*generic, {"syntax": "hgvs.c", "value": "c.5G>A"}])
-    b2 = _variant(label=None, vcfRecord=None, expressions=[*generic, {"syntax": "hgvs.c", "value": "c.5G>T"}])
-    assert len(_import(("c", a2), ("m", b2)).loci) == 2
+def test_phenopackets_one_locus_per_distinct_description() -> None:
+    # The same description, in any order of packets and under any descriptor id, is one locus; distinct descriptions
+    # are distinct loci, named as written (a label, else the first expression), never by reading the HGVS.
+    ps = _import(("c", _variant("GENO:0000136", id="v1")), ("m", _variant(id="v2")))
+    assert len(ps.loci) == 1
+    a = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.p", "value": "p.Arg2His"}])
+    b = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.c", "value": "c.5G>T"}])
+    for stated in ((("c", a), ("m", b)), (("m", b), ("c", a))):
+        assert sorted(locus.name for locus in _import(*stated).loci) == ["c.5G>T", "p.Arg2His"]
+    no_gene = _variant(label=None, vcfRecord=None, geneContext=None)
+    assert [(locus.gene, locus.name) for locus in _import(("c", no_gene)).loci] == [("", "NM_000492.4:c.1521_1523del")]
 
 
-def test_phenopackets_a_variant_pinned_only_by_its_vrs_id_is_named_by_it() -> None:
+def test_phenopackets_a_variant_stated_only_by_its_vrs_id_is_named_by_it() -> None:
     by_vrs = [
         _variant(label=None, vcfRecord=None, expressions=None, variation={"allele": {"_id": vrs}})
         for vrs in ("ga4gh:VA.a", "ga4gh:VA.b")
@@ -397,31 +382,17 @@ def test_phenopackets_a_biosample_is_its_individuals() -> None:
         ((("c", _variant("GENO:0000136")), ("c", _variant("GENO:0000135"))), "different allelic states"),
         ((("ghost", _variant()),), "names neither a person nor a biosample"),
         ((("c", _variant("GENO:0000999")),), "unrecognised allelicState"),
-        (  # an HGVS with no reference sequence and no gene pins nothing
-            (
-                (
-                    "c",
-                    _variant(
-                        label=None,
-                        vcfRecord=None,
-                        geneContext=None,
-                        expressions=[{"syntax": "hgvs.c", "value": "c.1A>G"}],
-                    ),
-                ),
-            ),
-            "identifies no variant",
-        ),
         (  # a descriptor's id is local to its document and names no variant
             (("c", _variant(label=None, vcfRecord=None, expressions=None, id="v1")),),
-            "identifies no variant",
+            "states no label, expression, VCF record or VRS id",
         ),
-        (  # two variants, different, printed alike and with nothing to tell them apart
-            (
-                ("c", _variant(vcfRecord=None, expressions=None, id="v1")),
-                ("m", _variant(vcfRecord=None, expressions=None, label="del", variation={"allele": {"_id": "a"}})),
-                ("f", _variant(vcfRecord=None, expressions=None, label="del", variation={"allele": {"_id": "b"}})),
-            ),
-            "named 'del' \\(gene 'CFTR'\\) are not shown to be one variant",
+        (  # one name, two descriptions: whether they are one variant is the caller's to settle, in either order
+            (("c", _variant()), ("m", _variant(vcfRecord=None))),
+            "is described two different ways",
+        ),
+        (
+            (("m", _variant(vcfRecord=None)), ("c", _variant())),
+            "is described two different ways",
         ),
     ],
 )
