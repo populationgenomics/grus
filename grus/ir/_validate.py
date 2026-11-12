@@ -343,7 +343,9 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
             )
         name = locus_identity(locus)
         if name in names:
-            stated = f"name={locus.name!r}" if locus.name else f"alleles={list(name[2])}"
+            stated = (
+                f"name={locus.name!r}" if locus.name else f"alleles={sorted(allele_text(a) for a in locus.alleles)}"
+            )
             raise IntegrityError(
                 f"{where}: locus (gene={name[0]!r}, {stated}) is already declared as {names[name]!r}; "
                 "one declaration per locus"
@@ -358,23 +360,33 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
         names[name] = locus.id
 
 
-# A locus's identity across records: (gene, name, alleles) — the alleles only for an unnamed locus.
-LocusIdentity = tuple[str | None, str, tuple[str, ...]]
+# An allele as compared: (symbol, printed name, whether it is the reference).
+AlleleIdentity = tuple[str, str, bool]
+# A locus's identity across records: (gene, name, alleles) — the alleles, sorted, only for an unnamed locus.
+LocusIdentity = tuple[str | None, str, tuple[AlleleIdentity, ...]]
 
 
 def locus_identity(locus: pb.Locus) -> LocusIdentity:
     """What tells ``locus`` apart from others: its gene (``None`` when not stated) and printed name.
 
-    An unnamed locus is told apart by its alleles as stated (``allele_text``, sorted) too. Two loci with equal
+    An unnamed locus is told apart by its alleles as stated (``allele_identity``, sorted) too. Two loci with equal
     identities state the same locus, whatever their ids and whichever records they come from: ``validate_set`` refuses
     two in one set and ``diff_set`` matches them across sets, so a caller merging sets declares one locus per identity.
     """
-    alleles = () if locus.name else tuple(sorted(allele_text(a) for a in locus.alleles))
+    alleles = () if locus.name else tuple(sorted(allele_identity(a) for a in locus.alleles))
     return (locus.gene if locus.HasField("gene") else None, locus.name, alleles)
 
 
+def allele_identity(allele: pb.Allele) -> AlleleIdentity:
+    """What an allele states, as compared: its symbol, printed name and whether it is the reference.
+
+    Its identifiers are not compared: they are other spellings of what its name states.
+    """
+    return (allele.symbol, allele.name, allele.reference)
+
+
 def allele_text(allele: pb.Allele) -> str:
-    """An allele as compared and shown: its symbol, with its printed name and whether it is the reference."""
+    """An allele for display: its symbol, with its printed name and whether it is the reference."""
     stated = [x for x in (allele.name, "reference" if allele.reference else "") if x]
     return f"{allele.symbol} ({', '.join(stated)})" if stated else allele.symbol
 

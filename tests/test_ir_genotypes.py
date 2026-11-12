@@ -359,3 +359,18 @@ def test_loci_of_one_identity_are_one_locus_across_sets(unnamed: bool) -> None:
     a.loci.add().CopyFrom(b.loci[0])
     with pytest.raises(ir.IntegrityError, match="is already declared as 'l1'"):
         ir.validate_set(a)
+
+
+def test_an_allele_named_reference_is_not_the_reference() -> None:
+    # Display text can coincide ("+ (reference)" both ways); what is stated does not.
+    named = pb.Allele(symbol="+", name="reference")
+    flagged = pb.Allele(symbol="+", reference=True)
+    assert ir.allele_text(named) == ir.allele_text(flagged)
+    assert ir.allele_identity(named) != ir.allele_identity(flagged)
+    a, b = _set(), _set()
+    for ps, plus in ((a, named), (b, flagged)):
+        for locus in ps.loci:
+            locus.name = ""
+            locus.alleles[0].CopyFrom(plus)
+    assert ir.locus_identity(a.loci[0]) != ir.locus_identity(b.loci[0])
+    assert [m.subject for m in _genotype_mismatches(a, b)] == ["1-1", "1-2", "2-1"]

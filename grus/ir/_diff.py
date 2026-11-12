@@ -471,8 +471,8 @@ def _individual_mismatches(
     return out
 
 
-# One genotype as compared: its locus's identity, and its alleles as stated (``_validate.allele_text``).
-_Called = tuple[_validate.LocusIdentity, tuple[str, ...]]
+# One genotype as compared: its locus's identity, and its alleles as stated (``_validate.allele_identity``).
+_Called = tuple[_validate.LocusIdentity, tuple[_validate.AlleleIdentity, ...]]
 
 
 def _genotype_mismatches(
@@ -488,8 +488,8 @@ class UndeclaredLocusError(KeyError):
     """A genotype names a ``locus_id`` no declaration has, or an allele its locus does not declare."""
 
 
-def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called]]:
-    """``ind``'s genotypes, each with its locus's identity and its alleles read through the locus.
+def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called, list[str]]]:
+    """``ind``'s genotypes, each with its locus's identity, its alleles read through the locus, and those for display.
 
     Raises:
         UndeclaredLocusError: a genotype's locus or one of its alleles is not declared.
@@ -501,11 +501,13 @@ def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Gen
             raise UndeclaredLocusError(
                 f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci"
             )
-        texts = {a.symbol: _validate.allele_text(a) for a in locus.alleles}
-        missing = [s for s in g.alleles if s not in texts]
+        by_symbol = {a.symbol: a for a in locus.alleles}
+        missing = [s for s in g.alleles if s not in by_symbol]
         if missing:
             raise UndeclaredLocusError(f"allele(s) {missing} are not declared at locus {g.locus_id!r}")
-        out.append((g, (_validate.locus_identity(locus), tuple(texts[s] for s in g.alleles))))
+        alleles = [by_symbol[s] for s in g.alleles]
+        called = (_validate.locus_identity(locus), tuple(_validate.allele_identity(a) for a in alleles))
+        out.append((g, called, [_validate.allele_text(a) for a in alleles]))
     return out
 
 
@@ -520,7 +522,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
     out: list[object] = []
     unphased: list[_Called] = []
     phased: dict[str, list[_Called]] = defaultdict(list)
-    for g, called in _resolve(ind, loci):
+    for g, called, _ in _resolve(ind, loci):
         heterozygous = len(set(g.alleles)) > 1
         (phased[g.phase_set] if g.HasField("phase_set") and heterozygous else unphased).append(called)
     for members in phased.values():
@@ -528,7 +530,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
             unphased.extend(members)
             continue
         slots = len(members[0][1])
-        haplotypes = sorted(tuple(sorted((repr(locus), al[i]) for locus, al in members)) for i in range(slots))
+        haplotypes = sorted(tuple(sorted((repr(locus), repr(al[i])) for locus, al in members)) for i in range(slots))
         out.append(("phased", tuple(haplotypes)))
     out.extend(("unphased", locus, tuple(sorted(alleles))) for locus, alleles in unphased)
     return tuple(sorted(out, key=repr))
@@ -537,7 +539,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
 def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
     """Render genotypes as ``gene name: a/b`` (``|`` between phased alleles), sorted; ``none`` if there are none."""
     parts = []
-    for g, ((gene, name, _), alleles) in _resolve(ind, loci):
+    for g, ((gene, name, _), _), alleles in _resolve(ind, loci):
         where = " ".join(x for x in (gene, name) if x) or "-"
         sep = "|" if g.HasField("phase_set") else "/"
         parts.append(f"{where}: {sep.join(alleles)}" + (f" [{g.phase_set}]" if g.HasField("phase_set") else ""))
