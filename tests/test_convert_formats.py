@@ -361,6 +361,23 @@ def test_phenopackets_variants_identified_by_what_they_share() -> None:
         ("CFTR", "c.100A>G"),
         ("GJB2", "c.100A>G"),
     ]
+    # ... and a descriptor that also pins it (a VCF record) is joined by one stating only that HGVS.
+    pinned = {**c, "vcfRecord": {"chrom": "7", "pos": "100", "ref": "A", "alt": "G"}}
+    assert len(_import(("c", pinned), ("m", c)).loci) == 1
+    # A protein change is not a pin, whatever syntax it is filed under.
+    generic = [{"syntax": "hgvs", "value": "NP_1.1:p.Arg2His"}]
+    a2 = _variant(label=None, vcfRecord=None, expressions=[*generic, {"syntax": "hgvs.c", "value": "c.5G>A"}])
+    b2 = _variant(label=None, vcfRecord=None, expressions=[*generic, {"syntax": "hgvs.c", "value": "c.5G>T"}])
+    assert len(_import(("c", a2), ("m", b2)).loci) == 2
+
+
+def test_phenopackets_a_variant_pinned_only_by_its_vrs_id_is_named_by_it() -> None:
+    by_vrs = [
+        _variant(label=None, vcfRecord=None, expressions=None, variation={"allele": {"_id": vrs}})
+        for vrs in ("ga4gh:VA.a", "ga4gh:VA.b")
+    ]
+    ps = _import(("c", by_vrs[0]), ("m", by_vrs[1]))
+    assert [locus.name for locus in ps.loci] == ["ga4gh:VA.a", "ga4gh:VA.b"]
 
 
 def test_phenopackets_a_variant_without_label_or_expression_is_named_by_its_vcf_record() -> None:
@@ -380,6 +397,20 @@ def test_phenopackets_a_biosample_is_its_individuals() -> None:
         ((("c", _variant("GENO:0000136")), ("c", _variant("GENO:0000135"))), "different allelic states"),
         ((("ghost", _variant()),), "names neither a person nor a biosample"),
         ((("c", _variant("GENO:0000999")),), "unrecognised allelicState"),
+        (  # an HGVS with no reference sequence and no gene pins nothing
+            (
+                (
+                    "c",
+                    _variant(
+                        label=None,
+                        vcfRecord=None,
+                        geneContext=None,
+                        expressions=[{"syntax": "hgvs.c", "value": "c.1A>G"}],
+                    ),
+                ),
+            ),
+            "identifies no variant",
+        ),
         (  # a descriptor's id is local to its document and names no variant
             (("c", _variant(label=None, vcfRecord=None, expressions=None, id="v1")),),
             "identifies no variant",
@@ -390,7 +421,7 @@ def test_phenopackets_a_biosample_is_its_individuals() -> None:
                 ("m", _variant(vcfRecord=None, expressions=None, label="del", variation={"allele": {"_id": "a"}})),
                 ("f", _variant(vcfRecord=None, expressions=None, label="del", variation={"allele": {"_id": "b"}})),
             ),
-            "both named 'del'",
+            "named 'del' \\(gene 'CFTR'\\) are not shown to be one variant",
         ),
     ],
 )

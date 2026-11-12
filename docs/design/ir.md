@@ -285,14 +285,14 @@ second-guess them.
 
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 
-**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name), each allele
-by its symbol, printed name and whether it is the reference, unphased copies as a multiset and a phase set as its
-multiset of haplotypes. So ids, phase-set names and swapping every slot of a phase set at once do not register as
-differences. An allele's identifiers are not compared: they are other spellings of what its name states, and one reader
-may copy them where another does not. A support cites genotypes or locus declarations with paths `genotype.*` (scoped to
-people) and `locus.*` (the whole pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in
-trans" backs the phase at both), as `condition.*` paths name a condition. Stored layouts ignore genotypes and an
-annotation's loci, since layout reads only the annotation's text.
+**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name) — and an
+unnamed one by its alleles too — each allele by its symbol, printed name and whether it is the reference, unphased
+copies as a multiset and a phase set as its multiset of haplotypes. So ids, phase-set names and swapping every slot of a
+phase set at once do not register as differences. An allele's identifiers are not compared: they are other spellings of
+what its name states, and one reader may copy them where another does not. A support cites genotypes or locus
+declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole pedigree) and names the loci, several
+when one sentence covers several ("M1 and M2 in trans" backs the phase at both), as `condition.*` paths name a
+condition. Stored layouts ignore genotypes and an annotation's loci, since layout reads only the annotation's text.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 

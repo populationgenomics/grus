@@ -144,21 +144,22 @@ names or ints; fixture `family.phenopackets.json`). An array's families are buil
 | phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                           |
 
 Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct variant. Two descriptors
-are the same variant when they share something that pins one down — a VRS id, the VCF record, or a non-protein HGVS
-expression on a reference sequence — since different packets describe one variant in different ways. An HGVS without a
-reference sequence, the label, or a protein change (several DNA changes give one) pins a variant only within its gene,
-so it identifies one, with the gene, only when nothing stronger is given; two different variants printed alike with
-nothing to tell them apart fail loud. A descriptor's id is local to its document and names no variant, so a descriptor
-identified by nothing else fails loud. A locus is named by the label, else the coding, genomic or other HGVS, else the
-VCF record. The allelic state gives the copies: heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]`
-(the X- and Y-linked subtypes too). Heterozygous says one copy is the variant; the importer records the other as the
-reference, the reading the GA4GH examples use, which is wrong only at a multiallelic site where the other copy is a
-second variant, and one descriptor cannot state that. Compound heterozygous maps to heterozygous at each variant: the
-two descriptors are not linked, so their phase is not recorded. An absent or unspecified allelic state states no
-genotype and the variant is dropped; an unknown term fails loud. An interpretation naming a biosample is that
-biosample's individual's (the subject's when it names none), and one naming neither a person nor a biosample fails loud.
-A packet whose subject is not in `persons` fails loud. Not expressible: twins, adoption, outcomes, counts, consultand,
-carrier, consanguinity on any other couple.
+are the same variant when they share something that pins one down — a VRS id, the VCF record, an SPDI, or a DNA or RNA
+HGVS on a reference sequence — since different packets describe one variant in different ways. An HGVS without a
+reference sequence, the label, or a protein change (several DNA changes give one, whatever syntax it is filed under)
+pins a variant only within its stated gene, so a descriptor stating nothing stronger is matched by the most specific of
+these against every locus stating the same, and must match at most one; two different variants printed alike with
+nothing to tell them apart fail loud. Without a gene, or with only a descriptor id (local to its document), a descriptor
+identifies no variant and fails loud. A locus is named by the label, else an HGVS (coding, genomic, then any other DNA
+or RNA one), else the SPDI, VCF record or VRS id, else the protein change. The allelic state gives the copies:
+heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]` (the X- and Y-linked subtypes too). Heterozygous
+says one copy is the variant; the importer records the other as the reference, the reading the GA4GH examples use, which
+is wrong only at a multiallelic site where the other copy is a second variant, and one descriptor cannot state that.
+Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so their phase is not
+recorded. An absent or unspecified allelic state states no genotype and the variant is dropped; an unknown term fails
+loud. An interpretation naming a biosample is that biosample's individual's (the subject's when it names none), and one
+naming neither a person nor a biosample fails loud. A packet whose subject is not in `persons` fails loud. Not
+expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity on any other couple.
 
 **Open Pedigree / PhenoTips simple JSON** (`_openpedigree.py`; a JSON array of person and relationship objects, keys
 case-insensitive; fixture `simple.openpedigree.json`)
