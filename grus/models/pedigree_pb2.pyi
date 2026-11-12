@@ -74,6 +74,17 @@ class AnnotationType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ANNOTATION_TYPE_OTHER: _ClassVar[AnnotationType]
     ANNOTATION_TYPE_AGE_AT_DEATH: _ClassVar[AnnotationType]
 
+class IdentifierScheme(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    IDENTIFIER_SCHEME_UNSPECIFIED: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_HGVS: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_RSID: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_CLINVAR: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_CLINGEN_ALLELE: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_SPDI: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_VRS: _ClassVar[IdentifierScheme]
+    IDENTIFIER_SCHEME_OTHER: _ClassVar[IdentifierScheme]
+
 class RelationshipStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     RELATIONSHIP_STATUS_UNSPECIFIED: _ClassVar[RelationshipStatus]
@@ -164,6 +175,14 @@ ANNOTATION_TYPE_PRONOUN: AnnotationType
 ANNOTATION_TYPE_CHOSEN_NAME: AnnotationType
 ANNOTATION_TYPE_OTHER: AnnotationType
 ANNOTATION_TYPE_AGE_AT_DEATH: AnnotationType
+IDENTIFIER_SCHEME_UNSPECIFIED: IdentifierScheme
+IDENTIFIER_SCHEME_HGVS: IdentifierScheme
+IDENTIFIER_SCHEME_RSID: IdentifierScheme
+IDENTIFIER_SCHEME_CLINVAR: IdentifierScheme
+IDENTIFIER_SCHEME_CLINGEN_ALLELE: IdentifierScheme
+IDENTIFIER_SCHEME_SPDI: IdentifierScheme
+IDENTIFIER_SCHEME_VRS: IdentifierScheme
+IDENTIFIER_SCHEME_OTHER: IdentifierScheme
 RELATIONSHIP_STATUS_UNSPECIFIED: RelationshipStatus
 RELATIONSHIP_STATUS_CURRENT: RelationshipStatus
 RELATIONSHIP_STATUS_SEPARATED: RelationshipStatus
@@ -222,7 +241,7 @@ class Condition(_message.Message):
     def __init__(self, condition_id: _Optional[str] = ..., status: _Optional[_Union[ConditionStatus, str]] = ..., onset_age: _Optional[str] = ...) -> None: ...
 
 class Individual(_message.Message):
-    __slots__ = ("generation", "index", "gender", "sex_assigned_at_birth", "conditions", "deceased", "proband", "consultand", "reproductive_outcome", "reproductive_role", "count", "count_unspecified", "annotations", "external_id", "documented_evaluation")
+    __slots__ = ("generation", "index", "gender", "sex_assigned_at_birth", "conditions", "deceased", "proband", "consultand", "reproductive_outcome", "reproductive_role", "count", "count_unspecified", "annotations", "external_id", "documented_evaluation", "genotypes")
     GENERATION_FIELD_NUMBER: _ClassVar[int]
     INDEX_FIELD_NUMBER: _ClassVar[int]
     GENDER_FIELD_NUMBER: _ClassVar[int]
@@ -238,6 +257,7 @@ class Individual(_message.Message):
     ANNOTATIONS_FIELD_NUMBER: _ClassVar[int]
     EXTERNAL_ID_FIELD_NUMBER: _ClassVar[int]
     DOCUMENTED_EVALUATION_FIELD_NUMBER: _ClassVar[int]
+    GENOTYPES_FIELD_NUMBER: _ClassVar[int]
     generation: int
     index: int
     gender: Gender
@@ -253,15 +273,60 @@ class Individual(_message.Message):
     annotations: _containers.RepeatedCompositeFieldContainer[Annotation]
     external_id: str
     documented_evaluation: bool
-    def __init__(self, generation: _Optional[int] = ..., index: _Optional[int] = ..., gender: _Optional[_Union[Gender, str]] = ..., sex_assigned_at_birth: _Optional[_Union[SexAssignedAtBirth, str]] = ..., conditions: _Optional[_Iterable[_Union[Condition, _Mapping]]] = ..., deceased: _Optional[bool] = ..., proband: _Optional[bool] = ..., consultand: _Optional[bool] = ..., reproductive_outcome: _Optional[_Union[ReproductiveOutcome, str]] = ..., reproductive_role: _Optional[_Union[ReproductiveRole, str]] = ..., count: _Optional[int] = ..., count_unspecified: _Optional[bool] = ..., annotations: _Optional[_Iterable[_Union[Annotation, _Mapping]]] = ..., external_id: _Optional[str] = ..., documented_evaluation: _Optional[bool] = ...) -> None: ...
+    genotypes: _containers.RepeatedCompositeFieldContainer[Genotype]
+    def __init__(self, generation: _Optional[int] = ..., index: _Optional[int] = ..., gender: _Optional[_Union[Gender, str]] = ..., sex_assigned_at_birth: _Optional[_Union[SexAssignedAtBirth, str]] = ..., conditions: _Optional[_Iterable[_Union[Condition, _Mapping]]] = ..., deceased: _Optional[bool] = ..., proband: _Optional[bool] = ..., consultand: _Optional[bool] = ..., reproductive_outcome: _Optional[_Union[ReproductiveOutcome, str]] = ..., reproductive_role: _Optional[_Union[ReproductiveRole, str]] = ..., count: _Optional[int] = ..., count_unspecified: _Optional[bool] = ..., annotations: _Optional[_Iterable[_Union[Annotation, _Mapping]]] = ..., external_id: _Optional[str] = ..., documented_evaluation: _Optional[bool] = ..., genotypes: _Optional[_Iterable[_Union[Genotype, _Mapping]]] = ...) -> None: ...
 
 class Annotation(_message.Message):
-    __slots__ = ("text", "type")
+    __slots__ = ("text", "type", "loci")
     TEXT_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
+    LOCI_FIELD_NUMBER: _ClassVar[int]
     text: str
     type: AnnotationType
-    def __init__(self, text: _Optional[str] = ..., type: _Optional[_Union[AnnotationType, str]] = ...) -> None: ...
+    loci: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, text: _Optional[str] = ..., type: _Optional[_Union[AnnotationType, str]] = ..., loci: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class Identifier(_message.Message):
+    __slots__ = ("scheme", "value")
+    SCHEME_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    scheme: IdentifierScheme
+    value: str
+    def __init__(self, scheme: _Optional[_Union[IdentifierScheme, str]] = ..., value: _Optional[str] = ...) -> None: ...
+
+class Allele(_message.Message):
+    __slots__ = ("symbol", "name", "reference", "identifiers")
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    IDENTIFIERS_FIELD_NUMBER: _ClassVar[int]
+    symbol: str
+    name: str
+    reference: bool
+    identifiers: _containers.RepeatedCompositeFieldContainer[Identifier]
+    def __init__(self, symbol: _Optional[str] = ..., name: _Optional[str] = ..., reference: _Optional[bool] = ..., identifiers: _Optional[_Iterable[_Union[Identifier, _Mapping]]] = ...) -> None: ...
+
+class Locus(_message.Message):
+    __slots__ = ("id", "name", "gene", "alleles")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    GENE_FIELD_NUMBER: _ClassVar[int]
+    ALLELES_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    name: str
+    gene: str
+    alleles: _containers.RepeatedCompositeFieldContainer[Allele]
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., gene: _Optional[str] = ..., alleles: _Optional[_Iterable[_Union[Allele, _Mapping]]] = ...) -> None: ...
+
+class Genotype(_message.Message):
+    __slots__ = ("locus_id", "alleles", "phase_set")
+    LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
+    ALLELES_FIELD_NUMBER: _ClassVar[int]
+    PHASE_SET_FIELD_NUMBER: _ClassVar[int]
+    locus_id: str
+    alleles: _containers.RepeatedScalarFieldContainer[str]
+    phase_set: str
+    def __init__(self, locus_id: _Optional[str] = ..., alleles: _Optional[_Iterable[str]] = ..., phase_set: _Optional[str] = ...) -> None: ...
 
 class Mating(_message.Message):
     __slots__ = ("partner_a", "partner_b", "consanguineous", "status", "childlessness", "offspring", "annotations")
@@ -322,18 +387,20 @@ class Pedigree(_message.Message):
     def __init__(self, id: _Optional[str] = ..., labels: _Optional[_Iterable[_Union[Label, _Mapping]]] = ..., individuals: _Optional[_Iterable[_Union[Individual, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[Mating, _Mapping]]] = ..., provenance: _Optional[_Union[Provenance, _Mapping]] = ..., evidence: _Optional[_Iterable[str]] = ..., supports: _Optional[_Iterable[_Union[Support, _Mapping]]] = ...) -> None: ...
 
 class PedigreeSet(_message.Message):
-    __slots__ = ("pedigrees", "provenance", "citations", "evidence", "conditions")
+    __slots__ = ("pedigrees", "provenance", "citations", "evidence", "conditions", "loci")
     PEDIGREES_FIELD_NUMBER: _ClassVar[int]
     PROVENANCE_FIELD_NUMBER: _ClassVar[int]
     CITATIONS_FIELD_NUMBER: _ClassVar[int]
     EVIDENCE_FIELD_NUMBER: _ClassVar[int]
     CONDITIONS_FIELD_NUMBER: _ClassVar[int]
+    LOCI_FIELD_NUMBER: _ClassVar[int]
     pedigrees: _containers.RepeatedCompositeFieldContainer[Pedigree]
     provenance: Provenance
     citations: _containers.RepeatedCompositeFieldContainer[Citation]
     evidence: _containers.RepeatedScalarFieldContainer[str]
     conditions: _containers.RepeatedCompositeFieldContainer[ConditionDef]
-    def __init__(self, pedigrees: _Optional[_Iterable[_Union[Pedigree, _Mapping]]] = ..., provenance: _Optional[_Union[Provenance, _Mapping]] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ..., evidence: _Optional[_Iterable[str]] = ..., conditions: _Optional[_Iterable[_Union[ConditionDef, _Mapping]]] = ...) -> None: ...
+    loci: _containers.RepeatedCompositeFieldContainer[Locus]
+    def __init__(self, pedigrees: _Optional[_Iterable[_Union[Pedigree, _Mapping]]] = ..., provenance: _Optional[_Union[Provenance, _Mapping]] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ..., evidence: _Optional[_Iterable[str]] = ..., conditions: _Optional[_Iterable[_Union[ConditionDef, _Mapping]]] = ..., loci: _Optional[_Iterable[_Union[Locus, _Mapping]]] = ...) -> None: ...
 
 class Citation(_message.Message):
     __slots__ = ("id", "document_id", "quote", "region")
@@ -362,18 +429,20 @@ class Region(_message.Message):
     def __init__(self, page: _Optional[int] = ..., x0: _Optional[float] = ..., y0: _Optional[float] = ..., x1: _Optional[float] = ..., y1: _Optional[float] = ...) -> None: ...
 
 class Support(_message.Message):
-    __slots__ = ("citations", "field", "condition_id", "individuals", "matings")
+    __slots__ = ("citations", "field", "condition_id", "individuals", "matings", "locus_id")
     CITATIONS_FIELD_NUMBER: _ClassVar[int]
     FIELD_FIELD_NUMBER: _ClassVar[int]
     CONDITION_ID_FIELD_NUMBER: _ClassVar[int]
     INDIVIDUALS_FIELD_NUMBER: _ClassVar[int]
     MATINGS_FIELD_NUMBER: _ClassVar[int]
+    LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
     citations: _containers.RepeatedScalarFieldContainer[str]
     field: str
     condition_id: str
     individuals: _containers.RepeatedCompositeFieldContainer[Position]
     matings: _containers.RepeatedCompositeFieldContainer[MatingRef]
-    def __init__(self, citations: _Optional[_Iterable[str]] = ..., field: _Optional[str] = ..., condition_id: _Optional[str] = ..., individuals: _Optional[_Iterable[_Union[Position, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[MatingRef, _Mapping]]] = ...) -> None: ...
+    locus_id: str
+    def __init__(self, citations: _Optional[_Iterable[str]] = ..., field: _Optional[str] = ..., condition_id: _Optional[str] = ..., individuals: _Optional[_Iterable[_Union[Position, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[MatingRef, _Mapping]]] = ..., locus_id: _Optional[str] = ...) -> None: ...
 
 class MatingRef(_message.Message):
     __slots__ = ("partner_a", "partner_b")

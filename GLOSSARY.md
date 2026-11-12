@@ -24,6 +24,11 @@ Shared terms across grus docs and code. Pedigree conventions follow Bennett/NSGC
 - **Generation** — a horizontal row, numbered with Roman numerals (I, II, III …); individuals within a generation
   numbered with Arabic numerals (II-1, II-2 …).
 - **Founder** — an individual with no parents drawn; sits at the top of a lineage.
+- **Locus** — a place people are genotyped at: one variant, a gene with several alleles, or a marker. **Allele** — one
+  form at a locus, named in genotypes by a symbol (`+`, `M1`, `G`); may be several variants in cis. **Genotype** — the
+  alleles one person carries at one locus, as copies (`[M, +]` heterozygous, `[M, M]` homozygous, `[M]` hemizygous).
+- **Phase** — which of a person's alleles lie on the same chromosome copy (a **haplotype**): variants on one are **in
+  cis**, on different ones **in trans** (compound heterozygous). A **phase set** groups genotypes whose phase is stated.
 
 ## Project
 

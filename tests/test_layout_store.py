@@ -452,8 +452,14 @@ def test_every_digested_field_is_classified() -> None:
         assert {f.name for f in desc.fields} == read | ignored, f"{name}: unclassified fields"
 
 
+# The sample's one locus, which its first person is genotyped at.
+_LOCI = [pb.Locus(id="l1", alleles=[pb.Allele(symbol="N", reference=True), pb.Allele(symbol="M")])]
+
+
 def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
-    """A golden with a condition on every person, plus a mating with children, an annotation and a count to edit.
+    """A golden with a condition on every person, plus a mating, an annotation, a genotype and a count to edit.
+
+    The genotype is at ``_LOCI``, which every render of the sample passes.
 
     A fifth condition puts it in sixths, where any one fill has borders, so the count sits beside its symbol.
     """
@@ -464,6 +470,7 @@ def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
         offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
     )
     p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
+    p.individuals[0].genotypes.add(locus_id="l1", alleles=["N", "M"])
     p.individuals[2].count = 3
     p.individuals[3].conditions.add(condition_id="k5", status=pb.CONDITION_STATUS_AFFECTED)
     return p, [*defs, pb.ConditionDef(id="k5", name="E")]
@@ -511,6 +518,10 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDe
     ("Annotation", "type"): lambda p, defs: setattr(
         p.individuals[0].annotations[0], "type", pb.ANNOTATION_TYPE_GENOTYPE
     ),
+    ("Annotation", "loci"): lambda p, defs: (
+        p.individuals[0].annotations[0].MergeFrom(pb.Annotation(type=pb.ANNOTATION_TYPE_GENOTYPE, loci=["l1"]))
+    ),
+    ("Individual", "genotypes"): lambda p, defs: p.individuals[0].genotypes[0].alleles.__setitem__(0, "M"),
     ("Mating", "status"): lambda p, defs: setattr(p.matings[-1], "status", pb.RELATIONSHIP_STATUS_DIVORCED),
     ("Mating", "annotations"): lambda p, defs: p.matings[-1].annotations.add(
         text="vasectomy", type=pb.ANNOTATION_TYPE_OTHER
@@ -531,11 +542,11 @@ def test_an_edit_to_an_ignored_field_leaves_the_stored_layout(key: tuple[str, st
     base, base_defs = _sample()
     edited, defs = _sample()
     _IGNORED_EDITS[key](edited, defs)
-    stored = render.store_layout(base, conditions=base_defs)
-    assert render.store_layout(edited, conditions=defs) == stored
-    fresh = render.render_svg(edited, conditions=defs)
-    assert render.render_svg(edited, stored_layout=stored, conditions=defs) == fresh
-    edited_set = pb.PedigreeSet(pedigrees=[edited], conditions=defs)
+    stored = render.store_layout(base, conditions=base_defs, loci=_LOCI)
+    assert render.store_layout(edited, conditions=defs, loci=_LOCI) == stored
+    fresh = render.render_svg(edited, conditions=defs, loci=_LOCI)
+    assert render.render_svg(edited, stored_layout=stored, conditions=defs, loci=_LOCI) == fresh
+    edited_set = pb.PedigreeSet(pedigrees=[edited], conditions=defs, loci=_LOCI)
     assert render.render_set_svg(edited_set, stored_layouts=[stored]) == render.render_set_svg(edited_set)
 
 

@@ -12,6 +12,9 @@
 // field on the closed path list, its scope in the pedigree.
 // Conditions are declared once per set and referenced by id: every id resolves, declarations are unique and
 // each is referenced, and no person has two entries for one condition.
+// Loci are declared the same way: every genotype's locus resolves and each allele is one of its symbols, at most one
+// genotype per person per locus, genotypes sharing a phase set have equal ploidy, and an annotation's loci are ones
+// its person has a genotype at.
 
 syntax = "proto3";
 package grus.models.pedigree;
@@ -133,6 +136,8 @@ message Individual {
   optional string external_id = 14;                            // opaque external/study id printed for this person;
                                                                // identity + reference stay Position — passthrough only
   bool documented_evaluation = 15;                             // NSGC asterisk (*): documented / records reviewed
+  repeated Genotype genotypes = 16;                            // what the source states this person carries, per
+                                                               // declared locus; empty = not stated (never inferred)
 }
 
 // ── As-drawn text near a node, typed ────────────────────────────────────────────────────────────
@@ -157,6 +162,59 @@ message Annotation {
   };
   string text = 1 [(buf.validate.field).string.min_len = 1];
   AnnotationType type = 2;
+  // Locus ids whose genotypes this GENOTYPE / VARIANT text shows (one text may show several: "M1/M2" over two
+  // variant loci). The person has a genotype at each; the genotype may say more than the text does.
+  repeated string loci = 3 [(buf.validate.field).repeated.items.string.min_len = 1];
+}
+
+// ── Loci, alleles and genotypes (docs/design/ir.md, "Genotypes") ───────────────────────────────
+// A genotype table: rows are people, columns are loci, cells are genotypes. Loci are declared once per set, like
+// conditions, and referenced by id; a person carries a genotype at some of them. Recorded as the source states
+// them: an untested person has no genotype, an obligate carrier is not filled in.
+enum IdentifierScheme {
+  IDENTIFIER_SCHEME_UNSPECIFIED = 0;
+  IDENTIFIER_SCHEME_HGVS = 1;             // "NM_000492.4:c.1521_1523del", "c.[76A>C;83G>C]" (an allele in cis)
+  IDENTIFIER_SCHEME_RSID = 2;             // "rs113993960"
+  IDENTIFIER_SCHEME_CLINVAR = 3;          // a ClinVar variation id
+  IDENTIFIER_SCHEME_CLINGEN_ALLELE = 4;   // "CA000123"
+  IDENTIFIER_SCHEME_SPDI = 5;
+  IDENTIFIER_SCHEME_VRS = 6;              // "ga4gh:VA.…"
+  IDENTIFIER_SCHEME_OTHER = 7;
+}
+// A resolvable name for an allele, as printed; normalising it is a consumer's job.
+message Identifier {
+  option (buf.validate.message).cel = {
+    id: "identifier.scheme_specified", message: "scheme must be a real value", expression: "this.scheme != 0"
+  };
+  IdentifierScheme scheme = 1;
+  string value = 2 [(buf.validate.field).string.min_len = 1];
+}
+// One allele at a locus: the symbol genotypes use, and what the source says it stands for. One allele may be several
+// variants in cis (a haplotype), named so: "c.[76A>C;83G>C]".
+message Allele {
+  string symbol = 1 [(buf.validate.field).string.min_len = 1];  // as used in genotypes: "+", "M1", "G", "★", "1"
+  string name = 2;                        // as printed: "c.1234A>G", "wild type"; "" when the source does not say
+  bool reference = 3;                     // the reference / wild-type allele, when the source says which
+  repeated Identifier identifiers = 4;    // when the source prints them
+}
+// A place some people are genotyped at: one variant, a gene with several, or a marker. Declared once per set
+// (PedigreeSet.loci) and referenced by id.
+message Locus {
+  string id = 1 [(buf.validate.field).string.min_len = 1];  // local ("l1"), unique in the set
+  string name = 2;                        // as printed: "c.797G>A", "D12S1640"; "" when only the alleles are named
+  optional string gene = 3;               // as printed: "SLC26A4"
+  repeated Allele alleles = 4 [(buf.validate.field).repeated.min_items = 1];
+}
+// One person's genotype at one locus. `alleles` are copies, so zygosity is how often a symbol repeats: [M, M]
+// homozygous, [M, +] heterozygous, [M] hemizygous.
+message Genotype {
+  string locus_id = 1 [(buf.validate.field).string.min_len = 1];
+  repeated string alleles = 2 [(buf.validate.field).repeated = {
+    min_items: 1, max_items: 2, items: {string: {min_len: 1}}
+  }];                                     // symbols of the locus's alleles
+  // Stated phase, as VCF's PS: one person's genotypes sharing a phase set align slot by slot, slot i across them
+  // being one haplotype — so l1 [M, +] and l2 [+, M] in one set are in trans. Absent = phase not stated.
+  optional string phase_set = 3 [(buf.validate.field).string.min_len = 1];
 }
 
 // ── Matings ─────────────────────────────────────────────────────────────────────────────────────
@@ -217,6 +275,7 @@ message PedigreeSet {
   repeated Citation citations = 3;                        // the normalised list evidence and supports refer to
   repeated string evidence = 4;                           // Citation ids: the figure as a whole, its caption
   repeated ConditionDef conditions = 5;                   // every condition the set's entries reference, once
+  repeated Locus loci = 6;                                // every locus the set's genotypes reference, once
 }
 
 // ── Citations: where the record came from (docs/design/ir.md) ───────────────────────────────────
@@ -256,6 +315,8 @@ message Support {
                                       // starts "condition."
   repeated Position individuals = 4;  // scope; neither individuals nor matings = the whole pedigree
   repeated MatingRef matings = 5;     // a couple (or lone parent), by its partners' positions
+  optional string locus_id = 7 [(buf.validate.field).string.min_len = 1];  // a Locus id, iff `field` starts
+                                      // "genotype." or "locus."
 }
 message MatingRef {
   optional Position partner_a = 1;

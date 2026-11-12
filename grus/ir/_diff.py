@@ -17,6 +17,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from grus.ir import _validate
 from grus.ir._conditions import Conditions
 from grus.models import pedigree_pb2 as pb
 
@@ -308,12 +309,16 @@ def diff(
     *,
     a_conditions: Iterable[pb.ConditionDef] = (),
     b_conditions: Iterable[pb.ConditionDef] = (),
+    a_loci: Iterable[pb.Locus] = (),
+    b_loci: Iterable[pb.Locus] = (),
 ) -> Diff:
     """Structurally diff two IRs. See the module docstring; ``a`` is the reference, ``b`` the candidate.
 
-    ``a_conditions`` / ``b_conditions`` are each side's set-level condition declarations.
+    ``a_conditions`` / ``b_conditions`` and ``a_loci`` / ``b_loci`` are each side's set-level declarations. Genotypes
+    compare by what their loci and alleles state (``_genotypes_sig``), never by id.
     """
     a_defs, b_defs = list(a_conditions), list(b_conditions)
+    la, lb = {x.id: x for x in a_loci}, {x.id: x for x in b_loci}
     ra, rb = _relations(a, Conditions(a_defs)), _relations(b, Conditions(b_defs))
     a_to_b = match_individuals(a, b, a_conditions=a_defs, b_conditions=b_defs)
     b_to_a = {v: k for k, v in a_to_b.items()}
@@ -329,6 +334,7 @@ def diff(
                 _label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], ra.conditions, rb.conditions
             )
         )
+        mismatches.extend(_genotype_mismatches(_label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], la, lb))
     mismatches.extend(_mating_mismatches(a, b, a_to_b, b_to_a))
     return Diff(matched=matched, mismatches=mismatches, only_in_a=only_in_a, only_in_b=only_in_b)
 
@@ -339,14 +345,14 @@ def diff_set(a: pb.PedigreeSet, b: pb.PedigreeSet) -> SetDiff:
     ``a`` is the reference, ``b`` the candidate. Families are matched by unique label then by structural
     similarity (``_match_pedigrees``); each matched pair is compared with the single-pedigree ``diff``.
     """
-    pairs = _match_pedigrees(list(a.pedigrees), list(b.pedigrees), list(a.conditions), list(b.conditions))
+    pairs = _match_pedigrees(a, b)
     matched = [
         PedigreePair(
             ai,
             bi,
             _titles(a.pedigrees[ai]),
             _titles(b.pedigrees[bi]),
-            diff(a.pedigrees[ai], b.pedigrees[bi], a_conditions=a.conditions, b_conditions=b.conditions),
+            _diff_in_sets(a, b, ai, bi),
         )
         for ai, bi in pairs
     ]
@@ -374,18 +380,26 @@ def _match_key(p: pb.Pedigree) -> str:
     return p.labels[0].text if p.labels else ""
 
 
-def _match_pedigrees(
-    a_peds: list[pb.Pedigree],
-    b_peds: list[pb.Pedigree],
-    a_defs: list[pb.ConditionDef],
-    b_defs: list[pb.ConditionDef],
-) -> list[tuple[int, int]]:
+def _diff_in_sets(a: pb.PedigreeSet, b: pb.PedigreeSet, ai: int, bi: int) -> Diff:
+    """``diff`` of ``a``'s pedigree ``ai`` and ``b``'s ``bi``, each read through its own set's declarations."""
+    return diff(
+        a.pedigrees[ai],
+        b.pedigrees[bi],
+        a_conditions=a.conditions,
+        b_conditions=b.conditions,
+        a_loci=a.loci,
+        b_loci=b.loci,
+    )
+
+
+def _match_pedigrees(a: pb.PedigreeSet, b: pb.PedigreeSet) -> list[tuple[int, int]]:
     """Pair reference to candidate pedigrees (as (a_index, b_index)): unique label, then structural best-match.
 
     A label is the reliable key when several families share one structure (six near-identical trios separable
     only by their "Family N" labels); structure covers the unlabelled remainder. A structural pair needs at
     least one matched individual — an unmatched family stays unmatched rather than pairing to a stranger.
     """
+    a_peds, b_peds = list(a.pedigrees), list(b.pedigrees)
     a_avail = set(range(len(a_peds)))
     b_avail = set(range(len(b_peds)))
     pairs: list[tuple[int, int]] = []
@@ -402,7 +416,7 @@ def _match_pedigrees(
     scored: list[tuple[int, int, int, int]] = []
     for ai in sorted(a_avail):
         for bi in sorted(b_avail):
-            d = diff(a_peds[ai], b_peds[bi], a_conditions=a_defs, b_conditions=b_defs)
+            d = _diff_in_sets(a, b, ai, bi)
             if d.matched:  # require overlap; a zero-overlap pair is two different families
                 scored.append((len(d.matched), len(d.mismatches), ai, bi))
     scored.sort(key=lambda s: (-s[0], s[1], s[2], s[3]))  # most matched, then fewest mismatches, then low indices
@@ -452,6 +466,60 @@ def _individual_mismatches(
             out.append(Mismatch(subject, f, str(va), str(vb)))
     out.extend(_annotation_mismatches(subject, ia, ib))
     return out
+
+
+# One genotype as compared: its locus's (gene, name), and its alleles, each by symbol and stated name.
+_Called = tuple[tuple[str | None, str], tuple[str, ...]]
+
+
+def _genotype_mismatches(
+    subject: str, ia: pb.Individual, ib: pb.Individual, la: dict[str, pb.Locus], lb: dict[str, pb.Locus]
+) -> list[Mismatch]:
+    """One ``genotypes`` mismatch when the pair's genotypes state different things (``_genotypes_sig``)."""
+    if _genotypes_sig(ia, la) == _genotypes_sig(ib, lb):
+        return []
+    return [Mismatch(subject, "genotypes", _fmt_genotypes(ia, la), _fmt_genotypes(ib, lb))]
+
+
+def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called]]:
+    """``ind``'s genotypes, each with its locus's identity and its alleles read through the locus."""
+    out = []
+    for g in ind.genotypes:
+        locus = loci.get(g.locus_id)
+        if locus is None:
+            raise KeyError(f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci")
+        names = {a.symbol: f"{a.symbol} ({a.name})" if a.name else a.symbol for a in locus.alleles}
+        out.append((g, (_validate.locus_name(locus), tuple(names[s] for s in g.alleles))))
+    return out
+
+
+def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> frozenset[object]:
+    """What ``ind``'s genotypes state, independent of ids and of how phase sets are named or their slots ordered.
+
+    An unphased genotype is its locus and its alleles as a multiset. A phase set is the set of its haplotypes, each
+    the (locus, allele) pairs in one slot across its genotypes: swapping every slot at once states the same phase.
+    """
+    out: set[object] = set()
+    phased: dict[str, list[_Called]] = defaultdict(list)
+    for g, (locus, alleles) in _resolve(ind, loci):
+        if g.HasField("phase_set"):
+            phased[g.phase_set].append((locus, alleles))
+        else:
+            out.add(("unphased", locus, tuple(sorted(alleles))))
+    for members in phased.values():
+        slots = len(members[0][1])
+        out.add(("phased", frozenset(frozenset((locus, al[i]) for locus, al in members) for i in range(slots))))
+    return frozenset(out)
+
+
+def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
+    """Render genotypes as ``gene name: a/b`` (``|`` between phased alleles), sorted; ``none`` if there are none."""
+    parts = []
+    for g, ((gene, name), alleles) in _resolve(ind, loci):
+        where = " ".join(x for x in (gene, name) if x) or "-"
+        sep = "|" if g.HasField("phase_set") else "/"
+        parts.append(f"{where}: {sep.join(alleles)}" + (f" [{g.phase_set}]" if g.HasField("phase_set") else ""))
+    return "; ".join(sorted(parts)) if parts else "none"
 
 
 def _fmt_conditions(ind: pb.Individual, conditions: Conditions) -> str:

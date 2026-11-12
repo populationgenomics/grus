@@ -166,11 +166,13 @@ def render_svg(
     id_prefix: str = "",
     stored_layout: lpb.PedigreeLayout | None = None,
     conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> str:
     """Validate, lay out, and draw ``p``; return a complete, deterministic SVG document string.
 
-    ``conditions`` are the declarations of ``p``'s set (``PedigreeSet.conditions``), which its condition entries
-    reference; a pedigree with no entries needs none.
+    ``conditions`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.conditions``, ``.loci``), which
+    its condition entries and genotypes reference; a pedigree with none needs none. Genotypes are not drawn (an
+    annotation carries the drawn text), so ``loci`` serves validation alone.
 
     With ``stored_layout`` (from ``store_layout``), draw from it instead of laying out: the same bytes, without the
     layout's cost. It must be a layout of this pedigree content under this geometry's layout fields
@@ -178,7 +180,7 @@ def render_svg(
     """
     _check_prefix(id_prefix)
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    lay = _lay_out(p, geom, stored_layout, conditions)
+    lay = _lay_out(p, geom, stored_layout, conditions, loci)
     return _Draw(p, lay, geom, ir.Conditions(conditions), id_prefix=id_prefix).svg()
 
 
@@ -187,11 +189,12 @@ def _lay_out(
     geom: _geometry.Geometry,
     stored: lpb.PedigreeLayout | None,
     conditions: Sequence[pb.ConditionDef],
+    loci: Sequence[pb.Locus],
 ) -> _layout.Layout:
     """``p``'s layout: read from ``stored`` when given (checked for staleness), else computed."""
     if stored is None:
-        return _layout2.layout(p, geom, conditions=conditions)
-    return _store.load_layout(p, stored, geom, conditions=conditions)
+        return _layout2.layout(p, geom, conditions=conditions, loci=loci)
+    return _store.load_layout(p, stored, geom, conditions=conditions, loci=loci)
 
 
 def _stored_per_pedigree(
@@ -231,7 +234,7 @@ def render_set_svg(
     for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            lay = _lay_out(ped, geom, stored, defs)
+            lay = _lay_out(ped, geom, stored, defs, pedigree_set.loci)
             draw = _Draw(ped, lay, geom, table, id_prefix=f"{id_prefix}p{len(tiles)}-")
             width, height = draw.dimensions()
             tiles.append((title, width, height, draw.body(), draw.root_attrs()))
@@ -263,7 +266,8 @@ def render_svgs(
     for ped, stored in zip(pedigree_set.pedigrees, _stored_per_pedigree(pedigree_set, stored_layouts), strict=True):
         title = _display_title(ped)
         try:
-            svg = _Draw(ped, _lay_out(ped, geom, stored, defs), geom, table, id_prefix=id_prefix).svg()
+            lay = _lay_out(ped, geom, stored, defs, pedigree_set.loci)
+            svg = _Draw(ped, lay, geom, table, id_prefix=id_prefix).svg()
         except _layout.DeferredFeatureError as deferred:
             _, width, height, body, attrs = _placeholder_tile(ped, table, str(deferred))
             svg = _svg_root(width, height, body, attrs)

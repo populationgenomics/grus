@@ -58,7 +58,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
         ps = parse(text, pb.PedigreeSet())
     except (json_format.ParseError, text_format.ParseError):
         ps = None
-    if ps is not None and (ps.pedigrees or ps.conditions or ps.HasField("provenance")):
+    if ps is not None and (ps.pedigrees or ps.conditions or ps.loci or ps.HasField("provenance")):
         ir.validate_set(ps)
         return ps
     p = parse(text, pb.Pedigree())
@@ -203,7 +203,9 @@ def _cmd_layout(args: argparse.Namespace) -> int:
     geom = _geometry(args)
     record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
         lpb.PedigreeSetLayout(
-            pedigrees=[render.store_layout(p, geom, conditions=loaded.conditions) for p in loaded.pedigrees]
+            pedigrees=[
+                render.store_layout(p, geom, conditions=loaded.conditions, loci=loaded.loci) for p in loaded.pedigrees
+            ]
         )
         if isinstance(loaded, pb.PedigreeSet)
         else render.store_layout(loaded, geom)

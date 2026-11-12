@@ -27,11 +27,21 @@ from grus.ir._serialize import (
     load_set_json,
     load_set_pbtxt,
 )
-from grus.ir._validate import SUPPORT_CONDITION_PREFIX, SUPPORT_FIELDS, IntegrityError, validate, validate_set
+from grus.ir._validate import (
+    SUPPORT_CONDITION_PREFIX,
+    SUPPORT_FIELDS,
+    SUPPORT_GENOTYPE_PREFIX,
+    SUPPORT_LOCUS_PREFIX,
+    IntegrityError,
+    validate,
+    validate_set,
+)
 
 __all__ = [
     "SUPPORT_CONDITION_PREFIX",
     "SUPPORT_FIELDS",
+    "SUPPORT_GENOTYPE_PREFIX",
+    "SUPPORT_LOCUS_PREFIX",
     "Conditions",
     "Diff",
     "Entry",

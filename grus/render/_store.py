@@ -84,11 +84,12 @@ LAYOUT_IGNORES: dict[str, frozenset[str]] = {
             "reproductive_outcome",
             "reproductive_role",
             "documented_evaluation",
+            "genotypes",  # meaning only; drawn, if at all, as an annotation's text
         }
     ),
     "Condition": frozenset({"onset_age"}),
     "ConditionDef": frozenset({"id"}),
-    "Annotation": frozenset({"type"}),
+    "Annotation": frozenset({"type", "loci"}),
     "Mating": frozenset({"status", "annotations"}),
     "Offspring": frozenset({"parentage", "adoption"}),
     "Position": frozenset(),
@@ -156,22 +157,26 @@ def layout_key(p: pb.Pedigree, geom: _geometry.Geometry, conditions: Sequence[pb
 
 
 def store_layout(
-    p: pb.Pedigree, geometry: _geometry.Geometry | None = None, *, conditions: Sequence[pb.ConditionDef] = ()
+    p: pb.Pedigree,
+    geometry: _geometry.Geometry | None = None,
+    *,
+    conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> lpb.PedigreeLayout:
     """Lay ``p`` out under ``geometry`` and record the result, a deferral included.
 
-    ``conditions`` are the declarations of ``p``'s set (``PedigreeSet.conditions``); a pedigree with no condition
-    entries needs none.
+    ``conditions`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.conditions``, ``.loci``); a
+    pedigree with no condition entries or genotypes needs none.
 
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     try:
-        lay = _layout2.layout(p, geom, conditions=conditions)
+        lay = _layout2.layout(p, geom, conditions=conditions, loci=loci)
     except _layout.DeferredFeatureError as deferred:
         return lpb.PedigreeLayout(key=layout_key(p, geom, conditions), deferred=str(deferred))
-    return to_proto(p, lay, geom, conditions)
+    return to_proto(p, lay, geom, conditions, loci)
 
 
 def load_layout(
@@ -180,10 +185,11 @@ def load_layout(
     geometry: _geometry.Geometry | None = None,
     *,
     conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """The ``Layout`` of ``p`` under ``geometry`` that ``stored`` records, after checking it is not stale.
 
-    ``conditions`` are the declarations of ``p``'s set, as for ``store_layout``.
+    ``conditions`` and ``loci`` are the declarations of ``p``'s set, as for ``store_layout``.
 
     Raises:
         grus.ir.ValidationError: ``stored`` breaks a field rule of the layout schema.
@@ -196,7 +202,7 @@ def load_layout(
     _check_key(stored.key, p, geom, conditions)
     if stored.WhichOneof("outcome") == "deferred":
         raise _layout.DeferredFeatureError(stored.deferred)
-    return from_proto(p, stored.placement, geom, conditions)
+    return from_proto(p, stored.placement, geom, conditions, loci)
 
 
 def _check_key(
@@ -217,10 +223,14 @@ def _check_key(
 
 
 def to_proto(
-    p: pb.Pedigree, lay: _layout.Layout, geom: _geometry.Geometry, conditions: Sequence[pb.ConditionDef] = ()
+    p: pb.Pedigree,
+    lay: _layout.Layout,
+    geom: _geometry.Geometry,
+    conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> lpb.PedigreeLayout:
     """Record ``lay``, a layout of ``p`` under ``geom``, as a ``PedigreeLayout``."""
-    keys = _cell_keys(p, _layout2._prepare(p, conditions))
+    keys = _cell_keys(p, _layout2._prepare(p, conditions, loci))
     placement = lpb.Placement(first_generation=lay.first_generation)
     for level, row in enumerate(lay.nid):
         out = placement.rows.add()
@@ -245,6 +255,7 @@ def from_proto(
     placement: lpb.Placement,
     geom: _geometry.Geometry,
     conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """The ``Layout`` a stored placement of ``p`` under ``geom`` records — equal to the fresh layout it was taken from.
 
@@ -257,7 +268,7 @@ def from_proto(
     Raises:
         StaleLayoutError: any check above fails.
     """
-    prep = _layout2._prepare(p, conditions)
+    prep = _layout2._prepare(p, conditions, loci)
     g = prep.graph
     index = {key: idx for idx, key in _cell_keys(p, prep).items()}
     nid: list[list[int]] = []
