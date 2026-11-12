@@ -59,7 +59,17 @@ class FileCase:
         if self.member is None:
             return Loaded(ir.load_pbtxt(text), pb.PedigreeSet())
         ps = ir.load_set_pbtxt(text)
-        return Loaded(ps.pedigrees[self.member], pb.PedigreeSet(conditions=ps.conditions, loci=ps.loci))
+        p = ps.pedigrees[self.member]
+        # Only what this member references, so a tree without a kind of declaration still probes a member without it.
+        referenced = {c.condition_id for ind in p.individuals for c in ind.conditions}
+        genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
+        return Loaded(
+            p,
+            pb.PedigreeSet(
+                conditions=[d for d in ps.conditions if d.id in referenced],
+                loci=[locus for locus in ps.loci if locus.id in genotyped],
+            ),
+        )
 
 
 Case = GenCase | FileCase

@@ -471,8 +471,8 @@ def _individual_mismatches(
     return out
 
 
-# One genotype as compared: its locus's (gene, name), and its alleles, each by symbol and stated name.
-_Called = tuple[tuple[str | None, str], tuple[str, ...]]
+# One genotype as compared: its locus's identity, and its alleles as stated (``_validate.allele_text``).
+_Called = tuple[_validate.LocusIdentity, tuple[str, ...]]
 
 
 def _genotype_mismatches(
@@ -488,12 +488,6 @@ class UndeclaredLocusError(KeyError):
     """A genotype names a ``locus_id`` no declaration has, or an allele its locus does not declare."""
 
 
-def _allele_text(allele: pb.Allele) -> str:
-    """An allele as compared and shown: its symbol, with its printed name and whether it is the reference."""
-    stated = [x for x in (allele.name, "reference" if allele.reference else "") if x]
-    return f"{allele.symbol} ({', '.join(stated)})" if stated else allele.symbol
-
-
 def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called]]:
     """``ind``'s genotypes, each with its locus's identity and its alleles read through the locus.
 
@@ -507,11 +501,11 @@ def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Gen
             raise UndeclaredLocusError(
                 f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci"
             )
-        texts = {a.symbol: _allele_text(a) for a in locus.alleles}
+        texts = {a.symbol: _validate.allele_text(a) for a in locus.alleles}
         missing = [s for s in g.alleles if s not in texts]
         if missing:
             raise UndeclaredLocusError(f"allele(s) {missing} are not declared at locus {g.locus_id!r}")
-        out.append((g, (_validate.locus_name(locus), tuple(texts[s] for s in g.alleles))))
+        out.append((g, (_validate.locus_identity(locus), tuple(texts[s] for s in g.alleles))))
     return out
 
 
@@ -520,14 +514,15 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
 
     An unphased genotype is its locus and its alleles as a multiset. A phase set of several genotypes is the multiset
     of its haplotypes, each the (locus, allele) pairs in one slot across its genotypes: swapping every slot at once
-    states the same phase. A phase set of one genotype states no phase, so it compares as unphased. The whole is a
-    multiset too, since unnamed loci in one gene share an identity.
+    states the same phase. Phase relates heterozygous genotypes only, so a homozygous or hemizygous member compares as
+    unphased, and so does a phase set left with one heterozygous genotype.
     """
     out: list[object] = []
     unphased: list[_Called] = []
     phased: dict[str, list[_Called]] = defaultdict(list)
     for g, called in _resolve(ind, loci):
-        (phased[g.phase_set] if g.HasField("phase_set") else unphased).append(called)
+        heterozygous = len(set(g.alleles)) > 1
+        (phased[g.phase_set] if g.HasField("phase_set") and heterozygous else unphased).append(called)
     for members in phased.values():
         if len(members) == 1:
             unphased.extend(members)
@@ -542,7 +537,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
 def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
     """Render genotypes as ``gene name: a/b`` (``|`` between phased alleles), sorted; ``none`` if there are none."""
     parts = []
-    for g, ((gene, name), alleles) in _resolve(ind, loci):
+    for g, ((gene, name, _), alleles) in _resolve(ind, loci):
         where = " ".join(x for x in (gene, name) if x) or "-"
         sep = "|" if g.HasField("phase_set") else "/"
         parts.append(f"{where}: {sep.join(alleles)}" + (f" [{g.phase_set}]" if g.HasField("phase_set") else ""))

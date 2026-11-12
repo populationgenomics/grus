@@ -354,6 +354,13 @@ def test_phenopackets_variants_identified_by_what_they_share() -> None:
     a = _variant(label=None, vcfRecord=None, expressions=[*protein, {"syntax": "hgvs.c", "value": "c.5G>A"}])
     b = _variant(label=None, vcfRecord=None, expressions=[*protein, {"syntax": "hgvs.c", "value": "c.5G>T"}])
     assert [locus.name for locus in _import(("c", a), ("m", b)).loci] == ["c.5G>A", "c.5G>T"]
+    # An HGVS with no reference sequence pins a variant only within its gene.
+    c = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.c", "value": "c.100A>G"}])
+    other_gene = {**c, "geneContext": {"symbol": "GJB2"}}
+    assert [(locus.gene, locus.name) for locus in _import(("c", c), ("m", other_gene)).loci] == [
+        ("CFTR", "c.100A>G"),
+        ("GJB2", "c.100A>G"),
+    ]
 
 
 def test_phenopackets_a_variant_without_label_or_expression_is_named_by_its_vcf_record() -> None:
@@ -373,6 +380,10 @@ def test_phenopackets_a_biosample_is_its_individuals() -> None:
         ((("c", _variant("GENO:0000136")), ("c", _variant("GENO:0000135"))), "different allelic states"),
         ((("ghost", _variant()),), "names neither a person nor a biosample"),
         ((("c", _variant("GENO:0000999")),), "unrecognised allelicState"),
+        (  # a descriptor's id is local to its document and names no variant
+            (("c", _variant(label=None, vcfRecord=None, expressions=None, id="v1")),),
+            "identifies no variant",
+        ),
         (  # two variants, different, printed alike and with nothing to tell them apart
             (
                 ("c", _variant(vcfRecord=None, expressions=None, id="v1")),

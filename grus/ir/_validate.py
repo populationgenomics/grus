@@ -322,13 +322,13 @@ def _check_declarations(ps: pb.PedigreeSet, citation_ids: set[str]) -> None:
 
 
 def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
-    """Each locus is well-formed, its id unique and no citation's or condition's, and a named one declared once.
+    """Each locus is well-formed, its id unique and no citation's or condition's, and told apart by what it states.
 
-    A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene. Within a locus,
-    allele symbols are unique and at most one allele is the reference.
+    A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene but not all of
+    their alleles (``locus_identity``). Within a locus, allele symbols are unique and at most one is the reference.
     """
     ids: set[str] = set()
-    names: dict[tuple[str | None, str], str] = {}
+    names: dict[LocusIdentity, str] = {}
     for k, locus in enumerate(ps.loci):
         where = f"loci[{k}] ({locus.id!r})"
         try:
@@ -341,10 +341,11 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
             raise IntegrityError(
                 f"{where}: locus id {locus.id!r} is also a citation or condition id; ids are unique in the set"
             )
-        name = locus_name(locus)
-        if locus.name and name in names:
+        name = locus_identity(locus)
+        if name in names:
+            stated = f"name={locus.name!r}" if locus.name else f"alleles={list(name[2])}"
             raise IntegrityError(
-                f"{where}: locus (gene={name[0]!r}, name={name[1]!r}) is already declared as {names[name]!r}; "
+                f"{where}: locus (gene={name[0]!r}, {stated}) is already declared as {names[name]!r}; "
                 "one declaration per locus"
             )
         symbols = [a.symbol for a in locus.alleles]
@@ -357,9 +358,23 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
         names[name] = locus.id
 
 
-def locus_name(locus: pb.Locus) -> tuple[str | None, str]:
-    """A locus's identity across records: its gene (``None`` when not stated) and its name, as printed."""
-    return (locus.gene if locus.HasField("gene") else None, locus.name)
+# A locus's identity across records: (gene, name, alleles) — the alleles only for an unnamed locus.
+LocusIdentity = tuple[str | None, str, tuple[str, ...]]
+
+
+def locus_identity(locus: pb.Locus) -> LocusIdentity:
+    """What tells ``locus`` apart from others: its gene (``None`` when not stated) and printed name.
+
+    An unnamed locus is told apart by its alleles as stated (``allele_text``, sorted) too.
+    """
+    alleles = () if locus.name else tuple(sorted(allele_text(a) for a in locus.alleles))
+    return (locus.gene if locus.HasField("gene") else None, locus.name, alleles)
+
+
+def allele_text(allele: pb.Allele) -> str:
+    """An allele as compared and shown: its symbol, with its printed name and whether it is the reference."""
+    stated = [x for x in (allele.name, "reference" if allele.reference else "") if x]
+    return f"{allele.symbol} ({', '.join(stated)})" if stated else allele.symbol
 
 
 def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:

@@ -8,8 +8,8 @@ A PLINK ``.ped`` appends two allele columns per marker, named by the rows of its
 the ``.map`` text is passed (``map_text``); then each marker with a called genotype becomes a locus and each called
 pair a genotype (allele ``0`` is missing: ``0 0`` is no genotype, one ``0`` an error, as PLINK has it). PLINK
 writes a haploid call doubled, so on chrY and chrMT, and on chrX for a man (``SEX`` 1), ``A A`` is the one copy ``[A]``
-and a heterozygous call is an error; chrXY (the pseudo-autosomal region) is diploid. A marker the ``.map`` excludes
-(negative position) is skipped.
+and a heterozygous call (or a chrY call for a woman) is an error; chrXY (the pseudo-autosomal region) is diploid.
+A marker the ``.map`` excludes (negative position) is skipped.
 
 Codes (PLINK 1.9/2 formats page): parent ``0`` = not in dataset (one ``0`` = a single known parent, kept as
 a single-parent mating — PLINK does not synthesise the other); sex ``1``/``M`` man, ``2``/``F`` woman, else

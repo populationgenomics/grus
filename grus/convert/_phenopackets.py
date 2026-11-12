@@ -122,8 +122,8 @@ class _Loci:
     """The loci a file's variant descriptors declare: one per distinct variant, ids ``l1``, ``l2``, … by first sight.
 
     Two descriptors are one variant when they share an identifying statement (``_tokens``): a VRS id, the VCF record,
-    or a genomic, coding or other non-protein HGVS expression. One describing a variant by none of those falls back to
-    its gene with its label, protein HGVS or id.
+    or a non-protein HGVS expression on a reference sequence. One describing a variant by none of those falls back to
+    its gene with an HGVS lacking a reference sequence, its label or its protein HGVS.
     """
 
     def __init__(self) -> None:
@@ -194,16 +194,19 @@ def _tokens(vd: dict[str, Any]) -> list[str]:
     if vcf := _vcf(vd):
         fields = ("genomeAssembly", "chrom", "pos", "ref", "alt")
         tokens.append("vcf:" + ":".join(str(_get(vcf, f, "")) for f in fields))
-    tokens += [f"{s}:{v}" for s, v in _expressions(vd) if s.startswith("hgvs") and s != "hgvs.p"]
+    dna = [(s, v) for s, v in _expressions(vd) if s.startswith("hgvs") and s != "hgvs.p"]
+    tokens += [f"{s}:{v}" for s, v in dna if ":" in v]  # on a reference sequence: pins one variant anywhere
     if tokens:
         return tokens
+    # Weaker statements pin a variant only within its gene: an HGVS with no reference sequence, the label, the protein
+    # change. A descriptor's id is local to its document and names nothing, so it does not identify a variant.
     gene = _gene(vd)
-    protein = next((v for s, v in _expressions(vd) if s == "hgvs.p"), "")
-    for kind, value in (("label", _get(vd, "label")), ("hgvs.p", protein), ("id", _get(vd, "id"))):
+    weak = [*(v for _, v in dna), _get(vd, "label"), *(v for s, v in _expressions(vd) if s == "hgvs.p")]
+    for value in weak:
         if value:
-            return [f"{kind}:{gene}:{value}"]
+            return [f"weak:{gene}:{value}"]
     raise _core.PedigreeImportError(
-        "a variationDescriptor identifies no variant (no VRS id, VCF record, expression, label or id)"
+        "a variationDescriptor identifies no variant (no VRS id, VCF record, HGVS expression or label)"
     )
 
 

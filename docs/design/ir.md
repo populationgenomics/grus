@@ -255,8 +255,9 @@ and figures and papers state it ("compound heterozygous", "maternally inherited"
 as VCF does with `PS`: one person's genotypes in the same phase set line up slot by slot, so slot *i* across them is one
 haplotype. In the example, `M1` is in slot 0 and `M2` in slot 1, so they are in trans; `l2 [M2, +]` would put them in
 cis. A genotype without a phase set states no phase. Because slots align, genotypes sharing a phase set have the same
-number of copies. A phase set holding one genotype states no phase. Which parent a haplotype came from is not recorded
-(see Open questions).
+number of copies. Phase relates heterozygous genotypes only: a homozygous or hemizygous member of a phase set states
+nothing by being there, and a phase set with one heterozygous genotype states no phase. Which parent a haplotype came
+from is not recorded (see Open questions).
 
 **Annotations keep the drawn text.** A genotype records meaning; the annotation still records what the figure prints,
 and the renderer draws only the annotation. A `GENOTYPE` or `VARIANT` annotation may name the loci its text shows,
@@ -271,8 +272,9 @@ second-guess them.
 **Checks** (loader, loud):
 
 - locus ids are unique and distinct from citation and condition ids;
-- a named locus's (gene, name) is declared once, so two records' loci can be matched by what they print; unnamed loci,
-  whose alleles alone are named, may share a gene, since a legend often names only the alleles;
+- every locus can be told apart by what it states, so two records' loci can be matched: a named locus's (gene, name) is
+  declared once, and unnamed loci, whose alleles alone are named, may share a gene (a legend often names only the
+  alleles) but not every allele;
 - allele symbols are unique within a locus, and at most one allele is the reference;
 - every genotype's locus resolves, each of its alleles is one of that locus's symbols, and a person has at most one
   genotype per locus;

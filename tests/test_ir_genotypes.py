@@ -83,6 +83,17 @@ def _set_field(path: Callable[[pb.PedigreeSet], object], name: str, value: objec
     return lambda ps: setattr(path(ps), name, value)
 
 
+def _indistinct_unnamed_loci(ps: pb.PedigreeSet) -> None:
+    """Both loci unnamed, in one gene, with the same alleles (``+`` and an unnamed ``M``): nothing tells them apart."""
+    for locus in ps.loci:
+        locus.ClearField("name")
+        locus.alleles[1].ClearField("name")
+        locus.alleles[1].symbol = "M"
+    for ind in ps.pedigrees[0].individuals:
+        for g in ind.genotypes:
+            g.alleles[:] = ["+" if a == "+" else "M" for a in g.alleles]
+
+
 # One edit per loader invariant, each breaking a valid set: (edit, the message the failure names).
 _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     "undeclared locus": (_set_field(lambda ps: _child(ps).genotypes[0], "locus_id", "l9"), r"'l9' is not declared"),
@@ -104,6 +115,10 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     "locus name declared twice": (
         lambda ps: setattr(ps.loci[1], "name", "c.1234A>G"),
         r"is already declared as 'l1'",
+    ),
+    "unnamed loci told apart by nothing": (
+        _indistinct_unnamed_loci,
+        r"locus \(gene='SLC26A4', alleles=\['\+ \(reference\)', 'M'\]\) is already declared as 'l1'",
     ),
     "locus id is a citation id": (
         lambda ps: ps.citations.add(id="l2", quote="x"),
@@ -292,6 +307,19 @@ def test_diff_reads_a_phase_set_of_one_genotype_as_unphased() -> None:
     alone = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1", "+"], phase_set="s"))
     unphased = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["+", "M1"]))
     assert _genotype_mismatches(alone, unphased) == []
+
+
+def test_diff_reads_homozygous_members_of_a_phase_set_as_unphased() -> None:
+    # Phase relates heterozygous genotypes: a homozygous member states none, and leaves one heterozygous genotype.
+    phased = _child_genotypes(
+        pb.Genotype(locus_id="l1", alleles=["M1", "M1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", alleles=["M2", "+"], phase_set="s"),
+    )
+    unphased = _child_genotypes(
+        pb.Genotype(locus_id="l1", alleles=["M1", "M1"]),
+        pb.Genotype(locus_id="l2", alleles=["+", "M2"]),
+    )
+    assert _genotype_mismatches(phased, unphased) == []
 
 
 def test_unnamed_loci_may_share_a_gene() -> None:
