@@ -15,7 +15,16 @@ from __future__ import annotations
 from protovalidate import ValidationError
 
 from grus.ir._conditions import Conditions, Entry, UndeclaredConditionError
-from grus.ir._diff import Diff, Mismatch, PedigreePair, SetDiff, diff, diff_set, match_individuals
+from grus.ir._diff import (
+    Diff,
+    Mismatch,
+    PedigreePair,
+    SetDiff,
+    UndeclaredLocusError,
+    diff,
+    diff_set,
+    match_individuals,
+)
 from grus.ir._migrate import MigrationError, migrate_json, migrate_pbtxt
 from grus.ir._serialize import (
     dump_json,
@@ -51,6 +60,7 @@ __all__ = [
     "PedigreePair",
     "SetDiff",
     "UndeclaredConditionError",
+    "UndeclaredLocusError",
     "ValidationError",
     "diff",
     "diff_set",

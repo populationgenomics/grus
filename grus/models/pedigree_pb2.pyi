@@ -429,20 +429,20 @@ class Region(_message.Message):
     def __init__(self, page: _Optional[int] = ..., x0: _Optional[float] = ..., y0: _Optional[float] = ..., x1: _Optional[float] = ..., y1: _Optional[float] = ...) -> None: ...
 
 class Support(_message.Message):
-    __slots__ = ("citations", "field", "condition_id", "individuals", "matings", "locus_id")
+    __slots__ = ("citations", "field", "condition_id", "individuals", "matings", "loci")
     CITATIONS_FIELD_NUMBER: _ClassVar[int]
     FIELD_FIELD_NUMBER: _ClassVar[int]
     CONDITION_ID_FIELD_NUMBER: _ClassVar[int]
     INDIVIDUALS_FIELD_NUMBER: _ClassVar[int]
     MATINGS_FIELD_NUMBER: _ClassVar[int]
-    LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
+    LOCI_FIELD_NUMBER: _ClassVar[int]
     citations: _containers.RepeatedScalarFieldContainer[str]
     field: str
     condition_id: str
     individuals: _containers.RepeatedCompositeFieldContainer[Position]
     matings: _containers.RepeatedCompositeFieldContainer[MatingRef]
-    locus_id: str
-    def __init__(self, citations: _Optional[_Iterable[str]] = ..., field: _Optional[str] = ..., condition_id: _Optional[str] = ..., individuals: _Optional[_Iterable[_Union[Position, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[MatingRef, _Mapping]]] = ..., locus_id: _Optional[str] = ...) -> None: ...
+    loci: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, citations: _Optional[_Iterable[str]] = ..., field: _Optional[str] = ..., condition_id: _Optional[str] = ..., individuals: _Optional[_Iterable[_Union[Position, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[MatingRef, _Mapping]]] = ..., loci: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class MatingRef(_message.Message):
     __slots__ = ("partner_a", "partner_b")

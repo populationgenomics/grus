@@ -255,7 +255,8 @@ and figures and papers state it ("compound heterozygous", "maternally inherited"
 as VCF does with `PS`: one person's genotypes in the same phase set line up slot by slot, so slot *i* across them is one
 haplotype. In the example, `M1` is in slot 0 and `M2` in slot 1, so they are in trans; `l2 [M2, +]` would put them in
 cis. A genotype without a phase set states no phase. Because slots align, genotypes sharing a phase set have the same
-number of copies. Which parent a haplotype came from is not recorded (see Open questions).
+number of copies. A phase set holding one genotype states no phase. Which parent a haplotype came from is not recorded
+(see Open questions).
 
 **Annotations keep the drawn text.** A genotype records meaning; the annotation still records what the figure prints,
 and the renderer draws only the annotation. A `GENOTYPE` or `VARIANT` annotation may name the loci its text shows,
@@ -270,7 +271,8 @@ second-guess them.
 **Checks** (loader, loud):
 
 - locus ids are unique and distinct from citation and condition ids;
-- a locus's (gene, name) is declared once, so two records' loci can be matched by what they print;
+- a named locus's (gene, name) is declared once, so two records' loci can be matched by what they print; unnamed loci,
+  whose alleles alone are named, may share a gene, since a legend often names only the alleles;
 - allele symbols are unique within a locus, and at most one allele is the reference;
 - every genotype's locus resolves, each of its alleles is one of that locus's symbols, and a person has at most one
   genotype per locus;
@@ -282,11 +284,13 @@ second-guess them.
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 
 **Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name), each allele
-by its symbol and printed name, unphased copies as a multiset and a phase set as its set of haplotypes. So ids,
-phase-set names and swapping every slot of a phase set at once do not register as differences. A support cites a
-genotype or a locus declaration with paths `genotype.*` (scoped to people) and `locus.*` (the whole pedigree) and names
-the locus, as `condition.*` paths name a condition. Stored layouts ignore genotypes and an annotation's loci, since
-layout reads only the annotation's text.
+by its symbol, printed name and whether it is the reference, unphased copies as a multiset and a phase set as its
+multiset of haplotypes. So ids, phase-set names and swapping every slot of a phase set at once do not register as
+differences. An allele's identifiers are not compared: they are other spellings of what its name states, and one reader
+may copy them where another does not. A support cites genotypes or locus declarations with paths `genotype.*` (scoped to
+people) and `locus.*` (the whole pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in
+trans" backs the phase at both), as `condition.*` paths name a condition. Stored layouts ignore genotypes and an
+annotation's loci, since layout reads only the annotation's text.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 

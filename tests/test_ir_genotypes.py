@@ -50,8 +50,8 @@ pedigrees {
     partner_b { generation: 1 index: 2 }
     offspring { child { generation: 2 index: 1 } }
   }
-  supports { citations: "legend" field: "locus.alleles" locus_id: "l1" }
-  supports { citations: "legend" field: "genotype.alleles" locus_id: "l2" individuals { generation: 2 index: 1 } }
+  supports { citations: "legend" field: "locus.alleles" loci: "l1" loci: "l2" }
+  supports { citations: "legend" field: "genotype.alleles" loci: "l2" individuals { generation: 2 index: 1 } }
 }
 """
 
@@ -114,6 +114,15 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         lambda ps: setattr(ps.loci[0].alleles[1], "reference", True),
         r"more than one allele is the reference",
     ),
+    "support names a locus twice": (
+        lambda ps: ps.pedigrees[0].supports[1].loci.append("l2"),
+        r"names a locus twice",
+    ),
+    "support names an undeclared locus": (
+        lambda ps: ps.pedigrees[0].supports[0].loci.append("l9"),
+        r"locus 'l9' is not declared",
+    ),
+    "empty gene": (lambda ps: setattr(ps.loci[0], "gene", ""), r"loci\[0\] \('l1'\) is malformed"),
     "locus with no alleles": (lambda ps: ps.loci[0].ClearField("alleles"), r"loci\[0\] \('l1'\) is malformed"),
     "unreferenced locus": (
         lambda ps: ps.loci.add(id="l3", name="D12S1640", alleles=[pb.Allele(symbol="1")]),
@@ -140,12 +149,12 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         r"a couple has no genotype",
     ),
     "genotype support without a locus": (
-        lambda ps: ps.pedigrees[0].supports[1].ClearField("locus_id"),
-        r"names a locus_id iff the field is genotype\.\* or locus\.\*",
+        lambda ps: ps.pedigrees[0].supports[1].ClearField("loci"),
+        r"names loci iff the field is genotype\.\* or locus\.\*",
     ),
     "locus id on another field": (
         _set_field(lambda ps: ps.pedigrees[0].supports[1], "field", "proband"),
-        r"names a locus_id iff",
+        r"names loci iff",
     ),
     "locus support scoped to people": (
         lambda ps: ps.pedigrees[0].supports[0].individuals.add(generation=2, index=1),
@@ -217,12 +226,12 @@ def test_diff_ignores_ids_phase_set_names_and_unphased_order() -> None:
             a.loci[:] = [ids[x] for x in a.loci]
     b.pedigrees[0].individuals[0].genotypes[0].alleles.reverse()  # unphased: a multiset
     for s in b.pedigrees[0].supports:
-        s.locus_id = ids[s.locus_id]
+        s.loci[:] = [ids[x] for x in s.loci]
     ir.validate_set(b)
     assert _genotype_mismatches(_set(), b) == []
 
 
-_CHILD = "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: +|M2 (c.2000del) [a]"
+_CHILD = "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2000del) [a]"
 
 
 @pytest.mark.parametrize(
@@ -230,15 +239,19 @@ _CHILD = "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: +|M2 (c.20
     [
         (  # in cis, not trans: one genotype's slots swapped
             lambda ps: _child(ps).genotypes[1].alleles.reverse(),
-            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: M2 (c.2000del)|+ [a]",
+            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: M2 (c.2000del)|+ (reference) [a]",
         ),
         (  # phase not stated
             lambda ps: _child(ps).genotypes[1].ClearField("phase_set"),
-            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: +/M2 (c.2000del)",
+            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: + (reference)/M2 (c.2000del)",
         ),
         (  # an allele's stated meaning
             lambda ps: setattr(ps.loci[1].alleles[1], "name", "c.2001del"),
-            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: +|M2 (c.2001del) [a]",
+            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2001del) [a]",
+        ),
+        (  # which allele is the reference
+            lambda ps: setattr(ps.loci[0].alleles[0], "reference", False),
+            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2000del) [a]",
         ),
         (lambda ps: _child(ps).ClearField("genotypes"), "none"),  # untested
     ],
@@ -248,3 +261,48 @@ def test_diff_reports_a_different_genotype(edit: Callable[[pb.PedigreeSet], obje
     edit(b)
     (m,) = (m for m in _genotype_mismatches(_set(), b) if m.subject == "2-1")
     assert (m.a_value, m.b_value) == (_CHILD, b_value)
+
+
+def _child_genotypes(*genotypes: pb.Genotype) -> pb.PedigreeSet:
+    """The sample with the child's genotypes replaced, no annotation naming loci, and no supports."""
+    ps = _set()
+    del _child(ps).genotypes[:]
+    _child(ps).genotypes.extend(genotypes)
+    for a in _child(ps).annotations:
+        del a.loci[:]
+    del ps.pedigrees[0].supports[:]
+    ir.validate_set(ps)
+    return ps
+
+
+def test_diff_keeps_copies_in_a_phase_set() -> None:
+    # Two copies of one haplotype are not one copy of it: homozygous at both loci vs hemizygous at both.
+    diploid = _child_genotypes(
+        pb.Genotype(locus_id="l1", alleles=["M1", "M1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", alleles=["M2", "M2"], phase_set="s"),
+    )
+    haploid = _child_genotypes(
+        pb.Genotype(locus_id="l1", alleles=["M1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", alleles=["M2"], phase_set="s"),
+    )
+    assert [m.subject for m in _genotype_mismatches(diploid, haploid)] == ["2-1"]
+
+
+def test_diff_reads_a_phase_set_of_one_genotype_as_unphased() -> None:
+    alone = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1", "+"], phase_set="s"))
+    unphased = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["+", "M1"]))
+    assert _genotype_mismatches(alone, unphased) == []
+
+
+def test_unnamed_loci_may_share_a_gene() -> None:
+    # The legend case, one variant per locus, with only the alleles named.
+    ps = _set()
+    for locus in ps.loci:
+        locus.name = ""
+    ir.validate_set(ps)
+    other = _set()
+    for locus in other.loci:
+        locus.name = ""
+    other.loci[1].alleles[1].name = "c.2001del"
+    (m,) = (m for m in _genotype_mismatches(ps, other) if m.subject == "2-1")
+    assert "c.2001del" in m.b_value

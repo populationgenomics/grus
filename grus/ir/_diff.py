@@ -316,6 +316,9 @@ def diff(
 
     ``a_conditions`` / ``b_conditions`` and ``a_loci`` / ``b_loci`` are each side's set-level declarations. Genotypes
     compare by what their loci and alleles state (``_genotypes_sig``), never by id.
+
+    Raises:
+        UndeclaredConditionError | UndeclaredLocusError: an entry or genotype names an undeclared condition or locus.
     """
     a_defs, b_defs = list(a_conditions), list(b_conditions)
     la, lb = {x.id: x for x in a_loci}, {x.id: x for x in b_loci}
@@ -481,35 +484,59 @@ def _genotype_mismatches(
     return [Mismatch(subject, "genotypes", _fmt_genotypes(ia, la), _fmt_genotypes(ib, lb))]
 
 
+class UndeclaredLocusError(KeyError):
+    """A genotype names a ``locus_id`` no declaration has, or an allele its locus does not declare."""
+
+
+def _allele_text(allele: pb.Allele) -> str:
+    """An allele as compared and shown: its symbol, with its printed name and whether it is the reference."""
+    stated = [x for x in (allele.name, "reference" if allele.reference else "") if x]
+    return f"{allele.symbol} ({', '.join(stated)})" if stated else allele.symbol
+
+
 def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called]]:
-    """``ind``'s genotypes, each with its locus's identity and its alleles read through the locus."""
+    """``ind``'s genotypes, each with its locus's identity and its alleles read through the locus.
+
+    Raises:
+        UndeclaredLocusError: a genotype's locus or one of its alleles is not declared.
+    """
     out = []
     for g in ind.genotypes:
         locus = loci.get(g.locus_id)
         if locus is None:
-            raise KeyError(f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci")
-        names = {a.symbol: f"{a.symbol} ({a.name})" if a.name else a.symbol for a in locus.alleles}
-        out.append((g, (_validate.locus_name(locus), tuple(names[s] for s in g.alleles))))
+            raise UndeclaredLocusError(
+                f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci"
+            )
+        texts = {a.symbol: _allele_text(a) for a in locus.alleles}
+        missing = [s for s in g.alleles if s not in texts]
+        if missing:
+            raise UndeclaredLocusError(f"allele(s) {missing} are not declared at locus {g.locus_id!r}")
+        out.append((g, (_validate.locus_name(locus), tuple(texts[s] for s in g.alleles))))
     return out
 
 
-def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> frozenset[object]:
+def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[object, ...]:
     """What ``ind``'s genotypes state, independent of ids and of how phase sets are named or their slots ordered.
 
-    An unphased genotype is its locus and its alleles as a multiset. A phase set is the set of its haplotypes, each
-    the (locus, allele) pairs in one slot across its genotypes: swapping every slot at once states the same phase.
+    An unphased genotype is its locus and its alleles as a multiset. A phase set of several genotypes is the multiset
+    of its haplotypes, each the (locus, allele) pairs in one slot across its genotypes: swapping every slot at once
+    states the same phase. A phase set of one genotype states no phase, so it compares as unphased. The whole is a
+    multiset too, since unnamed loci in one gene share an identity.
     """
-    out: set[object] = set()
+    out: list[object] = []
+    unphased: list[_Called] = []
     phased: dict[str, list[_Called]] = defaultdict(list)
-    for g, (locus, alleles) in _resolve(ind, loci):
-        if g.HasField("phase_set"):
-            phased[g.phase_set].append((locus, alleles))
-        else:
-            out.add(("unphased", locus, tuple(sorted(alleles))))
+    for g, called in _resolve(ind, loci):
+        (phased[g.phase_set] if g.HasField("phase_set") else unphased).append(called)
     for members in phased.values():
+        if len(members) == 1:
+            unphased.extend(members)
+            continue
         slots = len(members[0][1])
-        out.add(("phased", frozenset(frozenset((locus, al[i]) for locus, al in members) for i in range(slots))))
-    return frozenset(out)
+        haplotypes = sorted(tuple(sorted((repr(locus), al[i]) for locus, al in members)) for i in range(slots))
+        out.append(("phased", tuple(haplotypes)))
+    out.extend(("unphased", locus, tuple(sorted(alleles))) for locus, alleles in unphased)
+    return tuple(sorted(out, key=repr))
 
 
 def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:

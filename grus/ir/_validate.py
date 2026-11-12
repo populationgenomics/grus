@@ -254,8 +254,8 @@ SUPPORT_CONDITION_PREFIX = "condition."  # a path with it names a condition and 
 # a name or a mode of inheritance belongs to the condition, not to any one person).
 _CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status", "onset_age"))
 _DECLARATION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("name", "inheritance"))
-SUPPORT_GENOTYPE_PREFIX = "genotype."  # a person's genotype at a locus: needs Support.locus_id
-SUPPORT_LOCUS_PREFIX = "locus."  # a locus declaration (the whole pedigree only): needs Support.locus_id
+SUPPORT_GENOTYPE_PREFIX = "genotype."  # a person's genotypes at some loci: needs Support.loci
+SUPPORT_LOCUS_PREFIX = "locus."  # locus declarations (the whole pedigree only): needs Support.loci
 _GENOTYPE_FIELDS = tuple(SUPPORT_GENOTYPE_PREFIX + name for name in ("alleles", "phase_set"))
 _LOCUS_FIELDS = tuple(SUPPORT_LOCUS_PREFIX + name for name in ("name", "gene", "alleles"))
 _MATING_FIELDS = ("consanguineous", "status", "childlessness", "annotations")
@@ -322,9 +322,10 @@ def _check_declarations(ps: pb.PedigreeSet, citation_ids: set[str]) -> None:
 
 
 def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
-    """Each locus is well-formed, its id unique and no citation's or condition's, and its (gene, name) declared once.
+    """Each locus is well-formed, its id unique and no citation's or condition's, and a named one declared once.
 
-    Within a locus, allele symbols are unique and at most one allele is the reference.
+    A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene. Within a locus,
+    allele symbols are unique and at most one allele is the reference.
     """
     ids: set[str] = set()
     names: dict[tuple[str | None, str], str] = {}
@@ -341,7 +342,7 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
                 f"{where}: locus id {locus.id!r} is also a citation or condition id; ids are unique in the set"
             )
         name = locus_name(locus)
-        if name in names:
+        if locus.name and name in names:
             raise IntegrityError(
                 f"{where}: locus (gene={name[0]!r}, name={name[1]!r}) is already declared as {names[name]!r}; "
                 "one declaration per locus"
@@ -470,13 +471,15 @@ def _check_supports(p: pb.Pedigree, positions: set[Key], declared: set[str], loc
             scope = [by_key[key] for key in people] or list(p.individuals)
             if not any(c.condition_id == s.condition_id for ind in scope for c in ind.conditions):
                 raise IntegrityError(f"{where}: no one in scope has condition {s.condition_id!r}")
-        if (kind in ("genotype", "locus")) != s.HasField("locus_id"):
+        if (kind in ("genotype", "locus")) != bool(s.loci):
             raise IntegrityError(
-                f"{where}: names a locus_id iff the field is {SUPPORT_GENOTYPE_PREFIX}* or {SUPPORT_LOCUS_PREFIX}*"
+                f"{where}: names loci iff the field is {SUPPORT_GENOTYPE_PREFIX}* or {SUPPORT_LOCUS_PREFIX}*"
             )
-        if s.HasField("locus_id"):
-            if s.locus_id not in loci:
-                raise IntegrityError(f"{where}: locus_id {s.locus_id!r} is not declared")
-            scope = [by_key[key] for key in people] or list(p.individuals)
-            if not any(g.locus_id == s.locus_id for ind in scope for g in ind.genotypes):
-                raise IntegrityError(f"{where}: no one in scope has a genotype at locus {s.locus_id!r}")
+        if len(set(s.loci)) != len(s.loci):
+            raise IntegrityError(f"{where}: names a locus twice")
+        scope = [by_key[key] for key in people] or list(p.individuals)
+        for locus_id in s.loci:
+            if locus_id not in loci:
+                raise IntegrityError(f"{where}: locus {locus_id!r} is not declared")
+            if not any(g.locus_id == locus_id for ind in scope for g in ind.genotypes):
+                raise IntegrityError(f"{where}: no one in scope has a genotype at locus {locus_id!r}")

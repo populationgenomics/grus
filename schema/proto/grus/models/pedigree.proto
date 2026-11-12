@@ -12,9 +12,10 @@
 // field on the closed path list, its scope in the pedigree.
 // Conditions are declared once per set and referenced by id: every id resolves, declarations are unique and
 // each is referenced, and no person has two entries for one condition.
-// Loci are declared the same way: every genotype's locus resolves and each allele is one of its symbols, at most one
-// genotype per person per locus, genotypes sharing a phase set have equal ploidy, and an annotation's loci are ones
-// its person has a genotype at.
+// Loci are declared the same way: ids are unique, a named locus's (gene, name) is declared once, each locus is
+// referenced; every genotype's locus resolves and each allele is one of its symbols, at most one genotype per person
+// per locus, genotypes sharing a phase set have equal ploidy, and an annotation's loci are ones its person has a
+// genotype at.
 
 syntax = "proto3";
 package grus.models.pedigree;
@@ -201,8 +202,9 @@ message Allele {
 // (PedigreeSet.loci) and referenced by id.
 message Locus {
   string id = 1 [(buf.validate.field).string.min_len = 1];  // local ("l1"), unique in the set
-  string name = 2;                        // as printed: "c.797G>A", "D12S1640"; "" when only the alleles are named
-  optional string gene = 3;               // as printed: "SLC26A4"
+  string name = 2;                        // as printed: "c.797G>A", "D12S1640"; "" when only the alleles are
+                                          // named, and then not unique: several unnamed loci may share a gene
+  optional string gene = 3 [(buf.validate.field).string.min_len = 1];  // as printed: "SLC26A4"; absent if not
   repeated Allele alleles = 4 [(buf.validate.field).repeated.min_items = 1];
 }
 // One person's genotype at one locus. `alleles` are copies, so zygosity is how often a symbol repeats: [M, M]
@@ -315,8 +317,9 @@ message Support {
                                       // starts "condition."
   repeated Position individuals = 4;  // scope; neither individuals nor matings = the whole pedigree
   repeated MatingRef matings = 5;     // a couple (or lone parent), by its partners' positions
-  optional string locus_id = 7 [(buf.validate.field).string.min_len = 1];  // a Locus id, iff `field` starts
-                                      // "genotype." or "locus."
+  // Locus ids, non-empty iff `field` starts "genotype." or "locus."; several when one source states a fact across
+  // loci ("M1 and M2 in trans" backs genotype.phase_set at both).
+  repeated string loci = 7 [(buf.validate.field).repeated.items.string.min_len = 1];
 }
 message MatingRef {
   optional Position partner_a = 1;
