@@ -68,7 +68,7 @@ def _shuffle(args: argparse.Namespace) -> int:
     return 1 if shuffle.varying(results) else 0
 
 
-def _minimize_input(path: pathlib.Path) -> tuple[pb.Pedigree, tuple[pb.ConditionDef, ...]]:
+def _minimize_input(path: pathlib.Path) -> tuple[pb.Pedigree, pb.PedigreeSet]:
     """A ``--input`` file's pedigree and declarations: a bare ``Pedigree``, or a ``PedigreeSet`` of one pedigree."""
     cases = [] if path.is_dir() else corpus.file_cases(path)
     if len(cases) != 1:
@@ -79,16 +79,21 @@ def _minimize_input(path: pathlib.Path) -> tuple[pb.Pedigree, tuple[pb.Condition
 def _minimize(args: argparse.Namespace) -> int:
     if (args.input is None) == (args.seed is None):
         raise SystemExit("minimize takes exactly one of --input and --seed")
-    p, conditions = _minimize_input(args.input) if args.input else (gen.gen(args.seed, args.maxgen), ())
+    p, declarations = _minimize_input(args.input) if args.input else (gen.gen(args.seed, args.maxgen), pb.PedigreeSet())
     specs = [args.tree] + ([args.tree_b] if args.tree_b else [])
     with trees.materialised(specs) as dirs, contextlib.ExitStack() as stack:
         pools = [stack.enter_context(workers.pool(d, args.jobs)) for d in dirs]
-        search = minimize.tree_search(args.predicate, pools, args.reason, args.shuffles, args.highs, conditions)
+        search = minimize.tree_search(args.predicate, pools, args.reason, args.shuffles, args.highs, declarations)
         n = len(p.individuals)
         q, renumbered = minimize.minimize(p, search, batch=args.jobs)
     referenced = {c.condition_id for ind in q.individuals for c in ind.conditions}
-    if referenced:  # declarations live at set level: write a one-pedigree set with those it still references
-        out = pb.PedigreeSet(conditions=[d for d in conditions if d.id in referenced], pedigrees=[q])
+    genotyped = {g.locus_id for ind in q.individuals for g in ind.genotypes}
+    if referenced or genotyped:  # declarations live at set level: write a one-pedigree set with those still referenced
+        out = pb.PedigreeSet(
+            conditions=[d for d in declarations.conditions if d.id in referenced],
+            loci=[locus for locus in declarations.loci if locus.id in genotyped],
+            pedigrees=[q],
+        )
         args.output.write_text(ir.dump_set_pbtxt(out))
     else:
         args.output.write_text(ir.dump_pbtxt(q))

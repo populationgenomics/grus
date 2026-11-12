@@ -3,7 +3,8 @@
 A case names one pedigree and loads it where it is laid out, so a worker parses it with the grus tree under test. A
 case's ``key`` is its identity across runs and trees: ``g{maxgen}:{seed}`` for a generated pedigree, the path for a
 ``Pedigree`` pbtxt file, ``path#k`` for the ``k``-th pedigree of a ``PedigreeSet`` file. A case loads as its pedigree
-and the condition declarations its entries reference (its set's ``conditions``; none for a generated or bare pedigree).
+and the declarations its entries and genotypes reference (its set's ``conditions`` and ``loci``; none for a generated
+or bare pedigree).
 """
 
 from __future__ import annotations
@@ -25,10 +26,10 @@ _SPEC = re.compile(r"(\d+):(\d+)(?:-(\d+))?")
 
 
 class Loaded(NamedTuple):
-    """A case's pedigree and the set's condition declarations it is read through."""
+    """A case's pedigree and its set's declarations (a ``PedigreeSet`` of ``conditions`` and ``loci`` only)."""
 
     pedigree: pb.Pedigree
-    conditions: tuple[pb.ConditionDef, ...]
+    declarations: pb.PedigreeSet
 
 
 @dataclasses.dataclass(frozen=True)
@@ -41,7 +42,7 @@ class GenCase:
         return f"g{self.maxgen}:{self.seed}"
 
     def load(self) -> Loaded:
-        return Loaded(gen.gen(self.seed, self.maxgen), ())
+        return Loaded(gen.gen(self.seed, self.maxgen), pb.PedigreeSet())
 
 
 @dataclasses.dataclass(frozen=True)
@@ -56,9 +57,9 @@ class FileCase:
     def load(self) -> Loaded:
         text = pathlib.Path(self.path).read_text()
         if self.member is None:
-            return Loaded(ir.load_pbtxt(text), ())
+            return Loaded(ir.load_pbtxt(text), pb.PedigreeSet())
         ps = ir.load_set_pbtxt(text)
-        return Loaded(ps.pedigrees[self.member], tuple(ps.conditions))
+        return Loaded(ps.pedigrees[self.member], pb.PedigreeSet(conditions=ps.conditions, loci=ps.loci))
 
 
 Case = GenCase | FileCase

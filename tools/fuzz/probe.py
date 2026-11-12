@@ -1,9 +1,9 @@
 """Lay out and draw one pedigree in a worker, and measure what a renderer change could move.
 
 Runs in a worker from ``tools.fuzz.workers``, so ``grus`` here is the tree under test, while this module is the
-current tooling. Condition declarations reach the tree's ``grus`` only when a pedigree has some, so a tree from before
-1.0, whose calls take no ``conditions``, still probes every pedigree without conditions (every generated one); it
-cannot read a 1.0 IR file that has conditions.
+current tooling. Declarations reach the tree's ``grus`` only when a pedigree has some — ``conditions`` when it has
+condition entries, ``loci`` when it has genotypes — so a tree from before either, whose calls do not take it, still
+probes every pedigree without them (every generated one); it cannot read an IR file that has them.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import dataclasses
 import hashlib
 import random
 import time
-from collections.abc import Sequence
+from typing import Any
 
 from grus import ir, render
 from grus.models import pedigree_pb2 as pb
@@ -65,19 +65,26 @@ def geometry(highs: bool) -> render.Geometry:
 # The tree's grus calls, passing declarations only when there are some (see the module doc).
 
 
-def _validate(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef]) -> None:
-    if conditions:
-        ir.validate(p, conditions)
-    else:
-        ir.validate(p)
+def _passed(declarations: pb.PedigreeSet) -> dict[str, Any]:
+    """The declaration keywords to pass the tree's ``grus``: each kind only when there are some."""
+    out: dict[str, Any] = {}
+    if declarations.conditions:
+        out["conditions"] = list(declarations.conditions)
+    if declarations.loci:
+        out["loci"] = list(declarations.loci)
+    return out
 
 
-def _layout(p: pb.Pedigree, geom: render.Geometry, conditions: Sequence[pb.ConditionDef]) -> render.Layout:
-    return render.layout(p, geom, conditions=conditions) if conditions else render.layout(p, geom)
+def _validate(p: pb.Pedigree, declarations: pb.PedigreeSet) -> None:
+    ir.validate(p, **_passed(declarations))
 
 
-def _svg(p: pb.Pedigree, geom: render.Geometry, conditions: Sequence[pb.ConditionDef]) -> str:
-    return render.render_svg(p, geom, conditions=conditions) if conditions else render.render_svg(p, geom)
+def _layout(p: pb.Pedigree, geom: render.Geometry, declarations: pb.PedigreeSet) -> render.Layout:
+    return render.layout(p, geom, **_passed(declarations))
+
+
+def _svg(p: pb.Pedigree, geom: render.Geometry, declarations: pb.PedigreeSet) -> str:
+    return render.render_svg(p, geom, **_passed(declarations))
 
 
 def measure(case: corpus.Case, highs: bool) -> Result:
@@ -86,30 +93,25 @@ def measure(case: corpus.Case, highs: bool) -> Result:
     The drawing lays out again rather than drawing from a stored layout, so the result does not rest on the layout
     store, and so a tree from before it can be measured.
     """
-    p, conditions = case.load()
+    p, declarations = case.load()
     geom = geometry(highs)
     t = time.perf_counter()
     try:
-        lay = _layout(p, geom, conditions)
+        lay = _layout(p, geom, declarations)
     except render.DeferredFeatureError as e:
         return Result(case.key, time.perf_counter() - t, None, str(e))
     seconds = time.perf_counter() - t
-    return Result(case.key, seconds, _drawn(p, lay, _svg(p, geom, conditions)), None)
+    return Result(case.key, seconds, _drawn(p, lay, _svg(p, geom, declarations)), None)
 
 
-def _declarations(data: bytes) -> list[pb.ConditionDef]:
-    """The condition declarations of a serialized ``PedigreeSet`` that carries only them."""
-    return list(pb.PedigreeSet.FromString(data).conditions)
-
-
-def outcome_of(data: bytes, highs: bool, conditions: bytes = b"") -> str:
+def outcome_of(data: bytes, highs: bool, declarations: bytes = b"") -> str:
     """The serialized pedigree's SVG digest if it draws, else ``defer: <reason>``, or ``invalid: <error>``.
 
-    ``conditions`` is a serialized ``PedigreeSet`` carrying only the declarations the pedigree's entries reference.
-    A caller passes it only when there are some, so a tree from before 1.0 can probe a pedigree without conditions.
+    ``declarations`` is a serialized ``PedigreeSet`` carrying only the declarations (``conditions``, ``loci``) the
+    pedigree references; empty when it references none.
     """
     p = pb.Pedigree.FromString(data)
-    defs = _declarations(conditions)
+    defs = pb.PedigreeSet.FromString(declarations)
     try:
         _validate(p, defs)
     except (ir.ValidationError, ir.IntegrityError) as e:
@@ -137,26 +139,26 @@ def shuffled(p: pb.Pedigree, seed: int) -> pb.Pedigree:
 
 
 def shuffle_outcomes(
-    p: pb.Pedigree, shuffles: int, highs: bool, conditions: Sequence[pb.ConditionDef] = ()
+    p: pb.Pedigree, shuffles: int, highs: bool, declarations: pb.PedigreeSet | None = None
 ) -> list[str]:
     """The SVG digest, or ``defer``, of ``p`` and of ``shuffled(p, s)`` for each ``s`` below ``shuffles``."""
     geom = geometry(highs)
     out = []
     for q in [p] + [shuffled(p, s) for s in range(shuffles)]:
         try:
-            out.append(hashlib.sha1(_svg(q, geom, conditions).encode()).hexdigest())
+            out.append(hashlib.sha1(_svg(q, geom, declarations or pb.PedigreeSet()).encode()).hexdigest())
         except render.DeferredFeatureError:
             out.append("defer")
     return out
 
 
-def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool, conditions: bytes = b"") -> list[str]:
+def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool, declarations: bytes = b"") -> list[str]:
     """``shuffle_outcomes`` of a serialized pedigree; ``["invalid"]`` if it is not valid IR.
 
-    ``conditions`` is as for ``outcome_of``.
+    ``declarations`` is as for ``outcome_of``.
     """
     p = pb.Pedigree.FromString(data)
-    defs = _declarations(conditions)
+    defs = pb.PedigreeSet.FromString(declarations)
     try:
         _validate(p, defs)
     except (ir.ValidationError, ir.IntegrityError):
@@ -166,8 +168,8 @@ def shuffle_outcomes_of(data: bytes, shuffles: int, highs: bool, conditions: byt
 
 def shuffle_case(case: corpus.Case, shuffles: int, highs: bool) -> tuple[str, list[str]]:
     """``shuffle_outcomes`` of ``case``'s pedigree, with its key."""
-    p, conditions = case.load()
-    return case.key, shuffle_outcomes(p, shuffles, highs, conditions)
+    p, declarations = case.load()
+    return case.key, shuffle_outcomes(p, shuffles, highs, declarations)
 
 
 def _drawn(p: pb.Pedigree, lay: render.Layout, svg: str) -> Drawn:
