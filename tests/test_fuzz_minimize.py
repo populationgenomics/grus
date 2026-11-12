@@ -69,3 +69,17 @@ def test_a_probe_reads_entries_through_the_declarations_it_is_given() -> None:
     assert not probe.outcome_of(p.SerializeToString(), False, defs).startswith(("invalid", "defer"))
     outs = probe.shuffle_outcomes_of(p.SerializeToString(), 2, False, defs)
     assert len(outs) == 3 and len(set(outs)) == 1
+
+
+def test_a_probe_reads_genotypes_through_the_loci_it_is_given(tmp_path: pathlib.Path) -> None:
+    from tools.fuzz import corpus, probe
+
+    p = gen.gen(3, 4)
+    p.individuals[0].genotypes.add(locus_id="l1", alleles=["A", "A"])
+    locus = pb.Locus(id="l1", name="rs1", alleles=[pb.Allele(symbol="A")])
+    assert probe.outcome_of(p.SerializeToString(), False).startswith("invalid: ")
+    defs = pb.PedigreeSet(loci=[locus]).SerializeToString()
+    assert not probe.outcome_of(p.SerializeToString(), False, defs).startswith(("invalid", "defer"))
+    path = tmp_path / "set.pbtxt"
+    path.write_text(ir.dump_set_pbtxt(pb.PedigreeSet(pedigrees=[p], loci=[locus])))
+    probe.measure(corpus.FileCase(str(path), 0), False)

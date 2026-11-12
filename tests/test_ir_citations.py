@@ -110,15 +110,18 @@ def test_support_fields_name_real_schema_fields() -> None:
         "individual": pb.Individual,
         "condition": pb.Condition,
         "declaration": pb.ConditionDef,
+        "genotype": pb.Genotype,
+        "locus": pb.Locus,
         "mating": pb.Mating,
         "offspring": pb.Offspring,
         "pedigree": pb.Pedigree,
     }
+    prefixes = {"condition": "condition.", "declaration": "condition.", "genotype": "genotype.", "locus": "locus."}
     for path, kinds in _validate.SUPPORT_FIELDS.items():
         for kind in kinds:
-            prefixed = kind in ("condition", "declaration")
-            name = path.removeprefix("condition.") if prefixed else path
-            assert prefixed == path.startswith("condition.")
+            prefix = prefixes.get(kind, "")
+            assert path.startswith(prefix) and (prefix or "." not in path)
+            name = path.removeprefix(prefix)
             assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
     assert _validate.SUPPORT_FIELDS["annotations"] == {"individual", "mating"}
     assert ir.SUPPORT_FIELDS is _validate.SUPPORT_FIELDS, "exported for callers listing the valid paths"

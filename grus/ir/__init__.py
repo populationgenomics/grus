@@ -15,7 +15,16 @@ from __future__ import annotations
 from protovalidate import ValidationError
 
 from grus.ir._conditions import Conditions, Entry, UndeclaredConditionError
-from grus.ir._diff import Diff, Mismatch, PedigreePair, SetDiff, diff, diff_set, match_individuals
+from grus.ir._diff import (
+    Diff,
+    Mismatch,
+    PedigreePair,
+    SetDiff,
+    UndeclaredLocusError,
+    diff,
+    diff_set,
+    match_individuals,
+)
 from grus.ir._migrate import MigrationError, migrate_json, migrate_pbtxt
 from grus.ir._serialize import (
     dump_json,
@@ -27,21 +36,41 @@ from grus.ir._serialize import (
     load_set_json,
     load_set_pbtxt,
 )
-from grus.ir._validate import SUPPORT_CONDITION_PREFIX, SUPPORT_FIELDS, IntegrityError, validate, validate_set
+from grus.ir._validate import (
+    SUPPORT_CONDITION_PREFIX,
+    SUPPORT_FIELDS,
+    SUPPORT_GENOTYPE_PREFIX,
+    SUPPORT_LOCUS_PREFIX,
+    AlleleIdentity,
+    IntegrityError,
+    LocusIdentity,
+    allele_identity,
+    allele_text,
+    locus_identity,
+    validate,
+    validate_set,
+)
 
 __all__ = [
     "SUPPORT_CONDITION_PREFIX",
     "SUPPORT_FIELDS",
+    "SUPPORT_GENOTYPE_PREFIX",
+    "SUPPORT_LOCUS_PREFIX",
+    "AlleleIdentity",
     "Conditions",
     "Diff",
     "Entry",
     "IntegrityError",
+    "LocusIdentity",
     "MigrationError",
     "Mismatch",
     "PedigreePair",
     "SetDiff",
     "UndeclaredConditionError",
+    "UndeclaredLocusError",
     "ValidationError",
+    "allele_identity",
+    "allele_text",
     "diff",
     "diff_set",
     "dump_json",
@@ -52,6 +81,7 @@ __all__ = [
     "load_pbtxt",
     "load_set_json",
     "load_set_pbtxt",
+    "locus_identity",
     "match_individuals",
     "migrate_json",
     "migrate_pbtxt",

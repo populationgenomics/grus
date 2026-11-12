@@ -55,7 +55,11 @@ class _Block:
 
 
 def layout(
-    p: pb.Pedigree, geometry: _geometry.Geometry | None = None, *, conditions: Sequence[pb.ConditionDef] = ()
+    p: pb.Pedigree,
+    geometry: _geometry.Geometry | None = None,
+    *,
+    conditions: Sequence[pb.ConditionDef] = (),
+    loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """Lay ``p`` out on the (level, x) grid; return the per-level arrays the drawing step reads.
 
@@ -72,7 +76,8 @@ def layout(
     defers — its one drawn form, a track over the row, read as a sibship (docs/design/layout-v2.md). An avuncular
     cross-generation join draws via the ``ghost`` (a same-row couple on the deeper partner's rank).
 
-    ``conditions`` are the declarations of ``p``'s set (``PedigreeSet.conditions``), which its entries reference.
+    ``conditions`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.conditions``, ``.loci``), which
+    its entries and genotypes reference. Layout does not read genotypes; ``loci`` serves validation alone.
 
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
@@ -82,7 +87,7 @@ def layout(
             descent bars would overlap.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    prep = _prepare(p, conditions)
+    prep = _prepare(p, conditions, loci)
     g = prep.graph
     clinical = _labels.Clinical.of(p, ir.Conditions(conditions))
 
@@ -138,13 +143,13 @@ class _Prepared:
     phantom: frozenset[int]
 
 
-def _prepare(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> _Prepared:
+def _prepare(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = (), loci: Sequence[pb.Locus] = ()) -> _Prepared:
     """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, phantoms, pass-throughs.
 
     Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
     couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
     """
-    ir.validate(p, conditions)
+    ir.validate(p, conditions, loci=loci)
     g = _layout._derive(p)
     ghost_of = _layout._duplicate_cross_generation(g, p)
     cross = _layout._cross_matings(g)

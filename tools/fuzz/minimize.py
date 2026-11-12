@@ -164,12 +164,12 @@ def tree_search(
     reason: str,
     shuffles: int,
     highs: bool,
-    conditions: Sequence[pb.ConditionDef] = (),
+    declarations: pb.PedigreeSet | None = None,
 ) -> Search:
     """A ``Search`` for one of ``PREDICATES``, evaluated in ``pools`` (one per tree it names).
 
-    ``conditions`` are the declarations of the pedigree's set; passed to the probes only when there are some, so a
-    pre-1.0 tree can still probe a pedigree without conditions.
+    ``declarations`` are the pedigree's set's (``conditions``, ``loci``); passed to the probes only when there are
+    some, so an older tree can still probe a pedigree without them.
 
     ``reason``, when not empty, narrows a deferral to one whose message contains it.
 
@@ -182,7 +182,9 @@ def tree_search(
     if len(pools) != (2 if two else 1):
         raise ValueError(f"predicate {predicate!r} takes {2 if two else 1} tree(s)")
 
-    defs = (pb.PedigreeSet(conditions=conditions).SerializeToString(),) if conditions else ()
+    defs = (
+        (declarations.SerializeToString(),) if declarations and (declarations.conditions or declarations.loci) else ()
+    )
 
     def defers(o: str) -> bool:
         return o.startswith("defer: ") and reason in o

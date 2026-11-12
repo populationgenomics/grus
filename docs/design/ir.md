@@ -77,8 +77,8 @@ Mating-centric, so the visual vocabulary is representable directly:
 - `Individual` — node: `Position` (`generation`/`index`), `gender`, optional `sex_assigned_at_birth`, `conditions`,
   `deceased`, `proband`, `consultand`, `documented_evaluation` (the NSGC `*` — finding documented / records reviewed),
   optional `external_id` (an opaque study/sample id printed for the person — passthrough; identity + reference stay
-  `Position`), and full-coverage axes below; plus `annotations` (typed `text` + kind) for every remaining piece of
-  as-drawn text (genotype, variant, age, karyotype, gestational age, pronoun, …).
+  `Position`), and full-coverage axes below; `genotypes` (below); plus `annotations` (typed `text` + kind) for every
+  remaining piece of as-drawn text (genotype, variant, age, karyotype, gestational age, pronoun, …).
 - `Mating` — edge: an **optional** `partner_a` and **optional** `partner_b` (a single drawn parent is one partner — no
   phantom stand-in; **both absent** is a *founder sibship*: the offspring are siblings via an undrawn parent couple, so
   a partnerless mating needs ≥2 offspring and no stray lone `partner_b`), `consanguineous` (explicit, *not* inferred),
@@ -221,6 +221,85 @@ A removed field's number and name are reserved, never reused: `condition_id` tak
 A condition-centred view (each condition with the people who have it, as a case-record `Assertion` with `applies_to`) is
 a mechanical projection of this form, so an export can produce it without storing it.
 
+### Genotypes: loci declared once, a genotype per person
+
+A figure often prints genotypes beside its people: `c.797G>A/+`, `M1/M2`, `+/-`, `T/G`. Two data formats grus imports
+carry the same thing in structured form: PED's marker columns and a Phenopacket's variant interpretations. All three
+describe a **genotype table**: rows are people, columns are loci, and each cell is what one person carries at one locus.
+Typed annotation text keeps what is printed but not what it means. `M1/M2` means something only together with the legend
+("M1, c.1234A>G; M2, c.2000del"), and a reader of the IR alone cannot connect the person to a variant. In a sample of
+published pedigrees, about 60% of genotype labels were shorthand or bare bases that need such a key.
+
+So the IR records the table directly, in three parts:
+
+- A **locus** is a place people are genotyped at: one variant, a gene with several alleles, or a marker. It is declared
+  once per set, in `PedigreeSet.loci`, with a local id, the name and gene as printed, and its alleles. This is the same
+  pattern as condition declarations above, for the same reasons: one place for a fact shared by many people, an id for
+  citations to point at, and no free-text join.
+- An **allele** is a symbol genotypes use (`+`, `M1`, `G`, `★`, `1`) and what the source says it stands for: a printed
+  name, whether it is the reference, and any resolvable identifiers it prints (HGVS, rsID, ClinVar, ClinGen, SPDI, VRS).
+  An allele may be several variants in cis, a haplotype, named as such (`c.[76A>C;83G>C]`).
+- A **genotype** is one person's alleles at one locus, as copies. Zygosity is how often a symbol repeats, so no separate
+  field can disagree with it: `[M, M]` is homozygous, `[M, +]` heterozygous, `[M]` hemizygous. One or two copies.
+
+```
+locus l1 "c.1234A>G" gene SLC26A4: + (reference), M1 "c.1234A>G"
+locus l2 "c.2000del" gene SLC26A4: + (reference), M2 "c.2000del"
+
+II-1  l1 [M1, +] phase set a     annotation "M1/M2" shows l1, l2
+      l2 [+, M2] phase set a     → M1 and M2 on different haplotypes: in trans
+```
+
+**Phase.** Whether two variants are in cis or in trans decides whether a person with two recessive variants is affected,
+and figures and papers state it ("compound heterozygous", "maternally inherited"). A genotype may name a **phase set**,
+as VCF does with `PS`: one person's genotypes in the same phase set line up slot by slot, so slot *i* across them is one
+haplotype. In the example, `M1` is in slot 0 and `M2` in slot 1, so they are in trans; `l2 [M2, +]` would put them in
+cis. A genotype without a phase set states no phase. Because slots align, genotypes sharing a phase set have the same
+number of copies. Phase relates heterozygous genotypes only: a homozygous or hemizygous member of a phase set states
+nothing by being there, and a phase set with one heterozygous genotype states no phase. Which parent a haplotype came
+from is not recorded (see Open questions).
+
+**Annotations keep the drawn text.** A genotype records meaning; the annotation still records what the figure prints,
+and the renderer draws only the annotation. A `GENOTYPE` or `VARIANT` annotation may name the loci its text shows,
+linking the label to the genotypes, and one label can show several (`M1/M2` over two variant loci). The genotype may say
+more than the label: a figure that prints `M1/+` beside a legend that gives the HGVS has both. An imported record has
+genotypes and no annotation, and so draws none; drawing genotypes is a renderer choice, not a property of the IR.
+
+**Recorded as stated, never inferred.** An untested person has no genotype; an obligate carrier is not filled in; a
+hemizygous call is not checked against sex assigned at birth, since the source states the copies and the IR does not
+second-guess them.
+
+**Checks** (loader, loud):
+
+- locus ids are unique and distinct from citation and condition ids;
+- every locus can be told apart by what it states, so two records' loci can be matched: a named locus's (gene, name) is
+  declared once, and unnamed loci, whose alleles alone are named, may share a gene (a legend often names only the
+  alleles) but not every allele;
+- allele symbols are unique within a locus, and at most one allele is the reference;
+- every genotype's locus resolves, each of its alleles is one of that locus's symbols, and a person has at most one
+  genotype per locus;
+- genotypes sharing a phase set have equal copies;
+- an annotation names loci only if it is a `GENOTYPE` or `VARIANT` annotation of a person genotyped at each of them, and
+  a mating's annotation names none;
+- a declaration no genotype references is an error, as for conditions. A locus is a column of the table: declaring one
+  says someone was genotyped there. A variant a figure names without saying who carries it ("SLC26A4 c.1234A>G" over the
+  pedigree) is a pedigree-level fact, recorded as a gene label, not an empty column; allowing empty columns would make
+  "declared" and "someone carries it" two facts with nothing to tell them apart.
+
+The identity those checks and the diff use is exported from `grus.ir`, so a caller merging several sets (one per figure
+of a paper, say) can declare one locus per identity and re-point genotypes at it.
+
+A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
+
+**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name) — and an
+unnamed one by its alleles too — each allele by its symbol, printed name and whether it is the reference, unphased
+copies as a multiset and a phase set as its multiset of haplotypes. So ids, phase-set names and swapping every slot of a
+phase set at once do not register as differences. An allele's identifiers are not compared: they are other spellings of
+what its name states, and one reader may copy them where another does not. A support cites genotypes or locus
+declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole pedigree) and names the loci, several
+when one sentence covers several ("M1 and M2 in trans" backs the phase at both), as `condition.*` paths name a
+condition. Stored layouts ignore genotypes and an annotation's loci, since layout reads only the annotation's text.
+
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
 The schema represents the **entire** Bennett/NSGC concept space (2008 Figs 1–4 + the 2022 revision), so no figure is
@@ -262,9 +341,9 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   names a declared `condition_id` iff the field is `condition.*` and someone in scope has it, a declaration path scopes
   the whole pedigree, every person and couple in scope is in the pedigree, an offspring field is scoped by the child,
   and a mating field by couples. Condition declarations are checked as listed under "Conditions are declared once, by
-  id". Each failure names the pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never domain values; rare
-  axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never
-  emitted.
+  id", and loci and genotypes as listed under "Genotypes". Each failure names the pedigree and the item. Enum
+  `*_UNSPECIFIED` zeros are sentinels, never domain values; rare axes are `optional` (absent = the natural default —
+  LIVE / BIOLOGICAL / CURRENT / …), so the sentinel is never emitted.
 
 ## Alternatives considered
 
@@ -318,7 +397,30 @@ validate). The lost-unknowns caveat of text projections does not bite because no
 - **Figure-level citations only.** Simpler, but it can never say which recorded facts came from outside the drawing,
   which is what curation of caption-stated facts needs.
 
+- **Genotypes as annotation text only**, with a convention for the shorthand. Rejected: `M1/M2` means nothing without
+  the legend, and parsing free text to recover a variant is what a structured IR exists to avoid.
+
+- **Genotypes replacing the drawn annotation**, the renderer drawing `M1/+` from the genotype. One encoding of the fact,
+  but the drawn text is then a renderer's formatting choice (separator, order, a locus prefix when there are several), a
+  figure's exact label is lost, and an imported cohort with many markers would draw a stack of lines no figure has.
+  Keeping both, linked by the annotation's loci, records what is printed and what it means.
+
+- **Per-allele copy counts** (`{M: 2}`) instead of a list of copies. It states zygosity as directly, but a count has no
+  slots, so it cannot say which variants share a haplotype.
+
+- **A `phased` flag** on each genotype, meaning its order is maternal then paternal. It phases one locus against the
+  parents but cannot say that variants at two loci are in trans, which is the case that matters for compound
+  heterozygosity; the phase set covers both.
+
 ## Open questions
+
+- **Parent of origin.** A phase set says which variants share a haplotype, not which parent it came from. A figure that
+  states "maternally inherited" has nowhere to put it beyond a support's citation; the additive fix is an optional
+  origin per haplotype slot.
+
+- **One locus per variant or per gene.** Both are valid: `M1/M2` reads naturally as a gene-level locus with two alleles,
+  while VCF and Phenopackets keep one variant per locus (the Phenopackets importer does). An exporter will need one
+  convention, and a mapping from the other.
 
 - **ART multi-party parenthood.** `reproductive_role` + `parentage` records donor/surrogate roles but does not fully pin
   the 3-party genetic≠gestational≠rearing cases of Bennett 2022 Fig 5. KIN models these as *edges* (sperm/ovum donor,

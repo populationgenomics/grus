@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 
 import pytest
@@ -94,6 +95,68 @@ def test_ped_rejects_short_rows_and_zero_iid() -> None:
         convert.import_text("F a 0 0\n", "ped")
     with pytest.raises(convert.PedigreeImportError, match="'0'"):
         convert.import_text("F 0 0 0 1 1\n", "ped")
+
+
+def _genotypes(ps: pb.PedigreeSet, ind: pb.Individual) -> dict[str, list[str]]:
+    """``ind``'s genotypes by their locus's name."""
+    name = {locus.id: locus.name for locus in ps.loci}
+    return {name[g.locus_id]: list(g.alleles) for g in ind.genotypes}
+
+
+def test_ped_genotypes_are_dropped_unless_asked() -> None:
+    ps = convert.import_file(_FIX / "markers.ped")
+    assert not ps.loci and not any(ind.genotypes for ind in ps.pedigrees[0].individuals)
+
+
+def test_ped_genotypes_read_with_the_map() -> None:
+    ps = convert.import_file(_FIX / "markers.ped", genotypes=True)
+    # The third marker is never called, so it declares no locus; a missing marker id is named chr:bp.
+    assert [(locus.name, [a.symbol for a in locus.alleles]) for locus in ps.loci] == [
+        ("rs123", ["A", "G"]),
+        ("12:2000", ["1", "2"]),
+    ]
+    assert not any(a.reference for locus in ps.loci for a in locus.alleles)  # PED states no reference
+    ext = _by_ext(ps.pedigrees[0])
+    assert _genotypes(ps, ext["mum"]) == {"rs123": ["G", "G"], "12:2000": ["2", "2"]}
+    assert _genotypes(ps, ext["kid"]) == {"rs123": ["A", "G"], "12:2000": ["1", "2"]}
+    render.render_set_svg(ps)
+
+
+def test_ped_haploid_calls_are_one_copy() -> None:
+    # PLINK doubles a haploid call: chrX for a man, chrY, chrMT. chrXY (pseudo-autosomal) and a woman's chrX are
+    # diploid. A negative position excludes a marker, whose columns are still there.
+    ped = "F a 0 0 1 1 A A C C G G T T A G\nF b 0 0 2 1 A G 0 0 G G T T A A\n"
+    map_text = "X x1 0 10\nchrY y1 0 20\nMT m1 0 30\nXY p1 0 40\n1 gone 0 -50\n"
+    ps = convert._ped.import_ped(ped, map_text=map_text)
+    ext = _by_ext(ps.pedigrees[0])
+    assert _genotypes(ps, ext["a"]) == {"x1": ["A"], "y1": ["C"], "m1": ["G"], "p1": ["T", "T"]}
+    assert _genotypes(ps, ext["b"]) == {"x1": ["A", "G"], "m1": ["G"], "p1": ["T", "T"]}
+
+
+@pytest.mark.parametrize(
+    ("ped", "map_text", "match"),
+    [
+        ("F a 0 0 1 1 A 0\n", "1 rs1 0 10\n", "half-missing"),
+        ("F a 0 0 1 1 A G\n", "1 rs1 0 10\n1 rs2 0 20\n", "6 \\+ 2 per marker"),
+        ("F a 0 0 1 1 A G A G\n", "1 rs1 0 10\n1 rs1 0 20\n", r"marker\(s\) \['rs1'\] more than once"),
+        ("F a 0 0 1 1 A G\n", "1 rs1\n", "expected 3 or 4 columns"),
+        ("#FID IID SEX\nF a 1\n", "1 rs1 0 10\n", "has no genotype columns"),
+        ("F a 0 0 1 1 A G\n", "X rs1 0 10\n", "haploid here but called heterozygous"),
+        ("F a 0 0 2 1 A G\n", "MT rs1 0 10\n", "haploid here but called heterozygous"),
+        ("F a 0 0 2 1 C C\n", "Y rs1 0 10\n", "on chrY is called for a woman"),
+    ],
+)
+def test_ped_genotypes_fail_loud(ped: str, map_text: str, match: str) -> None:
+    with pytest.raises(convert.PedigreeImportError, match=match):
+        convert._ped.import_ped(ped, map_text=map_text)
+
+
+def test_ped_genotypes_need_a_ped_and_its_map(tmp_path: pathlib.Path) -> None:
+    with pytest.raises(convert.PedigreeImportError, match=r"PLINK \.ped only"):
+        convert.import_file(_FIX / "two_families.fam", genotypes=True)
+    (tmp_path / "x.ped").write_text("F a 0 0 1 1 A G\n")
+    with pytest.raises(convert.PedigreeImportError, match=r"'x\.map' is missing"):
+        convert.import_file(tmp_path / "x.ped", genotypes=True)
 
 
 # --- kinship2 ----------------------------------------------------------------------------------------------------
@@ -192,6 +255,150 @@ def test_phenopackets_stray_packet_fails_loud() -> None:
                                 "sex": "MALE"}]}}"""
     with pytest.raises(convert.PedigreeImportError, match="ghost"):
         convert.import_text(text, "phenopackets")
+
+
+def _variant(state: str = "GENO:0000135", **fields: object) -> dict[str, object]:
+    """A CFTR variationDescriptor in ``state``; ``fields`` replace its own (None removes one)."""
+    vd: dict[str, object] = {
+        "label": "c.1521_1523del",
+        "geneContext": {"valueId": "HGNC:1884", "symbol": "CFTR"},
+        "expressions": [{"syntax": "hgvs.c", "value": "NM_000492.4:c.1521_1523del"}],
+        "vcfRecord": {
+            "genomeAssembly": "GRCh38",
+            "chrom": "7",
+            "pos": "117559590",
+            "id": "rs113993960",
+            "ref": "ATCT",
+            "alt": "A",
+        },
+        "allelicState": {"id": state, "label": "x"},
+    }
+    vd.update(fields)
+    return {k: v for k, v in vd.items() if v is not None}
+
+
+def _family_with_variants(*stated: tuple[str, dict[str, object]], biosamples: list[object] | None = None) -> str:
+    """A trio whose child's packet interprets each ``(subjectOrBiosampleId, variationDescriptor)`` in ``stated``."""
+    persons = [
+        {"familyId": "A", "individualId": i, "paternalId": f, "maternalId": m, "sex": s}
+        for i, f, m, s in (("f", "0", "0", "MALE"), ("m", "0", "0", "FEMALE"), ("c", "f", "m", "MALE"))
+    ]
+    interpretations = [
+        {"subjectOrBiosampleId": who, "variantInterpretation": {"variationDescriptor": vd}} for who, vd in stated
+    ]
+    proband = {
+        "subject": {"id": "c"},
+        "biosamples": biosamples or [],
+        "interpretations": [{"id": "i1", "diagnosis": {"genomicInterpretations": interpretations}}],
+    }
+    return json.dumps({"id": "A", "proband": proband, "pedigree": {"persons": persons}})
+
+
+def _import(*stated: tuple[str, dict[str, object]], biosamples: list[object] | None = None) -> pb.PedigreeSet:
+    return convert.import_text(_family_with_variants(*stated, biosamples=biosamples), "phenopackets")
+
+
+def test_phenopackets_variant_interpretations_become_genotypes() -> None:
+    ps = _import(
+        ("c", _variant("GENO:0000136")),
+        ("m", _variant("GENO:0000135")),
+        ("bs1", _variant("GENO:0000136")),  # the child's biosample, stating what the child's own does
+        biosamples=[{"id": "bs1"}],
+    )
+    (locus,) = ps.loci  # one variant, however many interpretations state it
+    assert (locus.gene, locus.name) == ("CFTR", "c.1521_1523del")
+    ref, alt = locus.alleles
+    assert ref.reference and ref.name == "ATCT"
+    assert {(i.scheme, i.value) for i in alt.identifiers} == {
+        (pb.IDENTIFIER_SCHEME_HGVS, "NM_000492.4:c.1521_1523del"),
+        (pb.IDENTIFIER_SCHEME_RSID, "rs113993960"),
+    }
+    ext = _by_ext(ps.pedigrees[0])
+    assert _genotypes(ps, ext["m"]) == {"c.1521_1523del": ["ref", "alt"]}
+    assert _genotypes(ps, ext["c"]) == {"c.1521_1523del": ["alt", "alt"]}
+    assert not ext["f"].genotypes  # not interpreted: no genotype, nothing inferred
+
+
+@pytest.mark.parametrize(
+    ("state", "alleles"),
+    [
+        ("GENO:0000134", ["alt"]),
+        ("GENO:0000604", ["alt"]),
+        ("GENO:0000458", ["ref", "alt"]),
+        ("GENO:0000402", ["ref", "alt"]),
+    ],
+)
+def test_phenopackets_allelic_states(state: str, alleles: list[str]) -> None:
+    ps = _import(("c", _variant(state)))
+    assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": alleles}
+
+
+def test_phenopackets_unstated_zygosity_states_no_genotype() -> None:
+    for vd in (_variant("GENO:0000137"), _variant(allelicState=None)):
+        assert not _import(("c", vd)).loci
+
+
+def test_phenopackets_allelic_state_by_label() -> None:
+    ps = _import(("c", _variant(allelicState={"id": "GENO:9999999", "label": "Homozygous"})))
+    assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": ["alt", "alt"]}
+
+
+def test_phenopackets_one_locus_per_distinct_description() -> None:
+    # The same description, in any order of packets and under any descriptor id, is one locus; distinct descriptions
+    # are distinct loci, named as written (a label, else the first expression), never by reading the HGVS.
+    ps = _import(("c", _variant("GENO:0000136", id="v1")), ("m", _variant(id="v2")))
+    assert len(ps.loci) == 1
+    a = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.p", "value": "p.Arg2His"}])
+    b = _variant(label=None, vcfRecord=None, expressions=[{"syntax": "hgvs.c", "value": "c.5G>T"}])
+    for stated in ((("c", a), ("m", b)), (("m", b), ("c", a))):
+        assert sorted(locus.name for locus in _import(*stated).loci) == ["c.5G>T", "p.Arg2His"]
+    no_gene = _variant(label=None, vcfRecord=None, geneContext=None)
+    assert [(locus.gene, locus.name) for locus in _import(("c", no_gene)).loci] == [("", "NM_000492.4:c.1521_1523del")]
+
+
+def test_phenopackets_a_variant_stated_only_by_its_vrs_id_is_named_by_it() -> None:
+    by_vrs = [
+        _variant(label=None, vcfRecord=None, expressions=None, variation={"allele": {"_id": vrs}})
+        for vrs in ("ga4gh:VA.a", "ga4gh:VA.b")
+    ]
+    ps = _import(("c", by_vrs[0]), ("m", by_vrs[1]))
+    assert [locus.name for locus in ps.loci] == ["ga4gh:VA.a", "ga4gh:VA.b"]
+
+
+def test_phenopackets_a_variant_without_label_or_expression_is_named_by_its_vcf_record() -> None:
+    first = _variant(label=None, expressions=None)
+    second = _variant(label=None, expressions=None, vcfRecord={"chrom": "7", "pos": "100", "ref": "G", "alt": "T"})
+    assert [locus.name for locus in _import(("c", first), ("c", second)).loci] == ["7:117559590 ATCT>A", "7:100 G>T"]
+
+
+def test_phenopackets_a_biosample_is_its_individuals() -> None:
+    ps = _import(("bs1", _variant()), biosamples=[{"id": "bs1", "individualId": "f"}])
+    assert _genotypes(ps, _by_ext(ps.pedigrees[0])["f"]) == {"c.1521_1523del": ["ref", "alt"]}
+
+
+@pytest.mark.parametrize(
+    ("stated", "match"),
+    [
+        ((("c", _variant("GENO:0000136")), ("c", _variant("GENO:0000135"))), "different allelic states"),
+        ((("ghost", _variant()),), "names neither a person nor a biosample"),
+        ((("c", _variant("GENO:0000999")),), "unrecognised allelicState"),
+        (  # a descriptor's id is local to its document and names no variant
+            (("c", _variant(label=None, vcfRecord=None, expressions=None, id="v1")),),
+            "states no label, expression, VCF record or VRS id",
+        ),
+        (  # one name, two descriptions: whether they are one variant is the caller's to settle, in either order
+            (("c", _variant()), ("m", _variant(vcfRecord=None))),
+            "is described two different ways",
+        ),
+        (
+            (("m", _variant(vcfRecord=None)), ("c", _variant())),
+            "is described two different ways",
+        ),
+    ],
+)
+def test_phenopackets_variants_fail_loud(stated: tuple[tuple[str, dict[str, object]], ...], match: str) -> None:
+    with pytest.raises(convert.PedigreeImportError, match=match):
+        _import(*stated)
 
 
 # --- Open Pedigree -------------------------------------------------------------------------------------------------

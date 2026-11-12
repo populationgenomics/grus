@@ -58,7 +58,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
         ps = parse(text, pb.PedigreeSet())
     except (json_format.ParseError, text_format.ParseError):
         ps = None
-    if ps is not None and (ps.pedigrees or ps.conditions or ps.HasField("provenance")):
+    if ps is not None and (ps.pedigrees or ps.conditions or ps.loci or ps.HasField("provenance")):
         ir.validate_set(ps)
         return ps
     p = parse(text, pb.Pedigree())
@@ -203,7 +203,9 @@ def _cmd_layout(args: argparse.Namespace) -> int:
     geom = _geometry(args)
     record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
         lpb.PedigreeSetLayout(
-            pedigrees=[render.store_layout(p, geom, conditions=loaded.conditions) for p in loaded.pedigrees]
+            pedigrees=[
+                render.store_layout(p, geom, conditions=loaded.conditions, loci=loaded.loci) for p in loaded.pedigrees
+            ]
         )
         if isinstance(loaded, pb.PedigreeSet)
         else render.store_layout(loaded, geom)
@@ -219,7 +221,7 @@ def _cmd_layout(args: argparse.Namespace) -> int:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
-    ps = convert.import_file(args.input, fmt=args.from_format)
+    ps = convert.import_file(args.input, fmt=args.from_format, genotypes=args.genotypes)
     text = ir.dump_set_json(ps) if args.to == "json" else ir.dump_set_pbtxt(ps)
     if args.output is None:
         sys.stdout.write(text)
@@ -311,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="from_format",
         choices=sorted(convert.IMPORTERS),
         help="source format (default: inferred from the suffix, or sniffed for .json; .csv needs kinship2)",
+    )
+    imp.add_argument(
+        "--genotypes",
+        action="store_true",
+        help="read a PLINK .ped's marker columns as genotypes, named by the .map beside it (default: dropped)",
     )
     imp.add_argument("--to", choices=("pbtxt", "json"), default="pbtxt", help="IR text surface to write")
     imp.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")
