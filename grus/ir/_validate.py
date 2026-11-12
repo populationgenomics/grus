@@ -365,7 +365,9 @@ LocusIdentity = tuple[str | None, str, tuple[str, ...]]
 def locus_identity(locus: pb.Locus) -> LocusIdentity:
     """What tells ``locus`` apart from others: its gene (``None`` when not stated) and printed name.
 
-    An unnamed locus is told apart by its alleles as stated (``allele_text``, sorted) too.
+    An unnamed locus is told apart by its alleles as stated (``allele_text``, sorted) too. Two loci with equal
+    identities state the same locus, whatever their ids and whichever records they come from: ``validate_set`` refuses
+    two in one set and ``diff_set`` matches them across sets, so a caller merging sets declares one locus per identity.
     """
     alleles = () if locus.name else tuple(sorted(allele_text(a) for a in locus.alleles))
     return (locus.gene if locus.HasField("gene") else None, locus.name, alleles)

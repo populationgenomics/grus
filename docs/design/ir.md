@@ -281,7 +281,13 @@ second-guess them.
 - genotypes sharing a phase set have equal copies;
 - an annotation names loci only if it is a `GENOTYPE` or `VARIANT` annotation of a person genotyped at each of them, and
   a mating's annotation names none;
-- a declaration no genotype references is an error, as for conditions.
+- a declaration no genotype references is an error, as for conditions. A locus is a column of the table: declaring one
+  says someone was genotyped there. A variant a figure names without saying who carries it ("SLC26A4 c.1234A>G" over the
+  pedigree) is a pedigree-level fact, recorded as a gene label, not an empty column; allowing empty columns would make
+  "declared" and "someone carries it" two facts with nothing to tell them apart.
+
+The identity those checks and the diff use is exported from `grus.ir`, so a caller merging several sets (one per figure
+of a paper, say) can declare one locus per identity and re-point genotypes at it.
 
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 

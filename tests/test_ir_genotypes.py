@@ -334,3 +334,28 @@ def test_unnamed_loci_may_share_a_gene() -> None:
     other.loci[1].alleles[1].name = "c.2001del"
     (m,) = (m for m in _genotype_mismatches(ps, other) if m.subject == "2-1")
     assert "c.2001del" in m.b_value
+
+
+@pytest.mark.parametrize("unnamed", [False, True])
+def test_loci_of_one_identity_are_one_locus_across_sets(unnamed: bool) -> None:
+    # The promise a caller merging sets relies on: equal identities are one locus — diff_set matches them whatever
+    # their ids — and one set may not declare it twice.
+    a, b = _set(), _set()
+    for ps in (a, b):
+        for locus in ps.loci:
+            locus.name = "" if unnamed else locus.name
+    b.loci[0].id = "renamed"
+    for ind in b.pedigrees[0].individuals:
+        for g in ind.genotypes:
+            g.locus_id = "renamed" if g.locus_id == "l1" else g.locus_id
+        for ann in ind.annotations:
+            ann.loci[:] = ["renamed" if x == "l1" else x for x in ann.loci]
+    for s in b.pedigrees[0].supports:
+        s.loci[:] = ["renamed" if x == "l1" else x for x in s.loci]
+    ir.validate_set(b)
+    assert ir.locus_identity(a.loci[0]) == ir.locus_identity(b.loci[0])
+    assert ir.locus_identity(a.loci[0]) != ir.locus_identity(a.loci[1])
+    assert _genotype_mismatches(a, b) == []
+    a.loci.add().CopyFrom(b.loci[0])
+    with pytest.raises(ir.IntegrityError, match="is already declared as 'l1'"):
+        ir.validate_set(a)
