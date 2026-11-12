@@ -75,14 +75,27 @@ def import_text(text: str, fmt: str) -> pb.PedigreeSet:
     return importer(text)
 
 
-def import_file(path: pathlib.Path | str, fmt: str | None = None) -> pb.PedigreeSet:
+def import_file(path: pathlib.Path | str, fmt: str | None = None, *, genotypes: bool = False) -> pb.PedigreeSet:
     """Import ``path``; the format is ``fmt`` or inferred (``infer_format``).
 
-    kinship2 tables may carry their relation matrix in a ``<stem>.rel.csv`` sidecar next to the file.
+    kinship2 tables may carry their relation matrix in a ``<stem>.rel.csv`` sidecar next to the file. With
+    ``genotypes``, a PLINK ``.ped``'s marker columns are read as genotypes, named by the ``<stem>.map`` beside it;
+    without, they are dropped (a genome-wide file holds far more markers than a pedigree record wants).
+
+    Raises:
+        PedigreeImportError: the file is malformed, or ``genotypes`` is asked of a file that is not a ``.ped`` or has
+            no ``.map``.
     """
     path = pathlib.Path(path)
     text = path.read_text()
     fmt = fmt or infer_format(path, text)
+    if genotypes:
+        if fmt != _ped.FORMAT or path.suffix.lower() != ".ped":
+            raise PedigreeImportError(f"genotypes are read from a PLINK .ped only, not {path.name!r}")
+        sidecar = path.with_suffix(".map")
+        if not sidecar.exists():
+            raise PedigreeImportError(f"genotypes need the .map beside {path.name!r}; {sidecar.name!r} is missing")
+        return _ped.import_ped(text, map_text=sidecar.read_text())
     if fmt == _kinship2.FORMAT:
         sidecar = path.with_name(path.stem + _kinship2.SIDECAR_SUFFIX)
         relation = sidecar.read_text() if sidecar.exists() else None

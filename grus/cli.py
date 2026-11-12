@@ -221,7 +221,7 @@ def _cmd_layout(args: argparse.Namespace) -> int:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
-    ps = convert.import_file(args.input, fmt=args.from_format)
+    ps = convert.import_file(args.input, fmt=args.from_format, genotypes=args.genotypes)
     text = ir.dump_set_json(ps) if args.to == "json" else ir.dump_set_pbtxt(ps)
     if args.output is None:
         sys.stdout.write(text)
@@ -313,6 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="from_format",
         choices=sorted(convert.IMPORTERS),
         help="source format (default: inferred from the suffix, or sniffed for .json; .csv needs kinship2)",
+    )
+    imp.add_argument(
+        "--genotypes",
+        action="store_true",
+        help="read a PLINK .ped's marker columns as genotypes, named by the .map beside it (default: dropped)",
     )
     imp.add_argument("--to", choices=("pbtxt", "json"), default="pbtxt", help="IR text surface to write")
     imp.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")

@@ -6,13 +6,14 @@ pair, synthesises the ``Position`` identity (kinship2-style ``kindepth`` with co
 generation; source order within the generation for the index), and validates the result through
 ``grus.ir`` so no importer ever returns an invalid IR. A person's conditions are stated by name (``Condition``);
 ``build_set`` declares one ``ConditionDef`` per distinct name, ids ``k1``, ``k2``, … in order of first appearance
-across the set, and points each entry at its declaration.
+across the set, and points each entry at its declaration. Loci are the format's to declare (it knows what identifies
+one): it passes them to ``build_set`` and states each person's genotypes against their ids.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from grus import ir
@@ -56,6 +57,7 @@ class Person:
     count: int | None = None
     count_unspecified: bool = False
     annotations: list[pb.Annotation] = field(default_factory=list)
+    genotypes: list[pb.Genotype] = field(default_factory=list)  # against the loci passed to build_set
     # Offspring-edge facts (about this person as a child of its parents).
     twin_group: int | None = None
     twin_type: pb.ZygosityType = pb.ZYGOSITY_TYPE_UNSPECIFIED
@@ -78,19 +80,30 @@ class Extras:
 
 
 def build_set(
-    people: list[Person], extras: Extras | None = None, *, provenance: pb.Provenance | None = None
+    people: list[Person],
+    extras: Extras | None = None,
+    *,
+    provenance: pb.Provenance | None = None,
+    loci: Sequence[pb.Locus] = (),
 ) -> pb.PedigreeSet:
-    """Group ``people`` by family, build each ``Pedigree``, validate, return the set (families in source order)."""
-    return build_sets([(people, extras or Extras())], provenance=provenance)
+    """Group ``people`` by family, build each ``Pedigree``, validate, return the set (families in source order).
+
+    ``loci`` are the set's locus declarations, which the people's genotypes reference.
+    """
+    return build_sets([(people, extras or Extras())], provenance=provenance, loci=loci)
 
 
 def build_sets(
-    sources: list[tuple[list[Person], Extras]], *, provenance: pb.Provenance | None = None
+    sources: list[tuple[list[Person], Extras]],
+    *,
+    provenance: pb.Provenance | None = None,
+    loci: Sequence[pb.Locus] = (),
 ) -> pb.PedigreeSet:
     """``build_set`` over several sources (people with their own extras) into one set, sources in order.
 
     For a format whose file holds several independently keyed documents (a Phenopackets array of families): each
-    source's pedigrees are built from its own extras, and conditions are declared once across the whole set.
+    source's pedigrees are built from its own extras, and conditions and ``loci`` are declared once across the whole
+    set.
     """
     ids: dict[str, str] = {}
     for people, _ in sources:
@@ -103,6 +116,7 @@ def build_sets(
                 ids.setdefault(name, f"k{len(ids) + 1}")
     ps = pb.PedigreeSet()
     ps.conditions.extend(pb.ConditionDef(id=cid, name=name) for name, cid in ids.items())
+    ps.loci.extend(loci)
     for people, extras in sources:
         by_family: dict[str, list[Person]] = defaultdict(list)
         for person in people:
@@ -190,6 +204,7 @@ def build_pedigree(
             ind.count = p.count
         ind.count_unspecified = p.count_unspecified
         ind.annotations.extend(p.annotations)
+        ind.genotypes.extend(p.genotypes)
         if p.keep_external_id:
             ind.external_id = p.id
     for (father, mother), kids in matings.items():

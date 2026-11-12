@@ -14,8 +14,13 @@ whose ``subject.id`` matches a person:
   ontology label, verbatim).
 - ``vitalStatus.status == DECEASED`` -> ``deceased``; ``timeOfDeath`` -> AGE_AT_DEATH annotation.
 - ``karyotypicSex`` -> KARYOTYPE annotation; a ``gender`` ontology label naming non-binary -> NONBINARY.
+- ``interpretations[].diagnosis.genomicInterpretations[].variantInterpretation.variationDescriptor`` -> a locus
+  per distinct variant (one locus per variant, alleles ``ref`` and ``alt``) and a genotype for the person
+  ``subjectOrBiosampleId`` names (a biosample id: the packet's subject) by ``allelicState``: heterozygous (or
+  compound heterozygous) ``[ref, alt]``, homozygous ``[alt, alt]``, hemizygous ``[alt]``. A variant whose allelic
+  state is absent or another term states no genotype and is dropped.
 
-Unmapped Phenopacket content (phenotypic features, measurements, interpretations, files, metadata) is
+Unmapped Phenopacket content (phenotypic features, measurements, gene-level interpretations, files, metadata) is
 dropped. Importing from Phenopackets does not require its Python package: the JSON is read structurally.
 """
 
@@ -89,7 +94,124 @@ def _conditions_from_diseases(diseases: list[dict[str, Any]]) -> list[_core.Cond
     return out
 
 
-def _family(fam: dict[str, Any]) -> tuple[list[_core.Person], _core.Extras, str]:
+# GENO allelic states -> the genotype's alt copies (with ref for heterozygous): by id, else by label.
+_ALLELIC_STATE = {
+    "GENO:0000135": ("ref", "alt"),  # heterozygous
+    "GENO:0000402": ("ref", "alt"),  # compound heterozygous: heterozygous at each variant; phase is not stated
+    "GENO:0000136": ("alt", "alt"),  # homozygous
+    "GENO:0000134": ("alt",),  # hemizygous
+}
+_ALLELIC_LABEL = {
+    "heterozygous": "GENO:0000135",
+    "compound heterozygous": "GENO:0000402",
+    "homozygous": "GENO:0000136",
+    "hemizygous": "GENO:0000134",
+}
+# Expression syntax prefix -> identifier scheme; any other syntax is OTHER.
+_SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI, "vrs": pb.IDENTIFIER_SCHEME_VRS}
+
+
+class _Loci:
+    """The loci a file's variant descriptors declare: one per distinct variant, ids ``l1``, ``l2``, … by first sight.
+
+    A variant is identified by what its descriptor states, most specific first: the VRS id, an HGVS expression, the
+    VCF record, the label, the descriptor's own id.
+    """
+
+    def __init__(self) -> None:
+        self.declared: list[pb.Locus] = []
+        self._by_key: dict[str, str] = {}
+
+    def locus_id(self, vd: dict[str, Any]) -> str:
+        key = _variant_key(vd)
+        if key not in self._by_key:
+            self._by_key[key] = f"l{len(self.declared) + 1}"
+            self.declared.append(_locus(self._by_key[key], vd))
+        return self._by_key[key]
+
+
+def _expressions(vd: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(str(_get(e, "syntax", "")), str(_get(e, "value", ""))) for e in _get(vd, "expressions", []) or []]
+
+
+def _vrs_id(vd: dict[str, Any]) -> str:
+    variation = _get(vd, "variation", {}) or {}
+    for allele in (variation, _get(variation, "allele", {}) or {}):
+        for name in ("_id", "id"):
+            if value := allele.get(name):
+                return str(value)
+    return ""
+
+
+def _variant_key(vd: dict[str, Any]) -> str:
+    if vrs := _vrs_id(vd):
+        return f"vrs:{vrs}"
+    for syntax, value in _expressions(vd):
+        if syntax.lower().startswith("hgvs") and value:
+            return f"hgvs:{value}"
+    if vcf := _get(vd, "vcfRecord"):
+        fields = ("genomeAssembly", "chrom", "pos", "ref", "alt")
+        return "vcf:" + ":".join(str(_get(vcf, f, "")) for f in fields)
+    if label := _get(vd, "label"):
+        return f"label:{label}"
+    if vid := _get(vd, "id"):
+        return f"id:{vid}"
+    raise _core.PedigreeImportError(
+        "a variationDescriptor identifies no variant (no VRS, expression, VCF, label or id)"
+    )
+
+
+def _locus(locus_id: str, vd: dict[str, Any]) -> pb.Locus:
+    """The locus of one variant: named by its label (else its first expression), alleles ``ref`` and ``alt``."""
+    expressions = [(s, v) for s, v in _expressions(vd) if v]
+    name = str(_get(vd, "label", "") or (expressions[0][1] if expressions else ""))
+    identifiers = [
+        pb.Identifier(
+            scheme=next((v for k, v in _SYNTAX.items() if s.lower().startswith(k)), pb.IDENTIFIER_SCHEME_OTHER),
+            value=value,
+        )
+        for s, value in expressions
+    ]
+    if vrs := _vrs_id(vd):
+        identifiers.append(pb.Identifier(scheme=pb.IDENTIFIER_SCHEME_VRS, value=vrs))
+    vcf = _get(vd, "vcfRecord", {}) or {}
+    rsid = str(_get(vcf, "id", ""))
+    if rsid.startswith("rs"):
+        identifiers.append(pb.Identifier(scheme=pb.IDENTIFIER_SCHEME_RSID, value=rsid))
+    locus = pb.Locus(
+        id=locus_id,
+        name=name,
+        alleles=[
+            pb.Allele(symbol="ref", name=str(_get(vcf, "ref", "")), reference=True),
+            pb.Allele(symbol="alt", name=name, identifiers=identifiers),
+        ],
+    )
+    if symbol := _get(_get(vd, "geneContext", {}) or {}, "symbol"):
+        locus.gene = str(symbol)
+    return locus
+
+
+def _genotypes(packet: dict[str, Any], subject: str, known: set[str], loci: _Loci) -> dict[str, list[pb.Genotype]]:
+    """The genotypes a packet's variant interpretations state, by person id."""
+    out: dict[str, list[pb.Genotype]] = {}
+    for interpretation in _get(packet, "interpretations", []) or []:
+        diagnosis = _get(interpretation, "diagnosis", {}) or {}
+        for gi in _get(diagnosis, "genomicInterpretations", []) or []:
+            vd = _get(_get(gi, "variantInterpretation", {}) or {}, "variationDescriptor")
+            if not vd:
+                continue  # a gene-level interpretation states no genotype
+            state = _get(vd, "allelicState", {}) or {}
+            geno = str(_get(state, "id", "")) or _ALLELIC_LABEL.get(str(_get(state, "label", "")).lower(), "")
+            if geno not in _ALLELIC_STATE:
+                continue
+            who = str(_get(gi, "subjectOrBiosampleId", ""))
+            out.setdefault(who if who in known else subject, []).append(
+                pb.Genotype(locus_id=loci.locus_id(vd), alleles=_ALLELIC_STATE[geno])
+            )
+    return out
+
+
+def _family(fam: dict[str, Any], loci: _Loci) -> tuple[list[_core.Person], _core.Extras, str]:
     pedigree = _get(fam, "pedigree", {}) or {}
     persons: list[dict[str, Any]] = _get(pedigree, "persons", []) or []
     if not persons:
@@ -110,6 +232,17 @@ def _family(fam: dict[str, Any]) -> tuple[list[_core.Person], _core.Extras, str]
     stray = sorted(k for k in packets if k not in known)
     if stray:
         raise _core.PedigreeImportError(f"Phenopacket subject(s) {stray} are not in pedigree.persons")
+    genotypes: dict[str, list[pb.Genotype]] = {}
+    for subject, packet in packets.items():
+        for who, stated in _genotypes(packet, subject, known, loci).items():
+            for g in stated:
+                same = [x for x in genotypes.get(who, []) if x.locus_id == g.locus_id]
+                if same and same[0] != g:
+                    raise _core.PedigreeImportError(
+                        f"person {who!r}: interpretations state different allelic states for one variant"
+                    )
+                if not same:
+                    genotypes.setdefault(who, []).append(g)
 
     people: list[_core.Person] = []
     for p in persons:
@@ -159,6 +292,7 @@ def _family(fam: dict[str, Any]) -> tuple[list[_core.Person], _core.Extras, str]
                 deceased=deceased,
                 proband=pid == proband_id,
                 annotations=annotations,
+                genotypes=genotypes.get(pid, []),
             )
         )
 
@@ -184,14 +318,15 @@ def import_phenopackets(text: str) -> pb.PedigreeSet:
         raise _core.PedigreeImportError(f"not JSON: {e}") from e
     families = doc if isinstance(doc, list) else [doc]
     sources: list[tuple[list[_core.Person], _core.Extras]] = []
+    loci = _Loci()
     for fam in families:
         if not isinstance(fam, dict):
             raise _core.PedigreeImportError("expected a Family object")
-        people, extras, family_id = _family(fam)
+        people, extras, family_id = _family(fam, loci)
         # Each Family is one pedigree; build_sets groups by Person.family, which we set uniformly.
         for person in people:
             person.family = family_id
         sources.append((people, extras))
     if not sources:
         raise _core.PedigreeImportError("no families found")
-    return _core.build_sets(sources, provenance=pb.Provenance(source_format=FORMAT))
+    return _core.build_sets(sources, provenance=pb.Provenance(source_format=FORMAT), loci=loci.declared)

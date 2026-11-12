@@ -78,6 +78,9 @@ suffix (`.ped .fam .psam .pre` → ped), by sniffing (`.json` → a `Family` obj
 - **Dates and ages** are verbatim `Annotation`s (`b. …` AGE, `d. …` AGE_AT_DEATH); nothing is normalised.
 - **Unmappable fields** are dropped and named below; a data column is not stuffed into `annotations` unless the table
   says so.
+- **Loci are declared by the format**, not by name in the core: what identifies a locus differs (a PED marker id, a
+  Phenopackets variant), so a format module declares its loci and states each person's genotypes against their ids. A
+  genotype is recorded only where the source calls one; no format's untested person gets a genotype.
 
 ### Per-format mapping
 
@@ -93,7 +96,15 @@ suffix (`.ped .fam .psam .pre` → ped), by sniffing (`.json` → a `Family` obj
 | `PHENO` `2`/`1`, `0`/`-9`/`NA`/`A`/`U`/`X` | AFFECTED/UNAFFECTED, omitted, LINKAGE letters; `--1` scheme via `pheno_01` |
 | quantitative `PHENO`                       | MEASUREMENT annotation, verbatim                                           |
 | `.psam` `#FID/#IID …` header               | column mapping; first non-standard column is the phenotype                 |
-| genotype columns, `SID`                    | dropped                                                                    |
+| `.ped` marker columns, with the `.map`     | opt-in: a locus per called marker, a genotype per called pair (below)      |
+| marker columns without opt-in, `SID`       | dropped                                                                    |
+
+Genotypes are opt-in because a PLINK `.ped` is usually genome-wide: hundreds of thousands of markers is a genotyping
+dataset, not a pedigree record, and nothing downstream wants that many loci on every person. Asked for, the importer
+needs the `.map` beside the `.ped`, since it is the only place a marker is named; it names a locus by the marker's id,
+or `chr:bp` where the id is missing, and declares a locus only for a marker someone is called at. The file states no
+reference allele, so none is marked. LINKAGE `.pre` marker columns are not read: their layout depends on a separate
+locus file, so the columns after the phenotype cannot be split into allele pairs from the `.pre` alone.
 
 Not expressible: deceased, proband, twins, consanguinity, adoption, outcomes, counts, relationship status.
 
@@ -126,10 +137,17 @@ names or ints; fixture `family.phenopackets.json`). An array's families are buil
 | packet `diseases[]` (`term.label`, `excluded`, `onset`)                                    | replace the bare status: `Condition{name, AFFECTED/UNAFFECTED, onset_age}` (TimeElement verbatim) |
 | `subject.vitalStatus` DECEASED, `timeOfDeath`                                              | `deceased`; AGE_AT_DEATH annotation                                                               |
 | `subject.karyotypicSex`; `subject.gender` label naming non-binary                          | KARYOTYPE annotation; `GENDER_NONBINARY`                                                          |
-| phenotypic features, measurements, interpretations, files, `metaData`                      | dropped                                                                                           |
+| packet variant interpretations (`variationDescriptor`, `allelicState`)                     | a locus per distinct variant (alleles `ref`, `alt`); a genotype by allelic state (below)          |
+| phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                           |
 
-A packet whose subject is not in `persons` fails loud. Not expressible: twins, adoption, outcomes, counts, consultand,
-carrier, consanguinity on any other couple.
+Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct variant, identified by
+the most specific thing its descriptor states (a VRS id, an HGVS expression, the VCF record, the label), and named by
+its label. The allelic state gives the copies: heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]`.
+Heterozygous at a single variant site means the other copy is the reference there, so `ref` is what the term states, not
+an inference. Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so their
+phase is not recorded. A variant with no allelic state, or another term, states no genotype and is dropped. An
+interpretation naming a biosample is the packet's subject's. A packet whose subject is not in `persons` fails loud. Not
+expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity on any other couple.
 
 **Open Pedigree / PhenoTips simple JSON** (`_openpedigree.py`; a JSON array of person and relationship objects, keys
 case-insensitive; fixture `simple.openpedigree.json`)

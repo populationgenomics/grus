@@ -96,6 +96,54 @@ def test_ped_rejects_short_rows_and_zero_iid() -> None:
         convert.import_text("F 0 0 0 1 1\n", "ped")
 
 
+def _genotypes(ps: pb.PedigreeSet, ind: pb.Individual) -> dict[str, list[str]]:
+    """``ind``'s genotypes by their locus's name."""
+    name = {locus.id: locus.name for locus in ps.loci}
+    return {name[g.locus_id]: list(g.alleles) for g in ind.genotypes}
+
+
+def test_ped_genotypes_are_dropped_unless_asked() -> None:
+    ps = convert.import_file(_FIX / "markers.ped")
+    assert not ps.loci and not any(ind.genotypes for ind in ps.pedigrees[0].individuals)
+
+
+def test_ped_genotypes_read_with_the_map() -> None:
+    ps = convert.import_file(_FIX / "markers.ped", genotypes=True)
+    # The third marker is never called, so it declares no locus; a missing marker id is named chr:bp.
+    assert [(locus.name, [a.symbol for a in locus.alleles]) for locus in ps.loci] == [
+        ("rs123", ["A", "G"]),
+        ("12:2000", ["1", "2"]),
+    ]
+    assert not any(a.reference for locus in ps.loci for a in locus.alleles)  # PED states no reference
+    ext = _by_ext(ps.pedigrees[0])
+    assert _genotypes(ps, ext["mum"]) == {"rs123": ["G", "G"], "12:2000": ["2", "2"]}
+    assert _genotypes(ps, ext["kid"]) == {"rs123": ["A", "G"], "12:2000": ["1", "2"]}
+    render.render_set_svg(ps)
+
+
+@pytest.mark.parametrize(
+    ("ped", "map_text", "match"),
+    [
+        ("F a 0 0 1 1 A 0\n", "1 rs1 0 10\n", "half-missing"),
+        ("F a 0 0 1 1 A G\n", "1 rs1 0 10\n1 rs2 0 20\n", "6 \\+ 2 per marker"),
+        ("F a 0 0 1 1 A G A G\n", "1 rs1 0 10\n1 rs1 0 20\n", r"marker\(s\) \['rs1'\] more than once"),
+        ("F a 0 0 1 1 A G\n", "1 rs1\n", "expected 3 or 4 columns"),
+        ("#FID IID SEX\nF a 1\n", "1 rs1 0 10\n", "has no genotype columns"),
+    ],
+)
+def test_ped_genotypes_fail_loud(ped: str, map_text: str, match: str) -> None:
+    with pytest.raises(convert.PedigreeImportError, match=match):
+        convert._ped.import_ped(ped, map_text=map_text)
+
+
+def test_ped_genotypes_need_a_ped_and_its_map(tmp_path: pathlib.Path) -> None:
+    with pytest.raises(convert.PedigreeImportError, match=r"PLINK \.ped only"):
+        convert.import_file(_FIX / "two_families.fam", genotypes=True)
+    (tmp_path / "x.ped").write_text("F a 0 0 1 1 A G\n")
+    with pytest.raises(convert.PedigreeImportError, match=r"'x\.map' is missing"):
+        convert.import_file(tmp_path / "x.ped", genotypes=True)
+
+
 # --- kinship2 ----------------------------------------------------------------------------------------------------
 
 
@@ -191,6 +239,64 @@ def test_phenopackets_stray_packet_fails_loud() -> None:
       "pedigree": {"persons": [{"familyId": "A", "individualId": "x", "paternalId": "0", "maternalId": "0",
                                 "sex": "MALE"}]}}"""
     with pytest.raises(convert.PedigreeImportError, match="ghost"):
+        convert.import_text(text, "phenopackets")
+
+
+_VARIANT = """{{"label": "c.1521_1523del", "geneContext": {{"valueId": "HGNC:1884", "symbol": "CFTR"}},
+  "expressions": [{{"syntax": "hgvs.c", "value": "NM_000492.4:c.1521_1523del"}}],
+  "vcfRecord": {{"genomeAssembly": "GRCh38", "chrom": "7", "pos": "117559590", "id": "rs113993960",
+                 "ref": "ATCT", "alt": "A"}},
+  "allelicState": {{"id": "{state}", "label": "x"}}}}"""
+
+
+def _family_with_variants(*states: tuple[str, str]) -> str:
+    """A trio whose child's packet interprets one variant per ``(subject, GENO id)`` in ``states``."""
+    interpretations = ", ".join(
+        f'''{{"subjectOrBiosampleId": "{who}", "variantInterpretation": {{"variationDescriptor":
+            {_VARIANT.format(state=state)}}}}}'''
+        for who, state in states
+    )
+    person = '{{"familyId": "A", "individualId": "{0}", "paternalId": "{1}", "maternalId": "{2}", "sex": "{3}"}}'
+    persons = ", ".join(
+        person.format(*p) for p in (("f", "0", "0", "MALE"), ("m", "0", "0", "FEMALE"), ("c", "f", "m", "MALE"))
+    )
+    return f"""{{"id": "A", "proband": {{"subject": {{"id": "c"}}, "interpretations": [{{"id": "i1",
+        "diagnosis": {{"genomicInterpretations": [{interpretations}]}}}}]}},
+        "pedigree": {{"persons": [{persons}]}}}}"""
+
+
+def test_phenopackets_variant_interpretations_become_genotypes() -> None:
+    ps = convert.import_text(
+        _family_with_variants(("c", "GENO:0000136"), ("m", "GENO:0000135"), ("biosample-1", "GENO:0000136")),
+        "phenopackets",
+    )
+    (locus,) = ps.loci  # one variant, however many interpretations state it
+    assert (locus.gene, locus.name) == ("CFTR", "c.1521_1523del")
+    ref, alt = locus.alleles
+    assert ref.reference and ref.name == "ATCT"
+    assert {(i.scheme, i.value) for i in alt.identifiers} == {
+        (pb.IDENTIFIER_SCHEME_HGVS, "NM_000492.4:c.1521_1523del"),
+        (pb.IDENTIFIER_SCHEME_RSID, "rs113993960"),
+    }
+    ext = _by_ext(ps.pedigrees[0])
+    assert _genotypes(ps, ext["m"]) == {"c.1521_1523del": ["ref", "alt"]}
+    # A biosample id is the packet's subject's; stating what the child's own interpretation does, it adds nothing.
+    assert _genotypes(ps, ext["c"]) == {"c.1521_1523del": ["alt", "alt"]}
+    assert not ext["f"].genotypes  # not interpreted: no genotype, nothing inferred
+
+
+def test_phenopackets_variant_states() -> None:
+    for state, alleles in (("GENO:0000134", ["alt"]), ("GENO:0000402", ["ref", "alt"])):
+        ps = convert.import_text(_family_with_variants(("c", state)), "phenopackets")
+        assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": alleles}
+    # An unstated or unrecognised allelic state states no genotype: the variant is dropped, and declares no locus.
+    ps = convert.import_text(_family_with_variants(("c", "GENO:0000137")), "phenopackets")
+    assert not ps.loci
+
+
+def test_phenopackets_contradicting_interpretations_fail_loud() -> None:
+    text = _family_with_variants(("c", "GENO:0000136"), ("biosample-1", "GENO:0000135"))
+    with pytest.raises(convert.PedigreeImportError, match="different allelic states"):
         convert.import_text(text, "phenopackets")
 
 
