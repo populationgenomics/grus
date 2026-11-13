@@ -311,9 +311,9 @@ SAB, TOP, ectopic) and count-collapsed sibships; consanguinity, separated/divorc
 infertility; twins (MZ/DZ/unknown); adoption (in/out, dashed vs solid descent); ART donor/surrogate; family/panel/gene
 labels. Evolution is additive by default: CI runs `buf breaking` (FILE) against the baseline, through
 `tools/schema/compat.py`, which passes a break only when the same change raises the major version in `pyproject.toml`
-above the baseline's — the breaking release, with every consumer migrated in it. A removed field's number and name are
-reserved, never reused. Downstream bounds its pin below the next major (`grus>=0.2,<1`). The pre-release rewrites (slice
-22\) are history.
+above the baseline's, or below 1.0 the minor — the breaking release, with every consumer migrated in it. A removed
+field's number and name are reserved, never reused. Downstream bounds its pin below the next breaking release
+(`grus>=0.4,<0.5` before 1.0, `grus>=1.2,<2` after). The pre-release rewrites (slice 22) are history.
 
 ### Serialization
 

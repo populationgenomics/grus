@@ -10,8 +10,8 @@ jobs:
   backward-compatible:
     # `buf breaking` under the FILE rule set (buf.yaml): the IR contract evolves additively
     # (docs/design/ir.md), so a renumber, removal, or type change of a committed field fails here,
-    # unless the same change raises the package's major version (pyproject.toml, head against the
-    # baseline): a breaking release that migrates every consumer (tools/schema/compat.py).
+    # unless the same change raises the package's major version, or below 1.0 its minor (pyproject.toml,
+    # head against the baseline): a breaking release that migrates every consumer (tools/schema/compat.py).
     # Skips draft PRs.
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
