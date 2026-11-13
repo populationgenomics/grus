@@ -59,17 +59,28 @@ class FileCase:
         if self.member is None:
             return Loaded(ir.load_pbtxt(text), pb.PedigreeSet())
         ps = ir.load_set_pbtxt(text)
-        p = ps.pedigrees[self.member]
         # Only what this member references, so a tree without a kind of declaration still probes a member without it.
-        referenced = {c.condition_id for ind in p.individuals for c in ind.conditions}
-        genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
-        return Loaded(
-            p,
-            pb.PedigreeSet(
-                conditions=[d for d in ps.conditions if d.id in referenced],
-                loci=[locus for locus in ps.loci if locus.id in genotyped],
-            ),
-        )
+        return Loaded(*own_declarations(ps.pedigrees[self.member], ps))
+
+
+def own_declarations(p: pb.Pedigree, ps: pb.PedigreeSet) -> tuple[pb.Pedigree, pb.PedigreeSet]:
+    """``p`` and the declarations of its set ``ps`` that its entries and genotypes reference, those alone.
+
+    ``p``'s allele symbols at loci it has no genotype at are dropped with those loci: a shared legend may print
+    symbols for another member's alleles.
+    """
+    referenced = {c.condition_id for ind in p.individuals for c in ind.conditions}
+    genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
+    q = pb.Pedigree()
+    q.CopyFrom(p)
+    kept = [s for s in q.allele_symbols if s.locus_id in genotyped]
+    del q.allele_symbols[:]
+    q.allele_symbols.extend(kept)
+    declarations = pb.PedigreeSet(
+        conditions=[d for d in ps.conditions if d.id in referenced],
+        loci=[locus for locus in ps.loci if locus.id in genotyped],
+    )
+    return q, declarations
 
 
 Case = GenCase | FileCase

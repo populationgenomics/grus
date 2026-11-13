@@ -315,13 +315,14 @@ def diff(
     """Structurally diff two IRs. See the module docstring; ``a`` is the reference, ``b`` the candidate.
 
     ``a_conditions`` / ``b_conditions`` and ``a_loci`` / ``b_loci`` are each side's set-level declarations. Genotypes
-    compare by what their loci and alleles state (``_genotypes_sig``), never by id.
+    compare by what their loci and alleles state and the symbols each pedigree prints for them (``_genotypes_sig``),
+    never by id.
 
     Raises:
         UndeclaredConditionError | UndeclaredLocusError: an entry or genotype names an undeclared condition or locus.
     """
     a_defs, b_defs = list(a_conditions), list(b_conditions)
-    la, lb = {x.id: x for x in a_loci}, {x.id: x for x in b_loci}
+    la, lb = _Loci(a, a_loci), _Loci(b, b_loci)
     ra, rb = _relations(a, Conditions(a_defs)), _relations(b, Conditions(b_defs))
     a_to_b = match_individuals(a, b, a_conditions=a_defs, b_conditions=b_defs)
     b_to_a = {v: k for k, v in a_to_b.items()}
@@ -471,13 +472,22 @@ def _individual_mismatches(
     return out
 
 
-# One genotype as compared: its locus's identity, and its alleles as stated (``_validate.allele_identity``).
-_Called = tuple[_validate.LocusIdentity, tuple[_validate.AlleleIdentity, ...]]
+# One copy as compared: the allele as stated (``_validate.allele_identity``) and the symbol its pedigree prints for it,
+# "" when it prints none (a symbol is never empty).
+_Copy = tuple[_validate.AlleleIdentity, str]
+# One genotype as compared: its locus's identity, and its copies.
+_Called = tuple[_validate.LocusIdentity, tuple[_Copy, ...]]
 
 
-def _genotype_mismatches(
-    subject: str, ia: pb.Individual, ib: pb.Individual, la: dict[str, pb.Locus], lb: dict[str, pb.Locus]
-) -> list[Mismatch]:
+class _Loci:
+    """One side's loci, by id, and the symbols its pedigree prints for their alleles, by (locus id, allele id)."""
+
+    def __init__(self, p: pb.Pedigree, loci: Iterable[pb.Locus]) -> None:
+        self.by_id = {x.id: x for x in loci}
+        self.symbols = {(s.locus_id, s.allele_id): s.symbol for s in p.allele_symbols}
+
+
+def _genotype_mismatches(subject: str, ia: pb.Individual, ib: pb.Individual, la: _Loci, lb: _Loci) -> list[Mismatch]:
     """One ``genotypes`` mismatch when the pair's genotypes state different things (``_genotypes_sig``)."""
     if _genotypes_sig(ia, la) == _genotypes_sig(ib, lb):
         return []
@@ -485,10 +495,10 @@ def _genotype_mismatches(
 
 
 class UndeclaredLocusError(KeyError):
-    """A genotype names a ``locus_id`` no declaration has, or an allele its locus does not declare."""
+    """A genotype names a ``locus_id`` no declaration has, or an allele id its locus does not declare."""
 
 
-def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Genotype, _Called, list[str]]]:
+def _resolve(ind: pb.Individual, loci: _Loci) -> list[tuple[pb.Genotype, _Called, list[str]]]:
     """``ind``'s genotypes, each with its locus's identity, its alleles read through the locus, and those for display.
 
     Raises:
@@ -496,22 +506,23 @@ def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Gen
     """
     out = []
     for g in ind.genotypes:
-        locus = loci.get(g.locus_id)
+        locus = loci.by_id.get(g.locus_id)
         if locus is None:
             raise UndeclaredLocusError(
                 f"locus_id {g.locus_id!r} is not declared; loci are declared in PedigreeSet.loci"
             )
-        by_symbol = {a.symbol: a for a in locus.alleles}
-        missing = [s for s in g.alleles if s not in by_symbol]
+        by_id = {a.id: a for a in locus.alleles}
+        missing = [x for x in g.allele_ids if x not in by_id]
         if missing:
-            raise UndeclaredLocusError(f"allele(s) {missing} are not declared at locus {g.locus_id!r}")
-        alleles = [by_symbol[s] for s in g.alleles]
-        called = (_validate.locus_identity(locus), tuple(_validate.allele_identity(a) for a in alleles))
-        out.append((g, called, [_validate.allele_text(a) for a in alleles]))
+            raise UndeclaredLocusError(f"allele id(s) {missing} are not declared at locus {g.locus_id!r}")
+        copies = [(by_id[x], loci.symbols.get((g.locus_id, x), "")) for x in g.allele_ids]
+        called = (_validate.locus_identity(locus), tuple((_validate.allele_identity(a), s) for a, s in copies))
+        shown = [f"{s} ({_validate.allele_text(a)})" if s else _validate.allele_text(a) for a, s in copies]
+        out.append((g, called, shown))
     return out
 
 
-def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[object, ...]:
+def _genotypes_sig(ind: pb.Individual, loci: _Loci) -> tuple[object, ...]:
     """What ``ind``'s genotypes state, independent of ids and of how phase sets are named or their slots ordered.
 
     An unphased genotype is its locus and its alleles as a multiset. A phase set of several genotypes is the multiset
@@ -523,7 +534,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
     unphased: list[_Called] = []
     phased: dict[str, list[_Called]] = defaultdict(list)
     for g, called, _ in _resolve(ind, loci):
-        heterozygous = len(set(g.alleles)) > 1
+        heterozygous = len(set(g.allele_ids)) > 1
         (phased[g.phase_set] if g.HasField("phase_set") and heterozygous else unphased).append(called)
     for members in phased.values():
         if len(members) == 1:
@@ -536,7 +547,7 @@ def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[objec
     return tuple(sorted(out, key=repr))
 
 
-def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
+def _fmt_genotypes(ind: pb.Individual, loci: _Loci) -> str:
     """Render genotypes as ``gene name: a/b`` (``|`` between phased alleles), sorted; ``none`` if there are none."""
     parts = []
     for g, ((gene, name, _), _), alleles in _resolve(ind, loci):

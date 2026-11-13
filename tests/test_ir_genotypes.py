@@ -15,35 +15,39 @@ from grus.models import pedigree_pb2 as pb
 
 # A compound-heterozygous child of two carrier parents, as a figure with a legend ("M1 c.1234A>G, M2 c.2000del")
 # records it: two variant loci, the child's genotypes in trans in one phase set, each drawn label linked to the loci
-# it shows, and the legend cited for the alleles.
+# it shows, the symbols the figure prints for the alleles, and the legend cited for the alleles.
 _SET = """
 citations { id: "legend" quote: "M1, c.1234A>G; M2, c.2000del" }
 loci {
   id: "l1" name: "c.1234A>G" gene: "SLC26A4"
-  alleles { symbol: "+" reference: true }
-  alleles { symbol: "M1" name: "c.1234A>G" identifiers { scheme: IDENTIFIER_SCHEME_HGVS value: "c.1234A>G" } }
+  alleles { id: "wt" reference: true }
+  alleles { id: "m1" name: "c.1234A>G" identifiers { scheme: IDENTIFIER_SCHEME_HGVS value: "c.1234A>G" } }
 }
 loci {
   id: "l2" name: "c.2000del" gene: "SLC26A4"
-  alleles { symbol: "+" reference: true }
-  alleles { symbol: "M2" name: "c.2000del" }
+  alleles { id: "wt" reference: true }
+  alleles { id: "m2" name: "c.2000del" }
 }
 pedigrees {
+  allele_symbols { locus_id: "l1" allele_id: "wt" symbol: "+" }
+  allele_symbols { locus_id: "l1" allele_id: "m1" symbol: "M1" }
+  allele_symbols { locus_id: "l2" allele_id: "wt" symbol: "+" }
+  allele_symbols { locus_id: "l2" allele_id: "m2" symbol: "M2" }
   individuals {
     generation: 1 index: 1 gender: GENDER_MAN
     annotations { text: "M1/+" type: ANNOTATION_TYPE_GENOTYPE loci: "l1" }
-    genotypes { locus_id: "l1" alleles: "M1" alleles: "+" }
+    genotypes { locus_id: "l1" allele_ids: "m1" allele_ids: "wt" }
   }
   individuals {
     generation: 1 index: 2 gender: GENDER_WOMAN
     annotations { text: "M2/+" type: ANNOTATION_TYPE_GENOTYPE loci: "l2" }
-    genotypes { locus_id: "l2" alleles: "M2" alleles: "+" }
+    genotypes { locus_id: "l2" allele_ids: "m2" allele_ids: "wt" }
   }
   individuals {
     generation: 2 index: 1 gender: GENDER_MAN proband: true
     annotations { text: "M1/M2" type: ANNOTATION_TYPE_GENOTYPE loci: "l1" loci: "l2" }
-    genotypes { locus_id: "l1" alleles: "M1" alleles: "+" phase_set: "a" }
-    genotypes { locus_id: "l2" alleles: "+" alleles: "M2" phase_set: "a" }
+    genotypes { locus_id: "l1" allele_ids: "m1" allele_ids: "wt" phase_set: "a" }
+    genotypes { locus_id: "l2" allele_ids: "wt" allele_ids: "m2" phase_set: "a" }
   }
   matings {
     partner_a { generation: 1 index: 1 }
@@ -51,7 +55,7 @@ pedigrees {
     offspring { child { generation: 2 index: 1 } }
   }
   supports { citations: "legend" field: "locus.alleles" loci: "l1" loci: "l2" }
-  supports { citations: "legend" field: "genotype.alleles" loci: "l2" individuals { generation: 2 index: 1 } }
+  supports { citations: "legend" field: "genotype.allele_ids" loci: "l2" individuals { generation: 2 index: 1 } }
 }
 """
 
@@ -74,8 +78,8 @@ def test_hemizygous_and_homozygous_genotypes_are_valid() -> None:
     ps = _set()
     _child(ps).genotypes[0].ClearField("phase_set")
     _child(ps).genotypes[1].ClearField("phase_set")
-    del _child(ps).genotypes[0].alleles[1:]  # [M1]: one copy, on a single-copy locus
-    _child(ps).genotypes[1].alleles[:] = ["M2", "M2"]
+    del _child(ps).genotypes[0].allele_ids[1:]  # [M1]: one copy, on a single-copy locus
+    _child(ps).genotypes[1].allele_ids[:] = ["m2", "m2"]
     ir.validate_set(ps)
 
 
@@ -84,31 +88,30 @@ def _set_field(path: Callable[[pb.PedigreeSet], object], name: str, value: objec
 
 
 def _indistinct_unnamed_loci(ps: pb.PedigreeSet) -> None:
-    """Both loci unnamed, in one gene, with the same alleles (``+`` and an unnamed ``M``): nothing tells them apart."""
+    """Both loci unnamed, in one gene, with the same alleles (the reference, an unnamed one): nothing tells them apart.
+
+    The symbols the pedigree prints (``M1``, ``M2``) do not: they are the pedigree's, not the loci's.
+    """
     for locus in ps.loci:
         locus.ClearField("name")
         locus.alleles[1].ClearField("name")
-        locus.alleles[1].symbol = "M"
-    for ind in ps.pedigrees[0].individuals:
-        for g in ind.genotypes:
-            g.alleles[:] = ["+" if a == "+" else "M" for a in g.alleles]
 
 
 # One edit per loader invariant, each breaking a valid set: (edit, the message the failure names).
 _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     "undeclared locus": (_set_field(lambda ps: _child(ps).genotypes[0], "locus_id", "l9"), r"'l9' is not declared"),
-    "allele not a symbol": (
-        lambda ps: _child(ps).genotypes[0].alleles.__setitem__(0, "M2"),
-        r"allele 'M2' at locus 'l1' is not one of its symbols",
+    "undeclared allele": (
+        lambda ps: _child(ps).genotypes[0].allele_ids.__setitem__(0, "m2"),
+        r"allele id 'm2' is not declared at locus 'l1'",
     ),
     "two genotypes at one locus": (
-        lambda ps: _child(ps).genotypes.add(locus_id="l1", alleles=["+", "+"]),
+        lambda ps: _child(ps).genotypes.add(locus_id="l1", allele_ids=["wt", "wt"]),
         r"two genotypes at locus 'l1'",
     ),
-    "three alleles": (lambda ps: _child(ps).genotypes[0].alleles.append("+"), r"not a valid pedigree"),
-    "no alleles": (lambda ps: _child(ps).genotypes[0].ClearField("alleles"), r"not a valid pedigree"),
+    "three alleles": (lambda ps: _child(ps).genotypes[0].allele_ids.append("wt"), r"not a valid pedigree"),
+    "no alleles": (lambda ps: _child(ps).genotypes[0].ClearField("allele_ids"), r"not a valid pedigree"),
     "phase set of unequal ploidy": (
-        lambda ps: _child(ps).genotypes[1].alleles.pop(),
+        lambda ps: _child(ps).genotypes[1].allele_ids.pop(),
         r"phase set 'a' mixes genotypes of 2 and 1 alleles",
     ),
     "locus declared twice": (lambda ps: ps.loci.append(ps.loci[0]), r"locus id 'l1' is declared twice"),
@@ -118,13 +121,35 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     ),
     "unnamed loci told apart by nothing": (
         _indistinct_unnamed_loci,
-        r"locus \(gene='SLC26A4', alleles=\['\+ \(reference\)', 'M'\]\) is already declared as 'l1'",
+        r"locus \(gene='SLC26A4', alleles=\['reference', 'unnamed'\]\) is already declared as 'l1'",
     ),
     "locus id is a citation id": (
         lambda ps: ps.citations.add(id="l2", quote="x"),
         r"locus id 'l2' is also a citation or condition id",
     ),
-    "allele symbol twice": (lambda ps: ps.loci[0].alleles.add(symbol="M1"), r"allele symbol\(s\) \['M1'\]"),
+    "allele id twice": (lambda ps: ps.loci[0].alleles.add(id="m1"), r"allele id\(s\) \['m1'\] are declared twice"),
+    "allele name twice": (
+        lambda ps: ps.loci[0].alleles.add(id="m9", name="c.1234A>G"),
+        r"allele name\(s\) \['c.1234A>G'\] are declared twice",
+    ),
+    "allele without an id": (lambda ps: ps.loci[0].alleles.add(name="c.1300T>C"), r"loci\[0\] \('l1'\) is malformed"),
+    "symbol at an undeclared locus": (
+        lambda ps: ps.pedigrees[0].allele_symbols.add(locus_id="l9", allele_id="wt", symbol="+"),
+        r"allele_symbols\[4\] \('\+'\): locus_id 'l9' is not declared",
+    ),
+    "symbol of an undeclared allele": (
+        lambda ps: ps.pedigrees[0].allele_symbols.add(locus_id="l1", allele_id="m2", symbol="M2"),
+        r"allele id 'm2' is not declared at locus 'l1'",
+    ),
+    "one symbol for two alleles in a pedigree": (
+        lambda ps: ps.pedigrees[0].allele_symbols.add(locus_id="l1", allele_id="m1", symbol="+"),
+        r"symbol '\+' at locus 'l1' already names allele 'wt'",
+    ),
+    "two symbols for one allele in a pedigree": (
+        lambda ps: ps.pedigrees[0].allele_symbols.add(locus_id="l1", allele_id="m1", symbol="Mut"),
+        r"allele 'm1' at locus 'l1' already has symbol 'M1'",
+    ),
+    "empty symbol": (_set_field(lambda ps: ps.pedigrees[0].allele_symbols[1], "symbol", ""), r"not a valid pedigree"),
     "two reference alleles": (
         lambda ps: setattr(ps.loci[0].alleles[1], "reference", True),
         r"more than one allele is the reference",
@@ -140,7 +165,7 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     "empty gene": (lambda ps: setattr(ps.loci[0], "gene", ""), r"loci\[0\] \('l1'\) is malformed"),
     "locus with no alleles": (lambda ps: ps.loci[0].ClearField("alleles"), r"loci\[0\] \('l1'\) is malformed"),
     "unreferenced locus": (
-        lambda ps: ps.loci.add(id="l3", name="D12S1640", alleles=[pb.Allele(symbol="1")]),
+        lambda ps: ps.loci.add(id="l3", name="D12S1640", alleles=[pb.Allele(id="a1", name="1")]),
         r"loci\[2\] \('l3'\) is declared but no genotype references it",
     ),
     "identifier without a scheme": (
@@ -214,6 +239,7 @@ def test_genotypes_do_not_change_the_drawing() -> None:
             del a.loci[:]
     del bare.loci[:]
     del bare.pedigrees[0].supports[:]
+    del bare.pedigrees[0].allele_symbols[:]
     assert render.render_set_svg(ps) == render.render_set_svg(bare)
     p = ps.pedigrees[0]
     stored = render.store_layout(bare.pedigrees[0])
@@ -228,20 +254,27 @@ def _genotype_mismatches(a: pb.PedigreeSet, b: pb.PedigreeSet) -> list[ir.Mismat
 def test_diff_ignores_ids_phase_set_names_and_unphased_order() -> None:
     b = _set()
     ids = {"l1": "x", "l2": "y"}
+    alleles = {"wt": "ref", "m1": "alt1", "m2": "alt2"}
     for locus in b.loci:
         locus.id = ids[locus.id]
+        for allele in locus.alleles:
+            allele.id = alleles[allele.id]
     b.loci.reverse()
     for ind in b.pedigrees[0].individuals:
         for g in ind.genotypes:
             g.locus_id = ids[g.locus_id]
+            g.allele_ids[:] = [alleles[x] for x in g.allele_ids]
             if g.HasField("phase_set"):
                 g.phase_set = "other"
-                g.alleles.reverse()  # every slot of the phase set swapped at once: the same phase
+                g.allele_ids.reverse()  # every slot of the phase set swapped at once: the same phase
         for a in ind.annotations:
             a.loci[:] = [ids[x] for x in a.loci]
-    b.pedigrees[0].individuals[0].genotypes[0].alleles.reverse()  # unphased: a multiset
+    b.pedigrees[0].individuals[0].genotypes[0].allele_ids.reverse()  # unphased: a multiset
     for s in b.pedigrees[0].supports:
         s.loci[:] = [ids[x] for x in s.loci]
+    for row in b.pedigrees[0].allele_symbols:
+        row.locus_id, row.allele_id = ids[row.locus_id], alleles[row.allele_id]
+    b.pedigrees[0].allele_symbols.reverse()
     ir.validate_set(b)
     assert _genotype_mismatches(_set(), b) == []
 
@@ -253,7 +286,7 @@ _CHILD = "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del
     ("edit", "b_value"),
     [
         (  # in cis, not trans: one genotype's slots swapped
-            lambda ps: _child(ps).genotypes[1].alleles.reverse(),
+            lambda ps: _child(ps).genotypes[1].allele_ids.reverse(),
             "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: M2 (c.2000del)|+ (reference) [a]",
         ),
         (  # phase not stated
@@ -266,7 +299,15 @@ _CHILD = "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del
         ),
         (  # which allele is the reference
             lambda ps: setattr(ps.loci[0].alleles[0], "reference", False),
-            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2000del) [a]",
+            "SLC26A4 c.1234A>G: M1 (c.1234A>G)|+ (unnamed) [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2000del) [a]",
+        ),
+        (  # the symbol the pedigree prints for an allele
+            _set_field(lambda ps: ps.pedigrees[0].allele_symbols[1], "symbol", "M3"),
+            "SLC26A4 c.1234A>G: M3 (c.1234A>G)|+ (reference) [a]; SLC26A4 c.2000del: + (reference)|M2 (c.2000del) [a]",
+        ),
+        (  # no symbols recorded
+            lambda ps: ps.pedigrees[0].ClearField("allele_symbols"),
+            "SLC26A4 c.1234A>G: c.1234A>G|reference [a]; SLC26A4 c.2000del: reference|c.2000del [a]",
         ),
         (lambda ps: _child(ps).ClearField("genotypes"), "none"),  # untested
     ],
@@ -293,31 +334,31 @@ def _child_genotypes(*genotypes: pb.Genotype) -> pb.PedigreeSet:
 def test_diff_keeps_copies_in_a_phase_set() -> None:
     # Two copies of one haplotype are not one copy of it: homozygous at both loci vs hemizygous at both.
     diploid = _child_genotypes(
-        pb.Genotype(locus_id="l1", alleles=["M1", "M1"], phase_set="s"),
-        pb.Genotype(locus_id="l2", alleles=["M2", "M2"], phase_set="s"),
+        pb.Genotype(locus_id="l1", allele_ids=["m1", "m1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", allele_ids=["m2", "m2"], phase_set="s"),
     )
     haploid = _child_genotypes(
-        pb.Genotype(locus_id="l1", alleles=["M1"], phase_set="s"),
-        pb.Genotype(locus_id="l2", alleles=["M2"], phase_set="s"),
+        pb.Genotype(locus_id="l1", allele_ids=["m1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", allele_ids=["m2"], phase_set="s"),
     )
     assert [m.subject for m in _genotype_mismatches(diploid, haploid)] == ["2-1"]
 
 
 def test_diff_reads_a_phase_set_of_one_genotype_as_unphased() -> None:
-    alone = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1", "+"], phase_set="s"))
-    unphased = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["+", "M1"]))
+    alone = _child_genotypes(pb.Genotype(locus_id="l1", allele_ids=["m1", "wt"], phase_set="s"))
+    unphased = _child_genotypes(pb.Genotype(locus_id="l1", allele_ids=["wt", "m1"]))
     assert _genotype_mismatches(alone, unphased) == []
 
 
 def test_diff_reads_homozygous_members_of_a_phase_set_as_unphased() -> None:
     # Phase relates heterozygous genotypes: a homozygous member states none, and leaves one heterozygous genotype.
     phased = _child_genotypes(
-        pb.Genotype(locus_id="l1", alleles=["M1", "M1"], phase_set="s"),
-        pb.Genotype(locus_id="l2", alleles=["M2", "+"], phase_set="s"),
+        pb.Genotype(locus_id="l1", allele_ids=["m1", "m1"], phase_set="s"),
+        pb.Genotype(locus_id="l2", allele_ids=["m2", "wt"], phase_set="s"),
     )
     unphased = _child_genotypes(
-        pb.Genotype(locus_id="l1", alleles=["M1", "M1"]),
-        pb.Genotype(locus_id="l2", alleles=["+", "M2"]),
+        pb.Genotype(locus_id="l1", allele_ids=["m1", "m1"]),
+        pb.Genotype(locus_id="l2", allele_ids=["wt", "m2"]),
     )
     assert _genotype_mismatches(phased, unphased) == []
 
@@ -352,6 +393,8 @@ def test_loci_of_one_identity_are_one_locus_across_sets(unnamed: bool) -> None:
             ann.loci[:] = ["renamed" if x == "l1" else x for x in ann.loci]
     for s in b.pedigrees[0].supports:
         s.loci[:] = ["renamed" if x == "l1" else x for x in s.loci]
+    for row in b.pedigrees[0].allele_symbols:
+        row.locus_id = "renamed" if row.locus_id == "l1" else row.locus_id
     ir.validate_set(b)
     assert ir.locus_identity(a.loci[0]) == ir.locus_identity(b.loci[0])
     assert ir.locus_identity(a.loci[0]) != ir.locus_identity(a.loci[1])
@@ -362,9 +405,9 @@ def test_loci_of_one_identity_are_one_locus_across_sets(unnamed: bool) -> None:
 
 
 def test_an_allele_named_reference_is_not_the_reference() -> None:
-    # Display text can coincide ("+ (reference)" both ways); what is stated does not.
-    named = pb.Allele(symbol="+", name="reference")
-    flagged = pb.Allele(symbol="+", reference=True)
+    # Display text can coincide ("reference" both ways); what is stated does not.
+    named = pb.Allele(id="wt", name="reference")
+    flagged = pb.Allele(id="wt", reference=True)
     assert ir.allele_text(named) == ir.allele_text(flagged)
     assert ir.allele_identity(named) != ir.allele_identity(flagged)
     a, b = _set(), _set()
@@ -374,3 +417,55 @@ def test_an_allele_named_reference_is_not_the_reference() -> None:
             locus.alleles[0].CopyFrom(plus)
     assert ir.locus_identity(a.loci[0]) != ir.locus_identity(b.loci[0])
     assert [m.subject for m in _genotype_mismatches(a, b)] == ["1-1", "1-2", "2-1"]
+
+
+def _two_figures() -> pb.PedigreeSet:
+    """The sample and a second family, whose legend prints ``WT`` for the reference and ``M1`` for c.1300T>C."""
+    ps = _set()
+    ps.loci[0].alleles.add(id="m3", name="c.1300T>C")
+    ps.pedigrees[0].labels.add(text="Family 1", kind=pb.LABEL_KIND_FAMILY)
+    p = ps.pedigrees.add()
+    p.CopyFrom(ps.pedigrees[0])
+    p.labels[0].text = "Family 2"
+    del p.supports[:]
+    for ind in p.individuals:
+        for g in ind.genotypes:
+            g.allele_ids[:] = ["m3" if x == "m1" else x for x in g.allele_ids]
+    for row in p.allele_symbols:
+        row.allele_id = "m3" if row.allele_id == "m1" else row.allele_id
+        row.symbol = "WT" if row.symbol == "+" else row.symbol
+    return ps
+
+
+def test_symbols_are_scoped_to_their_pedigree() -> None:
+    # "M1" is c.1234A>G in one family and c.1300T>C in the other, and the reference is "+" in one and "WT" in the
+    # other: one locus in one set, each family printing it as its legend does.
+    ps = _two_figures()
+    ir.validate_set(ps)
+    symbols = {(row.allele_id, row.symbol) for row in ps.pedigrees[1].allele_symbols if row.locus_id == "l1"}
+    assert symbols == {("wt", "WT"), ("m3", "M1")}
+
+
+def test_a_pedigree_may_print_a_symbol_for_an_allele_no_one_in_it_carries() -> None:
+    # A legend shared by a figure's panels names every allele, whichever panel carries it.
+    ps = _set()
+    ps.loci[0].alleles.add(id="m3", name="c.1300T>C")
+    ps.pedigrees[0].allele_symbols.add(locus_id="l1", allele_id="m3", symbol="M3")
+    ir.validate_set(ps)
+
+
+def test_symbols_are_optional() -> None:
+    # An imported record prints no figure, so it records no symbols.
+    ps = _set()
+    ps.pedigrees[0].ClearField("allele_symbols")
+    ir.validate_set(ps)
+
+
+def test_diff_reads_a_copy_through_its_own_pedigree_s_symbols() -> None:
+    a, b = _two_figures(), _two_figures()
+    assert all(not pair.diff.mismatches for pair in ir.diff_set(a, b).matched)
+    b.pedigrees[1].allele_symbols[0].symbol = "+"  # the second family's reference, printed as the first prints it
+    ir.validate_set(b)
+    (pair,) = (pair for pair in ir.diff_set(a, b).matched if pair.diff.mismatches)
+    assert pair.a_index == 1
+    assert {m.field for m in pair.diff.mismatches} == {"genotypes"}

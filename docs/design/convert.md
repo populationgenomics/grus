@@ -102,12 +102,12 @@ suffix (`.ped .fam .psam .pre` → ped), by sniffing (`.json` → a `Family` obj
 Genotypes are opt-in because a PLINK `.ped` is usually genome-wide: hundreds of thousands of markers is a genotyping
 dataset, not a pedigree record, and nothing downstream wants that many loci on every person. Asked for, the importer
 needs the `.map` beside the `.ped`, since it is the only place a marker is named; it names a locus by the marker's id,
-or `chr:bp` where the id is missing, and declares a locus only for a marker someone is called at. The file states no
-reference allele, so none is marked. PLINK writes a haploid call as a doubled pair, so on chrY and chrMT, and on chrX
-for a man, `A A` is read as the one copy it encodes; a heterozygous call there, or a chrY call for a woman, fails loud
-rather than being kept as a copy PLINK itself would discard. LINKAGE `.pre` marker columns are not read: their layout
-depends on a separate locus file, so the columns after the phenotype cannot be split into allele pairs from the `.pre`
-alone.
+or `chr:bp` where the id is missing, and declares a locus only for a marker someone is called at. Each allele is named
+by the code the file writes for it (`A`, `2`); the file states no reference allele, so none is marked, and prints no
+figure, so no allele symbols. PLINK writes a haploid call as a doubled pair, so on chrY and chrMT, and on chrX for a
+man, `A A` is read as the one copy it encodes; a heterozygous call there, or a chrY call for a woman, fails loud rather
+than being kept as a copy PLINK itself would discard. LINKAGE `.pre` marker columns are not read: their layout depends
+on a separate locus file, so the columns after the phenotype cannot be split into allele pairs from the `.pre` alone.
 
 Not expressible: deceased, proband, twins, consanguinity, adoption, outcomes, counts, relationship status.
 
@@ -131,17 +131,17 @@ single-parent mating. Not expressible: consanguinity, relationship status, adopt
 names or ints; fixture `family.phenopackets.json`). An array's families are built each from its own people and extras
 (`build_sets`), their conditions declared once across the set.
 
-| Source                                                                                     | IR                                                                                                |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `Family.id` / `Person.familyId`                                                            | `Pedigree.id`; one pedigree per `Family`                                                          |
-| `pedigree.persons[]` (`individualId`, `paternalId`, `maternalId`, `sex`, `affectedStatus`) | the graph, as PED (`"0"`/`""` missing; MISSING status omits the condition)                        |
-| `proband.subject.id`                                                                       | `proband`                                                                                         |
-| `consanguinousParents`                                                                     | `consanguineous` on the proband's parents' mating (fail loud if the proband lacks two parents)    |
-| packet `diseases[]` (`term.label`, `excluded`, `onset`)                                    | replace the bare status: `Condition{name, AFFECTED/UNAFFECTED, onset_age}` (TimeElement verbatim) |
-| `subject.vitalStatus` DECEASED, `timeOfDeath`                                              | `deceased`; AGE_AT_DEATH annotation                                                               |
-| `subject.karyotypicSex`; `subject.gender` label naming non-binary                          | KARYOTYPE annotation; `GENDER_NONBINARY`                                                          |
-| packet variant interpretations (`variationDescriptor`, `allelicState`)                     | a locus per distinct variant (alleles `ref`, `alt`); a genotype by allelic state (below)          |
-| phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                           |
+| Source                                                                                     | IR                                                                                                   |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `Family.id` / `Person.familyId`                                                            | `Pedigree.id`; one pedigree per `Family`                                                             |
+| `pedigree.persons[]` (`individualId`, `paternalId`, `maternalId`, `sex`, `affectedStatus`) | the graph, as PED (`"0"`/`""` missing; MISSING status omits the condition)                           |
+| `proband.subject.id`                                                                       | `proband`                                                                                            |
+| `consanguinousParents`                                                                     | `consanguineous` on the proband's parents' mating (fail loud if the proband lacks two parents)       |
+| packet `diseases[]` (`term.label`, `excluded`, `onset`)                                    | replace the bare status: `Condition{name, AFFECTED/UNAFFECTED, onset_age}` (TimeElement verbatim)    |
+| `subject.vitalStatus` DECEASED, `timeOfDeath`                                              | `deceased`; AGE_AT_DEATH annotation                                                                  |
+| `subject.karyotypicSex`; `subject.gender` label naming non-binary                          | KARYOTYPE annotation; `GENDER_NONBINARY`                                                             |
+| packet variant interpretations (`variationDescriptor`, `allelicState`)                     | a locus per distinct variant (alleles `ref`, `alt`, no symbols); a genotype by allelic state (below) |
+| phenotypic features, measurements, gene-level interpretations, files, `metaData`           | dropped                                                                                              |
 
 Phenopackets keeps one variant per descriptor, so the importer declares one locus per distinct description: two
 descriptors are one locus when they are identical as written, leaving out the allelic state (the person's, not the

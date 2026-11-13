@@ -230,30 +230,59 @@ Typed annotation text keeps what is printed but not what it means. `M1/M2` means
 ("M1, c.1234A>G; M2, c.2000del"), and a reader of the IR alone cannot connect the person to a variant. In a sample of
 published pedigrees, about 60% of genotype labels were shorthand or bare bases that need such a key.
 
-So the IR records the table directly, in three parts:
+So the IR records the table directly, in four parts:
 
 - A **locus** is a place people are genotyped at: one variant, a gene with several alleles, or a marker. It is declared
   once per set, in `PedigreeSet.loci`, with a local id, the name and gene as printed, and its alleles. This is the same
   pattern as condition declarations above, for the same reasons: one place for a fact shared by many people, an id for
   citations to point at, and no free-text join.
-- An **allele** is a symbol genotypes use (`+`, `M1`, `G`, `★`, `1`) and what the source says it stands for: a printed
-  name, whether it is the reference, and any resolvable identifiers it prints (HGVS, rsID, ClinVar, ClinGen, SPDI, VRS).
-  An allele may be several variants in cis, a haplotype, named as such (`c.[76A>C;83G>C]`).
-- A **genotype** is one person's alleles at one locus, as copies. Zygosity is how often a symbol repeats, so no separate
-  field can disagree with it: `[M, M]` is homozygous, `[M, +]` heterozygous, `[M]` hemizygous. One or two copies.
+- An **allele** is one form at a locus: a local id, unique within its locus, and what the source says the allele is — a
+  printed name, whether it is the reference, and any resolvable identifiers it prints (HGVS, rsID, ClinVar, ClinGen,
+  SPDI, VRS). An allele may be several variants in cis, a haplotype, named as such (`c.[76A>C;83G>C]`).
+- An **allele symbol** is how one pedigree writes an allele: `M1`, `+`, `WT`, `★`. It belongs to the pedigree that
+  prints it, not to the allele (below).
+- A **genotype** is one person's alleles at one locus, as copies, each copy an allele id. Zygosity is how often an
+  allele repeats, so no separate field can disagree with it: `[M, M]` is homozygous, `[M, +]` heterozygous, `[M]`
+  hemizygous. One or two copies.
 
 ```
-locus l1 "c.1234A>G" gene SLC26A4: + (reference), M1 "c.1234A>G"
-locus l2 "c.2000del" gene SLC26A4: + (reference), M2 "c.2000del"
+locus l1 "c.1234A>G" gene SLC26A4: wt (reference), m1 "c.1234A>G"
+locus l2 "c.2000del" gene SLC26A4: wt (reference), m2 "c.2000del"
 
-II-1  l1 [M1, +] phase set a     annotation "M1/M2" shows l1, l2
-      l2 [+, M2] phase set a     → M1 and M2 on different haplotypes: in trans
+pedigree, as its legend prints them: l1 wt "+", l1 m1 "M1", l2 wt "+", l2 m2 "M2"
+II-1  l1 [m1, wt] phase set a     annotation "M1/M2" shows l1, l2
+      l2 [wt, m2] phase set a     → M1 and M2 on different haplotypes: in trans
 ```
+
+**Symbols belong to the pedigree that prints them.** A legend defines its symbols for its own drawing, so as soon as a
+set holds more than one figure — a paper's figures merged into one record — the symbol stops identifying the allele:
+
+- *The same symbol can mean different alleles.* Figure 1's legend says "M1 = c.1234A>G" and Figure 3's says "M1 =
+  c.1300T>C", both at one locus.
+- *Different symbols can mean the same allele.* Figure 1 prints the wild type `+` and Figure 2 prints it `WT`.
+
+If the symbol were the allele's key, a merged set could hold the second figure's genotypes only by dropping them, which
+leaves those people looking untested, or by inventing a symbol nobody printed ("M1 (Figure 3)"). So an allele's identity
+is its id and what it states, set-wide, and each pedigree carries its own table of symbols: one row per (locus, allele,
+symbol) it prints. The two figures above are two rows naming different alleles `M1`, and two rows naming one allele `+`
+and `WT`. This is the split already made for loci, whose id is separate from their printed name.
+
+What that implies:
+
+- **Within one pedigree, a symbol names one allele and an allele has one symbol** at a locus, so a printed `M1/+` reads
+  back to exactly one genotype. Across pedigrees, both may repeat.
+- **Symbols are optional.** They are recorded where the source prints them. An imported record prints no figure, so it
+  has none, and the importers no longer invent them; an allele a paper names only in its text ("the father carried
+  c.2000del") has none either, even when the legend prints symbols for the locus's other alleles.
+- **A pedigree may print a symbol for an allele no one in it carries**, since a legend shared by a figure's panels names
+  every allele, whichever panel carries it.
+- **Genotypes reference alleles by id**, never by symbol. The field that held symbols is retired rather than reused with
+  a new meaning, so a 0.4 record cannot have a symbol read as an id; it is re-read, not migrated.
 
 **Phase.** Whether two variants are in cis or in trans decides whether a person with two recessive variants is affected,
 and figures and papers state it ("compound heterozygous", "maternally inherited"). A genotype may name a **phase set**,
 as VCF does with `PS`: one person's genotypes in the same phase set line up slot by slot, so slot *i* across them is one
-haplotype. In the example, `M1` is in slot 0 and `M2` in slot 1, so they are in trans; `l2 [M2, +]` would put them in
+haplotype. In the example, `m1` is in slot 0 and `m2` in slot 1, so they are in trans; `l2 [m2, wt]` would put them in
 cis. A genotype without a phase set states no phase. Because slots align, genotypes sharing a phase set have the same
 number of copies. Phase relates heterozygous genotypes only: a homozygous or hemizygous member of a phase set states
 nothing by being there, and a phase set with one heterozygous genotype states no phase. Which parent a haplotype came
@@ -275,9 +304,12 @@ second-guess them.
 - every locus can be told apart by what it states, so two records' loci can be matched: a named locus's (gene, name) is
   declared once, and unnamed loci, whose alleles alone are named, may share a gene (a legend often names only the
   alleles) but not every allele;
-- allele symbols are unique within a locus, and at most one allele is the reference;
-- every genotype's locus resolves, each of its alleles is one of that locus's symbols, and a person has at most one
+- within a locus, allele ids are unique, so are the names of named alleles, and at most one allele is the reference;
+  several unnamed alleles may share a locus, told apart only by the symbols a pedigree prints for them;
+- every genotype's locus resolves, each of its allele ids is one of that locus's alleles, and a person has at most one
   genotype per locus;
+- each of a pedigree's symbols names a declared allele of a declared locus, and within the pedigree a (locus, symbol)
+  names one allele and an allele has one symbol;
 - genotypes sharing a phase set have equal copies;
 - an annotation names loci only if it is a `GENOTYPE` or `VARIANT` annotation of a person genotyped at each of them, and
   a mating's annotation names none;
@@ -286,19 +318,25 @@ second-guess them.
   pedigree) is a pedigree-level fact, recorded as a gene label, not an empty column; allowing empty columns would make
   "declared" and "someone carries it" two facts with nothing to tell them apart.
 
-The identity those checks and the diff use is exported from `grus.ir`, so a caller merging several sets (one per figure
-of a paper, say) can declare one locus per identity and re-point genotypes at it.
+**Identity across records.** A locus is identified by its gene and printed name, and an unnamed one by its alleles too.
+An allele is identified by its printed name and whether it is the reference — not by its id, local to its record, nor by
+its symbols, local to each pedigree. Its identifiers are not part of it: they are other spellings of what its name
+states, and one reader may copy them where another does not. Two unnamed, non-reference alleles therefore have the same
+identity: outside a pedigree that prints symbols for them, nothing the record states tells them apart, so a caller
+merging sets cannot match them and has to keep them distinct. The identity the checks and the diff use is exported from
+`grus.ir`, so a caller merging several sets (one per figure of a paper, say) can declare one locus per identity, one
+allele per allele identity, re-point genotypes at them, and carry each figure's symbol table over unchanged.
 
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 
-**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name) — and an
-unnamed one by its alleles too — each allele by its symbol, printed name and whether it is the reference, unphased
-copies as a multiset and a phase set as its multiset of haplotypes. So ids, phase-set names and swapping every slot of a
-phase set at once do not register as differences. An allele's identifiers are not compared: they are other spellings of
-what its name states, and one reader may copy them where another does not. A support cites genotypes or locus
-declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole pedigree) and names the loci, several
-when one sentence covers several ("M1 and M2 in trans" backs the phase at both), as `condition.*` paths name a
-condition. Stored layouts ignore genotypes and an annotation's loci, since layout reads only the annotation's text.
+**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its identity, and each copy by
+its allele's identity and the symbol the person's own pedigree prints for it, so two readings that agree on the variant
+but not on the printed symbol differ. Unphased copies compare as a multiset and a phase set as its multiset of
+haplotypes, so ids, phase-set names and swapping every slot of a phase set at once do not register as differences. A
+support cites genotypes or locus declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole
+pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in trans" backs the phase at both),
+as `condition.*` paths name a condition. Stored layouts ignore genotypes, symbols and an annotation's loci, since layout
+reads only the annotation's text.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
@@ -404,6 +442,10 @@ validate). The lost-unknowns caveat of text projections does not bite because no
   but the drawn text is then a renderer's formatting choice (separator, order, a locus prefix when there are several), a
   figure's exact label is lost, and an imported cohort with many markers would draw a stack of lines no figure has.
   Keeping both, linked by the annotation's loci, records what is printed and what it means.
+
+- **The symbol as the allele's key, with per-pedigree aliases** for the symbols that clash. Additive, and genotypes
+  would not change. Rejected: whenever symbols clash the key is a symbol nobody printed, and every reader has to know to
+  look past it to the aliases; an id that never claims to be printed says what it is.
 
 - **Per-allele copy counts** (`{M: 2}`) instead of a list of copies. It states zygosity as directly, but a count has no
   slots, so it cannot say which variants share a haplotype.

@@ -295,16 +295,16 @@ class Identifier(_message.Message):
     def __init__(self, scheme: _Optional[_Union[IdentifierScheme, str]] = ..., value: _Optional[str] = ...) -> None: ...
 
 class Allele(_message.Message):
-    __slots__ = ("symbol", "name", "reference", "identifiers")
-    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("id", "name", "reference", "identifiers")
+    ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     REFERENCE_FIELD_NUMBER: _ClassVar[int]
     IDENTIFIERS_FIELD_NUMBER: _ClassVar[int]
-    symbol: str
+    id: str
     name: str
     reference: bool
     identifiers: _containers.RepeatedCompositeFieldContainer[Identifier]
-    def __init__(self, symbol: _Optional[str] = ..., name: _Optional[str] = ..., reference: _Optional[bool] = ..., identifiers: _Optional[_Iterable[_Union[Identifier, _Mapping]]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., reference: _Optional[bool] = ..., identifiers: _Optional[_Iterable[_Union[Identifier, _Mapping]]] = ...) -> None: ...
 
 class Locus(_message.Message):
     __slots__ = ("id", "name", "gene", "alleles")
@@ -319,14 +319,24 @@ class Locus(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., gene: _Optional[str] = ..., alleles: _Optional[_Iterable[_Union[Allele, _Mapping]]] = ...) -> None: ...
 
 class Genotype(_message.Message):
-    __slots__ = ("locus_id", "alleles", "phase_set")
+    __slots__ = ("locus_id", "allele_ids", "phase_set")
     LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
-    ALLELES_FIELD_NUMBER: _ClassVar[int]
+    ALLELE_IDS_FIELD_NUMBER: _ClassVar[int]
     PHASE_SET_FIELD_NUMBER: _ClassVar[int]
     locus_id: str
-    alleles: _containers.RepeatedScalarFieldContainer[str]
+    allele_ids: _containers.RepeatedScalarFieldContainer[str]
     phase_set: str
-    def __init__(self, locus_id: _Optional[str] = ..., alleles: _Optional[_Iterable[str]] = ..., phase_set: _Optional[str] = ...) -> None: ...
+    def __init__(self, locus_id: _Optional[str] = ..., allele_ids: _Optional[_Iterable[str]] = ..., phase_set: _Optional[str] = ...) -> None: ...
+
+class AlleleSymbol(_message.Message):
+    __slots__ = ("locus_id", "allele_id", "symbol")
+    LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
+    ALLELE_ID_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    locus_id: str
+    allele_id: str
+    symbol: str
+    def __init__(self, locus_id: _Optional[str] = ..., allele_id: _Optional[str] = ..., symbol: _Optional[str] = ...) -> None: ...
 
 class Mating(_message.Message):
     __slots__ = ("partner_a", "partner_b", "consanguineous", "status", "childlessness", "offspring", "annotations")
@@ -369,7 +379,7 @@ class Label(_message.Message):
     def __init__(self, text: _Optional[str] = ..., kind: _Optional[_Union[LabelKind, str]] = ...) -> None: ...
 
 class Pedigree(_message.Message):
-    __slots__ = ("id", "labels", "individuals", "matings", "provenance", "evidence", "supports")
+    __slots__ = ("id", "labels", "individuals", "matings", "provenance", "evidence", "supports", "allele_symbols")
     ID_FIELD_NUMBER: _ClassVar[int]
     LABELS_FIELD_NUMBER: _ClassVar[int]
     INDIVIDUALS_FIELD_NUMBER: _ClassVar[int]
@@ -377,6 +387,7 @@ class Pedigree(_message.Message):
     PROVENANCE_FIELD_NUMBER: _ClassVar[int]
     EVIDENCE_FIELD_NUMBER: _ClassVar[int]
     SUPPORTS_FIELD_NUMBER: _ClassVar[int]
+    ALLELE_SYMBOLS_FIELD_NUMBER: _ClassVar[int]
     id: str
     labels: _containers.RepeatedCompositeFieldContainer[Label]
     individuals: _containers.RepeatedCompositeFieldContainer[Individual]
@@ -384,7 +395,8 @@ class Pedigree(_message.Message):
     provenance: Provenance
     evidence: _containers.RepeatedScalarFieldContainer[str]
     supports: _containers.RepeatedCompositeFieldContainer[Support]
-    def __init__(self, id: _Optional[str] = ..., labels: _Optional[_Iterable[_Union[Label, _Mapping]]] = ..., individuals: _Optional[_Iterable[_Union[Individual, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[Mating, _Mapping]]] = ..., provenance: _Optional[_Union[Provenance, _Mapping]] = ..., evidence: _Optional[_Iterable[str]] = ..., supports: _Optional[_Iterable[_Union[Support, _Mapping]]] = ...) -> None: ...
+    allele_symbols: _containers.RepeatedCompositeFieldContainer[AlleleSymbol]
+    def __init__(self, id: _Optional[str] = ..., labels: _Optional[_Iterable[_Union[Label, _Mapping]]] = ..., individuals: _Optional[_Iterable[_Union[Individual, _Mapping]]] = ..., matings: _Optional[_Iterable[_Union[Mating, _Mapping]]] = ..., provenance: _Optional[_Union[Provenance, _Mapping]] = ..., evidence: _Optional[_Iterable[str]] = ..., supports: _Optional[_Iterable[_Union[Support, _Mapping]]] = ..., allele_symbols: _Optional[_Iterable[_Union[AlleleSymbol, _Mapping]]] = ...) -> None: ...
 
 class PedigreeSet(_message.Message):
     __slots__ = ("pedigrees", "provenance", "citations", "evidence", "conditions", "loci")

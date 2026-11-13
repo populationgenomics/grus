@@ -198,7 +198,8 @@ def _genotypes(
 ) -> tuple[list[pb.Locus], list[list[pb.Genotype]]]:
     """The loci (markers with a called genotype, ids ``l1``, ``l2``, … in map order) and each row's genotypes.
 
-    A locus's alleles are the symbols its calls use, in order of first appearance; the file states no reference.
+    A locus's alleles are the codes its calls use, each named by its code, ids ``a1``, ``a2``, … in order of first
+    appearance; the file states no reference and prints no figure, so no symbols.
     """
     loci: list[pb.Locus] = []
     genotypes: list[list[pb.Genotype]] = [[] for _ in rows]
@@ -218,10 +219,12 @@ def _genotypes(
         if not calls:
             continue
         locus_id = f"l{len(loci) + 1}"
-        symbols = list(dict.fromkeys(a for _, pair in calls for a in pair))
-        loci.append(pb.Locus(id=locus_id, name=marker.name, alleles=[pb.Allele(symbol=s) for s in symbols]))
+        ids = {code: f"a{k + 1}" for k, code in enumerate(dict.fromkeys(a for _, pair in calls for a in pair))}
+        loci.append(
+            pb.Locus(id=locus_id, name=marker.name, alleles=[pb.Allele(id=x, name=code) for code, x in ids.items()])
+        )
         for n, pair in calls:
-            genotypes[n].append(pb.Genotype(locus_id=locus_id, alleles=pair))
+            genotypes[n].append(pb.Genotype(locus_id=locus_id, allele_ids=[ids[code] for code in pair]))
     return loci, genotypes
 
 

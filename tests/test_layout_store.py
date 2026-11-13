@@ -453,7 +453,7 @@ def test_every_digested_field_is_classified() -> None:
 
 
 # The sample's one locus, which its first person is genotyped at.
-_LOCI = [pb.Locus(id="l1", alleles=[pb.Allele(symbol="N", reference=True), pb.Allele(symbol="M")])]
+_LOCI = [pb.Locus(id="l1", alleles=[pb.Allele(id="N", reference=True), pb.Allele(id="M", name="c.1A>G")])]
 
 
 def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
@@ -470,7 +470,7 @@ def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
         offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
     )
     p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
-    p.individuals[0].genotypes.add(locus_id="l1", alleles=["N", "M"])
+    p.individuals[0].genotypes.add(locus_id="l1", allele_ids=["N", "M"])
     p.individuals[2].count = 3
     p.individuals[3].conditions.add(condition_id="k5", status=pb.CONDITION_STATUS_AFFECTED)
     return p, [*defs, pb.ConditionDef(id="k5", name="E")]
@@ -497,6 +497,7 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDe
     ("Pedigree", "evidence"): lambda p, defs: p.evidence.append("c1"),
     ("Pedigree", "supports"): lambda p, defs: p.supports.add(citations=["c1"], field="labels"),
     ("Pedigree", "labels"): _reverse_phenotype_labels,  # reorders the legend
+    ("Pedigree", "allele_symbols"): lambda p, defs: p.allele_symbols.add(locus_id="l1", allele_id="M", symbol="M1"),
     ("Individual", "gender"): lambda p, defs: setattr(p.individuals[2], "gender", pb.GENDER_MAN),
     ("Individual", "proband"): lambda p, defs: setattr(p.individuals[1], "proband", True),  # B becomes primary
     ("Individual", "consultand"): lambda p, defs: setattr(p.individuals[0], "consultand", True),
@@ -521,7 +522,7 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDe
     ("Annotation", "loci"): lambda p, defs: (
         p.individuals[0].annotations[0].MergeFrom(pb.Annotation(type=pb.ANNOTATION_TYPE_GENOTYPE, loci=["l1"]))
     ),
-    ("Individual", "genotypes"): lambda p, defs: p.individuals[0].genotypes[0].alleles.__setitem__(0, "M"),
+    ("Individual", "genotypes"): lambda p, defs: p.individuals[0].genotypes[0].allele_ids.__setitem__(0, "M"),
     ("Mating", "status"): lambda p, defs: setattr(p.matings[-1], "status", pb.RELATIONSHIP_STATUS_DIVORCED),
     ("Mating", "annotations"): lambda p, defs: p.matings[-1].annotations.add(
         text="vasectomy", type=pb.ANNOTATION_TYPE_OTHER

@@ -15,7 +15,7 @@ whose ``subject.id`` matches a person:
 - ``vitalStatus.status == DECEASED`` -> ``deceased``; ``timeOfDeath`` -> AGE_AT_DEATH annotation.
 - ``karyotypicSex`` -> KARYOTYPE annotation; a ``gender`` ontology label naming non-binary -> NONBINARY.
 - ``interpretations[].diagnosis.genomicInterpretations[].variantInterpretation.variationDescriptor`` -> a locus
-  per distinct variant (one locus per variant, alleles ``ref`` and ``alt``) and a genotype for the person
+  per distinct variant (one locus per variant, allele ids ``ref`` and ``alt``, no symbols) and a genotype for the person
   ``subjectOrBiosampleId`` names (a biosample id: the packet's subject) by ``allelicState``: heterozygous (or
   compound heterozygous) ``[ref, alt]``, homozygous ``[alt, alt]``, hemizygous ``[alt]``. A variant whose allelic
   state is absent or another term states no genotype and is dropped.
@@ -215,14 +215,14 @@ def _identifiers(vd: dict[str, Any]) -> list[pb.Identifier]:
 
 
 def _locus(locus_id: str, vd: dict[str, Any]) -> pb.Locus:
-    """The locus of one variant (``_name``), alleles ``ref`` (named by the VCF REF, when stated) and ``alt``."""
+    """The locus of one variant (``_name``), allele ids ``ref`` (named by the VCF REF, when stated) and ``alt``."""
     name = _name(vd)
     locus = pb.Locus(
         id=locus_id,
         name=name,
         alleles=[
-            pb.Allele(symbol="ref", name=str(_get(_vcf(vd), "ref", "")), reference=True),
-            pb.Allele(symbol="alt", name=name, identifiers=_identifiers(vd)),
+            pb.Allele(id="ref", name=str(_get(_vcf(vd), "ref", "")), reference=True),
+            pb.Allele(id="alt", name=name, identifiers=_identifiers(vd)),
         ],
     )
     if gene := _gene(vd):
@@ -281,7 +281,7 @@ def _genotypes(packet: dict[str, Any], subject: str, known: set[str], loci: _Loc
             if copies is None:
                 continue
             who = _owner(str(_get(gi, "subjectOrBiosampleId", "")), subject, known, biosamples)
-            out.setdefault(who, []).append(pb.Genotype(locus_id=loci.locus_id(vd), alleles=copies))
+            out.setdefault(who, []).append(pb.Genotype(locus_id=loci.locus_id(vd), allele_ids=copies))
     return out
 
 

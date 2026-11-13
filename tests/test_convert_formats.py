@@ -98,9 +98,16 @@ def test_ped_rejects_short_rows_and_zero_iid() -> None:
 
 
 def _genotypes(ps: pb.PedigreeSet, ind: pb.Individual) -> dict[str, list[str]]:
-    """``ind``'s genotypes by their locus's name."""
+    """``ind``'s genotypes by their locus's name, as allele ids."""
     name = {locus.id: locus.name for locus in ps.loci}
-    return {name[g.locus_id]: list(g.alleles) for g in ind.genotypes}
+    return {name[g.locus_id]: list(g.allele_ids) for g in ind.genotypes}
+
+
+def _called(ps: pb.PedigreeSet, ind: pb.Individual) -> dict[str, list[str]]:
+    """``ind``'s genotypes by their locus's name, as allele names."""
+    loci = {locus.id: locus for locus in ps.loci}
+    names = {(locus.id, a.id): a.name for locus in ps.loci for a in locus.alleles}
+    return {loci[g.locus_id].name: [names[(g.locus_id, x)] for x in g.allele_ids] for g in ind.genotypes}
 
 
 def test_ped_genotypes_are_dropped_unless_asked() -> None:
@@ -111,14 +118,15 @@ def test_ped_genotypes_are_dropped_unless_asked() -> None:
 def test_ped_genotypes_read_with_the_map() -> None:
     ps = convert.import_file(_FIX / "markers.ped", genotypes=True)
     # The third marker is never called, so it declares no locus; a missing marker id is named chr:bp.
-    assert [(locus.name, [a.symbol for a in locus.alleles]) for locus in ps.loci] == [
+    assert [(locus.name, [a.name for a in locus.alleles]) for locus in ps.loci] == [
         ("rs123", ["A", "G"]),
         ("12:2000", ["1", "2"]),
     ]
     assert not any(a.reference for locus in ps.loci for a in locus.alleles)  # PED states no reference
+    assert not any(p.allele_symbols for p in ps.pedigrees)  # nor prints a figure
     ext = _by_ext(ps.pedigrees[0])
-    assert _genotypes(ps, ext["mum"]) == {"rs123": ["G", "G"], "12:2000": ["2", "2"]}
-    assert _genotypes(ps, ext["kid"]) == {"rs123": ["A", "G"], "12:2000": ["1", "2"]}
+    assert _called(ps, ext["mum"]) == {"rs123": ["G", "G"], "12:2000": ["2", "2"]}
+    assert _called(ps, ext["kid"]) == {"rs123": ["A", "G"], "12:2000": ["1", "2"]}
     render.render_set_svg(ps)
 
 
@@ -129,8 +137,8 @@ def test_ped_haploid_calls_are_one_copy() -> None:
     map_text = "X x1 0 10\nchrY y1 0 20\nMT m1 0 30\nXY p1 0 40\n1 gone 0 -50\n"
     ps = convert._ped.import_ped(ped, map_text=map_text)
     ext = _by_ext(ps.pedigrees[0])
-    assert _genotypes(ps, ext["a"]) == {"x1": ["A"], "y1": ["C"], "m1": ["G"], "p1": ["T", "T"]}
-    assert _genotypes(ps, ext["b"]) == {"x1": ["A", "G"], "m1": ["G"], "p1": ["T", "T"]}
+    assert _called(ps, ext["a"]) == {"x1": ["A"], "y1": ["C"], "m1": ["G"], "p1": ["T", "T"]}
+    assert _called(ps, ext["b"]) == {"x1": ["A", "G"], "m1": ["G"], "p1": ["T", "T"]}
 
 
 @pytest.mark.parametrize(

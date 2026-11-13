@@ -13,9 +13,10 @@
 // Conditions are declared once per set and referenced by id: every id resolves, declarations are unique and
 // each is referenced, and no person has two entries for one condition.
 // Loci are declared the same way: ids are unique, a named locus's (gene, name) is declared once, each locus is
-// referenced; every genotype's locus resolves and each allele is one of its symbols, at most one genotype per person
-// per locus, genotypes sharing a phase set have equal ploidy, and an annotation's loci are ones its person has a
-// genotype at.
+// referenced; allele ids are unique within a locus; every genotype's locus resolves and each allele id is one of its
+// alleles, at most one genotype per person per locus, genotypes sharing a phase set have equal ploidy, and an
+// annotation's loci are ones its person has a genotype at. A pedigree's allele symbols resolve, and within it a
+// (locus, symbol) names one allele and an allele has at most one symbol.
 
 syntax = "proto3";
 package grus.models.pedigree;
@@ -190,10 +191,13 @@ message Identifier {
   IdentifierScheme scheme = 1;
   string value = 2 [(buf.validate.field).string.min_len = 1];
 }
-// One allele at a locus: the symbol genotypes use, and what the source says it stands for. One allele may be several
-// variants in cis (a haplotype), named so: "c.[76A>C;83G>C]".
+// One allele at a locus: what the source says it stands for. One allele may be several variants in cis (a haplotype),
+// named so: "c.[76A>C;83G>C]". The symbol a figure prints for it ("M1", "+") is per pedigree (AlleleSymbol).
 message Allele {
-  string symbol = 1 [(buf.validate.field).string.min_len = 1];  // as used in genotypes: "+", "M1", "G", "★", "1"
+  reserved 1;                             // was symbol: now per pedigree, Pedigree.allele_symbols
+  reserved "symbol";
+  string id = 5 [(buf.validate.field).string.min_len = 1];  // local ("a1"), unique within its locus; what genotypes
+                                                            // reference
   string name = 2;                        // as printed: "c.1234A>G", "wild type"; "" when the source does not say
   bool reference = 3;                     // the reference / wild-type allele, when the source says which
   repeated Identifier identifiers = 4;    // when the source prints them
@@ -207,16 +211,26 @@ message Locus {
   optional string gene = 3 [(buf.validate.field).string.min_len = 1];  // as printed: "SLC26A4"; absent if not
   repeated Allele alleles = 4 [(buf.validate.field).repeated.min_items = 1];
 }
-// One person's genotype at one locus. `alleles` are copies, so zygosity is how often a symbol repeats: [M, M]
+// One person's genotype at one locus. `allele_ids` are copies, so zygosity is how often an allele repeats: [M, M]
 // homozygous, [M, +] heterozygous, [M] hemizygous.
 message Genotype {
+  reserved 2;                             // was alleles, by symbol: now allele_ids
+  reserved "alleles";
   string locus_id = 1 [(buf.validate.field).string.min_len = 1];
-  repeated string alleles = 2 [(buf.validate.field).repeated = {
+  repeated string allele_ids = 4 [(buf.validate.field).repeated = {
     min_items: 1, max_items: 2, items: {string: {min_len: 1}}
-  }];                                     // symbols of the locus's alleles
+  }];                                     // ids of the locus's alleles
   // Stated phase, as VCF's PS: one person's genotypes sharing a phase set align slot by slot, slot i across them
   // being one haplotype — so l1 [M, +] and l2 [+, M] in one set are in trans. Absent = phase not stated.
   optional string phase_set = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+// How one pedigree writes an allele: its figure's symbol for it. Per pedigree, because each figure's legend defines
+// its own: "M1" may be different alleles in two figures, and one allele "+" in one and "WT" in another.
+message AlleleSymbol {
+  string locus_id = 1 [(buf.validate.field).string.min_len = 1];
+  string allele_id = 2 [(buf.validate.field).string.min_len = 1];
+  string symbol = 3 [(buf.validate.field).string.min_len = 1];  // as printed in this pedigree: "M1", "+", "WT", "★"
 }
 
 // ── Matings ─────────────────────────────────────────────────────────────────────────────────────
@@ -270,6 +284,8 @@ message Pedigree {
   optional Provenance provenance = 5;
   repeated string evidence = 6;                           // Citation ids: the panel this pedigree is drawn in
   repeated Support supports = 7;                          // which facts came from where, when that matters
+  repeated AlleleSymbol allele_symbols = 8;               // the symbols this pedigree prints for alleles; none when
+                                                          // the source prints none (an imported record)
 }
 message PedigreeSet {
   repeated Pedigree pedigrees = 1;

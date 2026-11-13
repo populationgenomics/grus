@@ -73,7 +73,7 @@ LAYOUT_READS: dict[str, frozenset[str]] = {
 }
 LAYOUT_IGNORES: dict[str, frozenset[str]] = {
     # labels: the legend's order, never its length
-    "Pedigree": frozenset({"id", "provenance", "evidence", "supports", "labels"}),
+    "Pedigree": frozenset({"id", "provenance", "evidence", "supports", "labels", "allele_symbols"}),
     "Individual": frozenset(
         {
             "gender",  # sizes a count inside its symbol, never its reach

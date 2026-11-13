@@ -78,6 +78,7 @@ def validate(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = (), *, loci
     _check_entries(p, declared)
     by_locus = {locus.id: locus for locus in loci}
     _check_genotypes(p, by_locus)
+    _check_allele_symbols(p, by_locus)
     _check_supports(p, positions, declared, set(by_locus))
 
 
@@ -256,7 +257,7 @@ _CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status",
 _DECLARATION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("name", "inheritance"))
 SUPPORT_GENOTYPE_PREFIX = "genotype."  # a person's genotypes at some loci: needs Support.loci
 SUPPORT_LOCUS_PREFIX = "locus."  # locus declarations (the whole pedigree only): needs Support.loci
-_GENOTYPE_FIELDS = tuple(SUPPORT_GENOTYPE_PREFIX + name for name in ("alleles", "phase_set"))
+_GENOTYPE_FIELDS = tuple(SUPPORT_GENOTYPE_PREFIX + name for name in ("allele_ids", "phase_set"))
 _LOCUS_FIELDS = tuple(SUPPORT_LOCUS_PREFIX + name for name in ("name", "gene", "alleles"))
 _MATING_FIELDS = ("consanguineous", "status", "childlessness", "annotations")
 _OFFSPRING_FIELDS = ("twin_group", "twin_type", "parentage", "adoption")
@@ -325,7 +326,9 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
     """Each locus is well-formed, its id unique and no citation's or condition's, and told apart by what it states.
 
     A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene but not all of
-    their alleles (``locus_identity``). Within a locus, allele symbols are unique and at most one is the reference.
+    their alleles (``locus_identity``). Within a locus, allele ids are unique, so are the names of named alleles, and
+    at most one allele is the reference. Several unnamed alleles may share a locus: only the symbols a pedigree prints
+    for them tell them apart.
     """
     ids: set[str] = set()
     names: dict[LocusIdentity, str] = {}
@@ -350,18 +353,20 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
                 f"{where}: locus (gene={name[0]!r}, {stated}) is already declared as {names[name]!r}; "
                 "one declaration per locus"
             )
-        symbols = [a.symbol for a in locus.alleles]
-        if len(set(symbols)) != len(symbols):
-            dup = sorted({x for x in symbols if symbols.count(x) > 1})
-            raise IntegrityError(f"{where}: allele symbol(s) {dup} are declared twice; symbols are unique in a locus")
+        for what, values in (
+            ("id", [a.id for a in locus.alleles]),
+            ("name", [a.name for a in locus.alleles if a.name]),
+        ):
+            if dup := sorted({x for x in values if values.count(x) > 1}):
+                raise IntegrityError(f"{where}: allele {what}(s) {dup} are declared twice; they are unique in a locus")
         if sum(a.reference for a in locus.alleles) > 1:
             raise IntegrityError(f"{where}: more than one allele is the reference")
         ids.add(locus.id)
         names[name] = locus.id
 
 
-# An allele as compared: (symbol, printed name, whether it is the reference).
-AlleleIdentity = tuple[str, str, bool]
+# An allele as compared: (printed name, whether it is the reference).
+AlleleIdentity = tuple[str, bool]
 # A locus's identity across records: (gene, name, alleles) — the alleles, sorted, only for an unnamed locus.
 LocusIdentity = tuple[str | None, str, tuple[AlleleIdentity, ...]]
 
@@ -378,21 +383,23 @@ def locus_identity(locus: pb.Locus) -> LocusIdentity:
 
 
 def allele_identity(allele: pb.Allele) -> AlleleIdentity:
-    """What an allele states, as compared: its symbol, printed name and whether it is the reference.
+    """What an allele states, as compared: its printed name and whether it is the reference.
 
-    Its identifiers are not compared: they are other spellings of what its name states.
+    Not its id, which is local to its record, nor the symbols pedigrees print for it, which are local to each pedigree.
+    Its identifiers are not compared either: they are other spellings of what its name states. Two unnamed,
+    non-reference alleles have equal identities: nothing the set states tells them apart outside a pedigree that prints
+    symbols for them, so a caller merging sets cannot match them by identity.
     """
-    return (allele.symbol, allele.name, allele.reference)
+    return (allele.name, allele.reference)
 
 
 def allele_text(allele: pb.Allele) -> str:
-    """An allele for display: its symbol, with its printed name and whether it is the reference."""
-    stated = [x for x in (allele.name, "reference" if allele.reference else "") if x]
-    return f"{allele.symbol} ({', '.join(stated)})" if stated else allele.symbol
+    """An allele for display: its printed name and whether it is the reference, or ``unnamed``."""
+    return ", ".join(x for x in (allele.name, "reference" if allele.reference else "") if x) or "unnamed"
 
 
 def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
-    """Every genotype's locus is declared and its alleles are that locus's symbols; at most one per person per locus.
+    """Every genotype's locus is declared and its allele ids are that locus's; at most one per person per locus.
 
     Genotypes sharing a phase set align slot by slot, so they have equal ploidy. An annotation's loci are on a
     GENOTYPE or VARIANT annotation of a person genotyped at each; a mating's annotation names none.
@@ -410,17 +417,18 @@ def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
             if g.locus_id in seen:
                 raise IntegrityError(f"{who} has two genotypes at locus {g.locus_id!r}")
             seen.add(g.locus_id)
-            symbols = {a.symbol for a in locus.alleles}
-            for allele in g.alleles:
-                if allele not in symbols:
+            ids = {a.id for a in locus.alleles}
+            for allele_id in g.allele_ids:
+                if allele_id not in ids:
                     raise IntegrityError(
-                        f"{who}: allele {allele!r} at locus {g.locus_id!r} is not one of its symbols {sorted(symbols)}"
+                        f"{who}: allele id {allele_id!r} is not declared at locus {g.locus_id!r} "
+                        f"(its alleles: {sorted(ids)})"
                     )
             if g.HasField("phase_set"):
-                n = ploidy.setdefault(g.phase_set, len(g.alleles))
-                if n != len(g.alleles):
+                n = ploidy.setdefault(g.phase_set, len(g.allele_ids))
+                if n != len(g.allele_ids):
                     raise IntegrityError(
-                        f"{who}: phase set {g.phase_set!r} mixes genotypes of {n} and {len(g.alleles)} alleles; "
+                        f"{who}: phase set {g.phase_set!r} mixes genotypes of {n} and {len(g.allele_ids)} alleles; "
                         "a phase set aligns its genotypes slot by slot"
                     )
         for a in ind.annotations:
@@ -442,6 +450,36 @@ def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
         for a in m.annotations:
             if a.loci:
                 raise IntegrityError(f"matings[{i}]: annotation {a.text!r} names loci; a couple has no genotype")
+
+
+def _check_allele_symbols(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
+    """Each symbol names a declared allele; in ``p``, a (locus, symbol) names one allele and an allele has one symbol.
+
+    Symbols are optional: a pedigree prints one for an allele or records none. Across pedigrees both may repeat.
+    """
+    by_symbol: dict[tuple[str, str], str] = {}
+    by_allele: dict[tuple[str, str], str] = {}
+    for k, row in enumerate(p.allele_symbols):
+        where = f"allele_symbols[{k}] ({row.symbol!r})"
+        locus = loci.get(row.locus_id)
+        if locus is None:
+            raise IntegrityError(f"{where}: locus_id {row.locus_id!r} is not declared")
+        if row.allele_id not in {a.id for a in locus.alleles}:
+            raise IntegrityError(f"{where}: allele id {row.allele_id!r} is not declared at locus {row.locus_id!r}")
+        symbol, allele = (row.locus_id, row.symbol), (row.locus_id, row.allele_id)
+        at = f"at locus {row.locus_id!r}"
+        if symbol in by_symbol and by_symbol[symbol] != row.allele_id:
+            raise IntegrityError(
+                f"{where}: symbol {row.symbol!r} {at} already names allele {by_symbol[symbol]!r}; "
+                "in one pedigree a symbol names one allele"
+            )
+        if allele in by_allele:
+            raise IntegrityError(
+                f"{where}: allele {row.allele_id!r} {at} already has symbol {by_allele[allele]!r}; "
+                "in one pedigree an allele has one symbol"
+            )
+        by_symbol[symbol] = row.allele_id
+        by_allele[allele] = row.symbol
 
 
 def _check_entries(p: pb.Pedigree, declared: set[str]) -> None:
