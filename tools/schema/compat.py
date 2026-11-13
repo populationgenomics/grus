@@ -1,4 +1,4 @@
-"""Gate a schema change on backward compatibility, unless the package's major version rises (docs/design/ir.md).
+"""Gate a schema change on backward compatibility, unless it is a breaking release (docs/design/ir.md).
 
 ``buf breaking`` (FILE) against ``BASE_REF``: a clean result passes. A break passes only when ``pyproject.toml``'s
 breaking release at HEAD exceeds the one at ``BASE_REF``, the signal that a breaking release migrates every consumer;

@@ -472,9 +472,9 @@ def _individual_mismatches(
     return out
 
 
-# One copy as compared: the allele as stated (``_validate.allele_identity``) and the symbol its pedigree prints for it,
-# "" when it prints none (a symbol is never empty).
-_Copy = tuple[_validate.AlleleIdentity, str]
+# One copy as compared: whether its allele is the reference, the allele's printed name, and the symbol its pedigree
+# prints for it, "" when it prints none (a symbol is never empty).
+_Copy = tuple[bool, str, str]
 # One genotype as compared: its locus's identity, and its copies.
 _Called = tuple[_validate.LocusIdentity, tuple[_Copy, ...]]
 
@@ -516,7 +516,7 @@ def _resolve(ind: pb.Individual, loci: _Loci) -> list[tuple[pb.Genotype, _Called
         if missing:
             raise UndeclaredLocusError(f"allele id(s) {missing} are not declared at locus {g.locus_id!r}")
         copies = [(by_id[x], loci.symbols.get((g.locus_id, x), "")) for x in g.allele_ids]
-        called = (_validate.locus_identity(locus), tuple((_validate.allele_identity(a), s) for a, s in copies))
+        called = (_validate.locus_identity(locus), tuple((a.reference, a.name, s) for a, s in copies))
         shown = [f"{s} ({_validate.allele_text(a)})" if s else _validate.allele_text(a) for a, s in copies]
         out.append((g, called, shown))
     return out

@@ -87,14 +87,18 @@ def _set_field(path: Callable[[pb.PedigreeSet], object], name: str, value: objec
     return lambda ps: setattr(path(ps), name, value)
 
 
-def _indistinct_unnamed_loci(ps: pb.PedigreeSet) -> None:
-    """Both loci unnamed, in one gene, with the same alleles (the reference, an unnamed one): nothing tells them apart.
-
-    The symbols the pedigree prints (``M1``, ``M2``) do not: they are the pedigree's, not the loci's.
-    """
+def _unnamed_loci(ps: pb.PedigreeSet) -> None:
+    """Both loci unnamed, in one gene, each with the reference and an unnamed allele: a legend printing only symbols."""
     for locus in ps.loci:
         locus.ClearField("name")
         locus.alleles[1].ClearField("name")
+
+
+def _same_unnamed_loci(ps: pb.PedigreeSet) -> None:
+    """Both loci unnamed, in one gene, with the same named alleles: they state one locus."""
+    for locus in ps.loci:
+        locus.ClearField("name")
+        locus.alleles[1].name = "c.1234A>G"
 
 
 # One edit per loader invariant, each breaking a valid set: (edit, the message the failure names).
@@ -119,9 +123,17 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         lambda ps: setattr(ps.loci[1], "name", "c.1234A>G"),
         r"is already declared as 'l1'",
     ),
-    "unnamed loci told apart by nothing": (
-        _indistinct_unnamed_loci,
-        r"locus \(gene='SLC26A4', alleles=\['reference', 'unnamed'\]\) is already declared as 'l1'",
+    "unnamed loci with the same alleles": (
+        _same_unnamed_loci,
+        r"locus \(gene='SLC26A4', alleles=\['c.1234A>G', 'reference'\]\) is already declared as 'l1'",
+    ),
+    "unnamed allele with no symbol": (
+        lambda ps: (_unnamed_loci(ps), ps.pedigrees[0].allele_symbols.pop(1)),
+        r"allele 'm1' at locus 'l1' is unnamed and the pedigree prints no symbol for it",
+    ),
+    "symbol row twice": (
+        lambda ps: ps.pedigrees[0].allele_symbols.append(ps.pedigrees[0].allele_symbols[1]),
+        r"allele 'm1' at locus 'l1' is listed twice",
     ),
     "locus id is a citation id": (
         lambda ps: ps.citations.add(id="l2", quote="x"),
@@ -440,10 +452,46 @@ def _two_figures() -> pb.PedigreeSet:
 def test_symbols_are_scoped_to_their_pedigree() -> None:
     # "M1" is c.1234A>G in one family and c.1300T>C in the other, and the reference is "+" in one and "WT" in the
     # other: one locus in one set, each family printing it as its legend does.
-    ps = _two_figures()
+    ir.validate_set(_two_figures())
+
+
+def test_unnamed_loci_told_apart_by_their_symbols_are_valid() -> None:
+    # "M1/+" and "M2/+" beside one person, no legend: two loci, phase not stated. One locus [M1, M2] would state trans.
+    ps = _set()
+    _unnamed_loci(ps)
     ir.validate_set(ps)
-    symbols = {(row.allele_id, row.symbol) for row in ps.pedigrees[1].allele_symbols if row.locus_id == "l1"}
-    assert symbols == {("wt", "WT"), ("m3", "M1")}
+    assert not any(ir.locus_is_matchable(locus) for locus in ps.loci)
+
+
+def _one_locus_two_unnamed(child: list[str]) -> pb.PedigreeSet:
+    """One unnamed locus, the reference and two unnamed alleles printed ``M1`` and ``M2``; one person at ``child``."""
+    ps = text_format.Parse(
+        """
+        loci { id: "l1" gene: "SLC26A4" alleles { id: "wt" reference: true } alleles { id: "m1" } alleles { id: "m2" } }
+        pedigrees {
+          allele_symbols { locus_id: "l1" allele_id: "m1" symbol: "M1" }
+          allele_symbols { locus_id: "l1" allele_id: "m2" symbol: "M2" }
+          individuals { generation: 1 index: 1 gender: GENDER_MAN genotypes { locus_id: "l1" } }
+        }
+        """,
+        pb.PedigreeSet(),
+    )
+    ps.pedigrees[0].individuals[0].genotypes[0].allele_ids[:] = child
+    ir.validate_set(ps)
+    return ps
+
+
+def test_unnamed_alleles_of_one_locus_are_told_apart_by_their_symbols() -> None:
+    heterozygous, homozygous = _one_locus_two_unnamed(["m1", "m2"]), _one_locus_two_unnamed(["m2", "m2"])
+    assert [m.subject for m in _genotype_mismatches(heterozygous, homozygous)] == ["1-1"]
+
+
+def test_the_reference_is_one_allele_whatever_each_record_names_it() -> None:
+    # One legend says "+ = wild type", another prints "WT" and names nothing: a caller merging them has one reference.
+    named = pb.Allele(id="a", name="wild type", reference=True)
+    unnamed = pb.Allele(id="b", reference=True)
+    assert ir.allele_identity(named) == ir.allele_identity(unnamed)
+    assert ir.allele_identity(named) != ir.allele_identity(pb.Allele(id="c", name="wild type"))
 
 
 def test_a_pedigree_may_print_a_symbol_for_an_allele_no_one_in_it_carries() -> None:

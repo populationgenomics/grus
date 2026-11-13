@@ -47,6 +47,7 @@ from grus.ir._validate import (
     allele_identity,
     allele_text,
     locus_identity,
+    locus_is_matchable,
     validate,
     validate_set,
 )
@@ -82,6 +83,7 @@ __all__ = [
     "load_set_json",
     "load_set_pbtxt",
     "locus_identity",
+    "locus_is_matchable",
     "match_individuals",
     "migrate_json",
     "migrate_pbtxt",

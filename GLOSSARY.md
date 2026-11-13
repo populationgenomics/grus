@@ -28,7 +28,7 @@ Shared terms across grus docs and code. Pedigree conventions follow Bennett/NSGC
   form at a locus, identified set-wide by its id and what it states (name, reference); may be several variants in cis.
   **Allele symbol** — how one pedigree prints an allele (`+`, `M1`, `WT`), defined by that figure's legend, so the same
   symbol may mean different alleles in two figures. **Genotype** — the alleles one person carries at one locus, as
-  copies (`[M, +]` heterozygous, `[M, M]` homozygous, `[M]` hemizygous).
+  copies (`[m, wt]` heterozygous, `[m, m]` homozygous, `[m]` hemizygous).
 - **Phase** — which of a person's alleles lie on the same chromosome copy (a **haplotype**): variants on one are **in
   cis**, on different ones **in trans** (compound heterozygous). A **phase set** groups genotypes whose phase is stated.
 

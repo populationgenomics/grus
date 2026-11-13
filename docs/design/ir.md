@@ -242,7 +242,7 @@ So the IR records the table directly, in four parts:
 - An **allele symbol** is how one pedigree writes an allele: `M1`, `+`, `WT`, `★`. It belongs to the pedigree that
   prints it, not to the allele (below).
 - A **genotype** is one person's alleles at one locus, as copies, each copy an allele id. Zygosity is how often an
-  allele repeats, so no separate field can disagree with it: `[M, M]` is homozygous, `[M, +]` heterozygous, `[M]`
+  allele repeats, so no separate field can disagree with it: `[m, m]` is homozygous, `[m, wt]` heterozygous, `[m]`
   hemizygous. One or two copies.
 
 ```
@@ -273,7 +273,9 @@ What that implies:
   back to exactly one genotype. Across pedigrees, both may repeat.
 - **Symbols are optional.** They are recorded where the source prints them. An imported record prints no figure, so it
   has none, and the importers no longer invent them; an allele a paper names only in its text ("the father carried
-  c.2000del") has none either, even when the legend prints symbols for the locus's other alleles.
+  c.2000del") has none either, even when the legend prints symbols for the locus's other alleles. The one exception is
+  an unnamed allele other than the reference: its symbol is all that tells it apart, so a pedigree that uses one prints
+  it.
 - **A pedigree may print a symbol for an allele no one in it carries**, since a legend shared by a figure's panels names
   every allele, whichever panel carries it.
 - **Genotypes reference alleles by id**, never by symbol. The field that held symbols is retired rather than reused with
@@ -301,15 +303,18 @@ second-guess them.
 **Checks** (loader, loud):
 
 - locus ids are unique and distinct from citation and condition ids;
-- every locus can be told apart by what it states, so two records' loci can be matched: a named locus's (gene, name) is
-  declared once, and unnamed loci, whose alleles alone are named, may share a gene (a legend often names only the
-  alleles) but not every allele;
+- a locus that states enough to be matched is declared once: a named locus's (gene, name) is unique, and unnamed loci,
+  whose alleles alone are named, may share a gene (a legend often names only the alleles) but not every allele. A locus
+  that names neither itself nor any non-reference allele is matched by nothing it states, so several may share a gene
+  (below);
 - within a locus, allele ids are unique, so are the names of named alleles, and at most one allele is the reference;
-  several unnamed alleles may share a locus, told apart only by the symbols a pedigree prints for them;
+  several unnamed alleles may share a locus;
 - every genotype's locus resolves, each of its allele ids is one of that locus's alleles, and a person has at most one
   genotype per locus;
 - each of a pedigree's symbols names a declared allele of a declared locus, and within the pedigree a (locus, symbol)
   names one allele and an allele has one symbol;
+- an unnamed, non-reference allele a pedigree's genotypes use has a symbol in that pedigree, since nothing else tells it
+  apart: without one, `[m1, m2]` and `[m2, m2]` would state the same thing;
 - genotypes sharing a phase set have equal copies;
 - an annotation names loci only if it is a `GENOTYPE` or `VARIANT` annotation of a person genotyped at each of them, and
   a mating's annotation names none;
@@ -318,25 +323,37 @@ second-guess them.
   pedigree) is a pedigree-level fact, recorded as a gene label, not an empty column; allowing empty columns would make
   "declared" and "someone carries it" two facts with nothing to tell them apart.
 
-**Identity across records.** A locus is identified by its gene and printed name, and an unnamed one by its alleles too.
-An allele is identified by its printed name and whether it is the reference — not by its id, local to its record, nor by
-its symbols, local to each pedigree. Its identifiers are not part of it: they are other spellings of what its name
-states, and one reader may copy them where another does not. Two unnamed, non-reference alleles therefore have the same
-identity: outside a pedigree that prints symbols for them, nothing the record states tells them apart, so a caller
-merging sets cannot match them and has to keep them distinct. The identity the checks and the diff use is exported from
-`grus.ir`, so a caller merging several sets (one per figure of a paper, say) can declare one locus per identity, one
-allele per allele identity, re-point genotypes at them, and carry each figure's symbol table over unchanged.
+**Identity across records.** A caller merging several sets — one per figure of a paper, say — needs to know when two
+records' loci and alleles are the same. `grus.ir` exports the identity the checks use:
+
+- A **locus** is identified by its gene and printed name, and an unnamed one by its alleles too.
+- An **allele** is identified, within its locus, as the reference, or else by its printed name. A locus has at most one
+  reference, so the reference is one allele however each figure names it: `+` defined as "wild type" in one legend and
+  `WT` with no definition in another merge. Not its id, local to its record, nor its symbols, local to each pedigree,
+  nor its identifiers, which are other spellings of what its name states and which one reader may copy where another
+  does not.
+- **What cannot be matched.** An unnamed, non-reference allele is known only by the symbol each pedigree prints for it,
+  and Figure 1's `M1` may not be Figure 3's. So such alleles are never merged, and neither is a locus that names neither
+  itself nor any non-reference allele: a legend printing only `M1/+` and `M2/+` beside one person. Those are two loci,
+  not one with `[M1, M2]`, which would state that the variants are in trans when the figure does not say.
+
+So the merge declares one locus per identity, except loci that cannot be matched; one allele per identity, except
+unnamed non-reference alleles; and re-points each figure's genotypes and symbol rows at the merged ids. Two figures that
+disagree — one marking `A` as the reference, another not — give two alleles of one name, which the loader refuses: a
+conflict for the caller to resolve, not one grus resolves for them.
 
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 
 **Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its identity, and each copy by
-its allele's identity and the symbol the person's own pedigree prints for it, so two readings that agree on the variant
-but not on the printed symbol differ. Unphased copies compare as a multiset and a phase set as its multiset of
-haplotypes, so ids, phase-set names and swapping every slot of a phase set at once do not register as differences. A
-support cites genotypes or locus declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole
-pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in trans" backs the phase at both),
-as `condition.*` paths name a condition. Stored layouts ignore genotypes, symbols and an annotation's loci, since layout
-reads only the annotation's text.
+what its allele states — its name and whether it is the reference — and the symbol the person's own pedigree prints for
+it. So two readings that agree on the variant but not on the printed symbol differ, as do one that records the figure's
+symbol and one that records none: the symbol is something the figure states. Unphased copies compare as a multiset and a
+phase set as its multiset of haplotypes, so ids, phase-set names and swapping every slot of a phase set at once do not
+register as differences. A support cites genotypes or locus declarations with paths `genotype.*` (scoped to people) and
+`locus.*` (the whole pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in trans" backs
+the phase at both), as `condition.*` paths name a condition. A legend backs both a locus's alleles and the symbols a
+pedigree prints for them, and is cited with `locus.alleles`. Stored layouts ignore genotypes, symbols and an
+annotation's loci, since layout reads only the annotation's text.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
