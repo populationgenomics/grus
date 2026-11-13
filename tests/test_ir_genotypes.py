@@ -455,6 +455,17 @@ def test_symbols_are_scoped_to_their_pedigree() -> None:
     ir.validate_set(_two_figures())
 
 
+def test_diff_ignores_alleles_a_locus_declares_that_no_one_carries() -> None:
+    # A merged record's gene-level locus declares every figure's alleles; a person's genotype is still their copies.
+    a, b = _set(), _set()
+    for ps in (a, b):
+        for locus in ps.loci:
+            locus.name = ""
+    b.loci[0].alleles.add(id="m3", name="c.1300T>C")
+    ir.validate_set(b)
+    assert _genotype_mismatches(a, b) == []
+
+
 def test_unnamed_loci_told_apart_by_their_symbols_are_valid() -> None:
     # "M1/+" and "M2/+" beside one person, no legend: two loci, phase not stated. One locus [M1, M2] would state trans.
     ps = _set()

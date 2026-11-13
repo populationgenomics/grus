@@ -340,20 +340,23 @@ records' loci and alleles are the same. `grus.ir` exports the identity the check
 So the merge declares one locus per identity, except loci that cannot be matched; one allele per identity, except
 unnamed non-reference alleles; and re-points each figure's genotypes and symbol rows at the merged ids. Two figures that
 disagree — one marking `A` as the reference, another not — give two alleles of one name, which the loader refuses: a
-conflict for the caller to resolve, not one grus resolves for them.
+conflict for the caller to resolve, not one grus resolves for them. A merged reference keeps one figure's name for it,
+so diffing the merged record against another figure's own reading reports that name; `diff_set` compares two readings of
+one source, and there it is a real difference.
 
 A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as conditions are.
 
-**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its identity, and each copy by
-what its allele states — its name and whether it is the reference — and the symbol the person's own pedigree prints for
-it. So two readings that agree on the variant but not on the printed symbol differ, as do one that records the figure's
-symbol and one that records none: the symbol is something the figure states. Unphased copies compare as a multiset and a
-phase set as its multiset of haplotypes, so ids, phase-set names and swapping every slot of a phase set at once do not
-register as differences. A support cites genotypes or locus declarations with paths `genotype.*` (scoped to people) and
-`locus.*` (the whole pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in trans" backs
-the phase at both), as `condition.*` paths name a condition. A legend backs both a locus's alleles and the symbols a
-pedigree prints for them, and is cited with `locus.alleles`. Stored layouts ignore genotypes, symbols and an
-annotation's loci, since layout reads only the annotation's text.
+**Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its gene and name — not by the
+other alleles it declares, which the person does not carry — and each copy by what its allele states — its name and
+whether it is the reference — and the symbol the person's own pedigree prints for it. So two readings that agree on the
+variant but not on the printed symbol differ, as do one that records the figure's symbol and one that records none: the
+symbol is something the figure states. Unphased copies compare as a multiset and a phase set as its multiset of
+haplotypes, so ids, phase-set names and swapping every slot of a phase set at once do not register as differences. A
+support cites genotypes or locus declarations with paths `genotype.*` (scoped to people) and `locus.*` (the whole
+pedigree) and names the loci, several when one sentence covers several ("M1 and M2 in trans" backs the phase at both),
+as `condition.*` paths name a condition. A legend backs both a locus's alleles and the symbols a pedigree prints for
+them, and is cited with `locus.alleles`. Stored layouts ignore genotypes, symbols and an annotation's loci, since layout
+reads only the annotation's text.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 

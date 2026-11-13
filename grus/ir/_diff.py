@@ -475,8 +475,9 @@ def _individual_mismatches(
 # One copy as compared: whether its allele is the reference, the allele's printed name, and the symbol its pedigree
 # prints for it, "" when it prints none (a symbol is never empty).
 _Copy = tuple[bool, str, str]
-# One genotype as compared: its locus's identity, and its copies.
-_Called = tuple[_validate.LocusIdentity, tuple[_Copy, ...]]
+# One genotype as compared: its locus's (gene, name), and its copies. Not the locus's other declared alleles: what a
+# person carries is the copies, whichever alleles the record also declares.
+_Called = tuple[tuple[str | None, str], tuple[_Copy, ...]]
 
 
 class _Loci:
@@ -516,7 +517,8 @@ def _resolve(ind: pb.Individual, loci: _Loci) -> list[tuple[pb.Genotype, _Called
         if missing:
             raise UndeclaredLocusError(f"allele id(s) {missing} are not declared at locus {g.locus_id!r}")
         copies = [(by_id[x], loci.symbols.get((g.locus_id, x), "")) for x in g.allele_ids]
-        called = (_validate.locus_identity(locus), tuple((a.reference, a.name, s) for a, s in copies))
+        where = (locus.gene if locus.HasField("gene") else None, locus.name)
+        called = (where, tuple((a.reference, a.name, s) for a, s in copies))
         shown = [f"{s} ({_validate.allele_text(a)})" if s else _validate.allele_text(a) for a, s in copies]
         out.append((g, called, shown))
     return out
@@ -550,7 +552,7 @@ def _genotypes_sig(ind: pb.Individual, loci: _Loci) -> tuple[object, ...]:
 def _fmt_genotypes(ind: pb.Individual, loci: _Loci) -> str:
     """Render genotypes as ``gene name: a/b`` (``|`` between phased alleles), sorted; ``none`` if there are none."""
     parts = []
-    for g, ((gene, name, _), _), alleles in _resolve(ind, loci):
+    for g, ((gene, name), _), alleles in _resolve(ind, loci):
         where = " ".join(x for x in (gene, name) if x) or "-"
         sep = "|" if g.HasField("phase_set") else "/"
         parts.append(f"{where}: {sep.join(alleles)}" + (f" [{g.phase_set}]" if g.HasField("phase_set") else ""))
