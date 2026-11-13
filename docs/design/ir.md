@@ -321,6 +321,12 @@ field's number and name are reserved, never reused. Downstream bounds its pin be
 golden/human surface (comment-able, diffable), **proto3-JSON** is the LLM emission surface (structured-output → parse →
 validate). The lost-unknowns caveat of text projections does not bite because nothing does a lossy RMW of an IR.
 
+**Embedding the IR in another schema.** A downstream schema can hold grus messages, a `map<int32, PedigreeSet>` for
+instance, by importing `grus/models/pedigree.proto`. The wheel ships each `.proto` beside its stub, at the path the stub
+registers, so the import resolves from the installed package and the generated code reuses grus's stubs. The protos
+import `buf/validate/validate.proto`, which the `protovalidate` wheel does not ship; the downstream schema resolves it
+from its own protovalidate dependency.
+
 ### Validation, split by what protobuf can express
 
 - **Field-local / single-message** rules are **protovalidate** options on the `.proto`: `Position` components ≥ 1;
