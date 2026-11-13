@@ -69,6 +69,11 @@ only-include = [
 ]
 exclude = ["**/__pycache__"]
 
+# Each .proto ships at the path its stub registers, so a downstream proto can import it from the installed package.
+[tool.hatch.build.targets.wheel.force-include]
+"schema/proto/grus/models/pedigree.proto" = "grus/models/pedigree.proto"
+"schema/proto/grus/models/layout.proto" = "grus/models/layout.proto"
+
 [tool.hatch.build.targets.sdist]
 only-include = ["grus", "buf", "schema", "tests", "docs", "README.md", "LICENSE", "GLOSSARY.md"]
 exclude = ["**/__pycache__"]
