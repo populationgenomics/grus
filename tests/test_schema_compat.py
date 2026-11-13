@@ -20,6 +20,8 @@ def _pyproject(version: str) -> str:
         ("1.2.0", "2.0.0", True),
         ("1.2.0", "1.3.0", False),  # from 1.0 on a minor is additive
         ("1.2.0", "1.2.1", False),
+        ("0.9.3", "1.0rc1", True),  # a pre-release of 1.0 is on the 1.0 line
+        ("1", "2", True),
     ],
 )
 def test_a_break_needs_a_breaking_release(base: str, head: str, breaks: bool) -> None:

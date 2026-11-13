@@ -10,6 +10,7 @@ on ``PATH``).
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 import sys
 import tomllib
@@ -22,7 +23,11 @@ def breaking_release(pyproject: str) -> tuple[int, int]:
 
     ``(major, 0)`` from 1.0 on; ``(0, minor)`` below it.
     """
-    major, minor = (int(x) for x in tomllib.loads(pyproject)["project"]["version"].split(".")[:2])
+    version = tomllib.loads(pyproject)["project"]["version"]
+    release = re.match(r"(\d+)(?:\.(\d+))?", version)
+    if release is None:
+        raise ValueError(f"version {version!r} does not start with a release number")
+    major, minor = int(release[1]), int(release[2] or 0)
     return (major, 0) if major else (0, minor)
 
 
