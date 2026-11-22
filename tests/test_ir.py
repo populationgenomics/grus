@@ -546,6 +546,50 @@ def test_diff_missing_individual_shows_in_only_in_a() -> None:
     assert d.recall() == pytest.approx(3 / 4)
 
 
+def _married_in() -> pb.Pedigree:
+    """A couple's son, the woman he married (drawn without parents) and their daughter."""
+    return pb.Pedigree(
+        individuals=[
+            pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN),
+            pb.Individual(generation=1, index=2, gender=pb.GENDER_WOMAN),
+            pb.Individual(generation=2, index=1, gender=pb.GENDER_MAN),
+            pb.Individual(generation=2, index=2, gender=pb.GENDER_WOMAN),
+            pb.Individual(generation=3, index=1, gender=pb.GENDER_WOMAN),
+        ],
+        matings=[
+            pb.Mating(
+                partner_a=pb.Position(generation=1, index=1),
+                partner_b=pb.Position(generation=1, index=2),
+                offspring=[pb.Offspring(child=pb.Position(generation=2, index=1))],
+            ),
+            pb.Mating(
+                partner_a=pb.Position(generation=2, index=1),
+                partner_b=pb.Position(generation=2, index=2),
+                offspring=[pb.Offspring(child=pb.Position(generation=3, index=1))],
+            ),
+        ],
+    )
+
+
+def test_diff_partner_read_as_a_sibling_is_localized() -> None:
+    # B puts the woman who married in among her husband's siblings. Every person and mating still matches,
+    # so only her parents differ.
+    a = _married_in()
+    b = _copy(a)
+    b.matings[0].offspring.append(pb.Offspring(child=pb.Position(generation=2, index=2)))
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
+    assert [(m.subject, m.field, m.a_value, m.b_value) for m in d.mismatches] == [("2-2", "parents", "{}", "{1-1,1-2}")]
+
+
+def test_diff_child_left_without_parents_is_localized() -> None:
+    # B draws the couple's son with no parents: he is still matched, and so is the couple, now childless.
+    a = _married_in()
+    b = _copy(a)
+    del b.matings[0].offspring[:]
+    d = ir.diff(a, b, a_conditions=_DEFS, b_conditions=_DEFS)
+    assert [(m.subject, m.field, m.a_value, m.b_value) for m in d.mismatches] == [("2-1", "parents", "{1-1,1-2}", "{}")]
+
+
 def _chain(off: int) -> pb.Pedigree:
     """A labelless nuclear family with indices shifted by ``off`` per call.
 

@@ -339,6 +339,7 @@ def diff(
         )
         mismatches.extend(_genotype_mismatches(_label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], la, lb))
     mismatches.extend(_mating_mismatches(a, b, a_to_b, b_to_a))
+    mismatches.extend(_parent_mismatches(ra, rb, a_to_b, b_to_a))
     return Diff(matched=matched, mismatches=mismatches, only_in_a=only_in_a, only_in_b=only_in_b)
 
 
@@ -617,6 +618,27 @@ def _mating_mismatches(
             if va != vb:
                 out.append(Mismatch(key, f, _ENUM[f].Name(va), _ENUM[f].Name(vb)))
         out.extend(_offspring_mismatches(key, m, bm, a_to_b, b_to_a))
+    return out
+
+
+def _parent_mismatches(
+    ra: _Relations, rb: _Relations, a_to_b: dict[Key, Key], b_to_a: dict[Key, Key]
+) -> list[Mismatch]:
+    """Matched individuals whose drawn parents differ, under field ``parents``.
+
+    The mating comparison pairs sibships by their parents and compares only the children both sides place there, so a
+    child added to a sibship (a partner who married in, read as a sibling), dropped from one, or moved to another
+    surfaces only here. Compared only when every parent on both sides matched; an unmatched parent is already visible.
+    """
+    out: list[Mismatch] = []
+    for a_pos in sorted(a_to_b):
+        a_parents = ra.parents.get(a_pos, frozenset())
+        b_parents = rb.parents.get(a_to_b[a_pos], frozenset())
+        if any(k not in a_to_b for k in a_parents) or any(k not in b_to_a for k in b_parents):
+            continue
+        b_parents_as_a = {b_to_a[k] for k in b_parents}
+        if a_parents != b_parents_as_a:
+            out.append(Mismatch(_label(a_pos), "parents", _fmt_ids(set(a_parents)), _fmt_ids(b_parents_as_a)))
     return out
 
 
