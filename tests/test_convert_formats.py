@@ -333,9 +333,12 @@ def test_phenopackets_allelic_states(state: str, alleles: list[str]) -> None:
     assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": alleles}
 
 
-def test_phenopackets_unstated_zygosity_states_no_genotype() -> None:
-    for vd in (_variant("GENO:0000137"), _variant(allelicState=None)):
-        assert not _import(("c", vd)).loci
+@pytest.mark.parametrize("vd", [_variant("GENO:0000137"), _variant(allelicState=None)], ids=["unspecified", "absent"])
+def test_phenopackets_unstated_zygosity_carries_alt(vd: dict[str, object]) -> None:
+    ps = _import(("c", vd))
+    (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+    assert list(g.alleles) == ["alt"]
+    assert g.copies_unstated
 
 
 def test_phenopackets_allelic_state_by_label() -> None:

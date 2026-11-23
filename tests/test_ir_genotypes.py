@@ -111,6 +111,19 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         lambda ps: _child(ps).genotypes[1].alleles.pop(),
         r"phase set 'a' mixes genotypes of 2 and 1 alleles",
     ),
+    "unstated copies in a phase set": (
+        _set_field(lambda ps: _child(ps).genotypes[0], "copies_unstated", True),
+        r"not a valid pedigree",
+    ),
+    "unstated copies listing an allele twice": (
+        lambda ps: (
+            ps.pedigrees[0]
+            .individuals[0]
+            .genotypes[0]
+            .CopyFrom(pb.Genotype(locus_id="l1", alleles=["M1", "M1"], copies_unstated=True))
+        ),
+        r"not a valid pedigree",
+    ),
     "locus declared twice": (lambda ps: ps.loci.append(ps.loci[0]), r"locus id 'l1' is declared twice"),
     "locus name declared twice": (
         lambda ps: setattr(ps.loci[1], "name", "c.1234A>G"),
@@ -374,3 +387,14 @@ def test_an_allele_named_reference_is_not_the_reference() -> None:
             locus.alleles[0].CopyFrom(plus)
     assert ir.locus_identity(a.loci[0]) != ir.locus_identity(b.loci[0])
     assert [m.subject for m in _genotype_mismatches(a, b)] == ["1-1", "1-2", "2-1"]
+
+
+def test_a_genotype_may_carry_alleles_without_stating_copies() -> None:
+    carries = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1"], copies_unstated=True))
+    hemizygous = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1"]))
+    heterozygous = _child_genotypes(pb.Genotype(locus_id="l1", alleles=["M1", "+"]))
+    # "Carries M1" is consistent with [M1, +] but does not state it, and is not [M1] (hemizygous).
+    for other in (hemizygous, heterozygous):
+        (m,) = _genotype_mismatches(carries, other)
+        assert m.a_value == "SLC26A4 c.1234A>G: carries M1 (c.1234A>G)"
+    assert _genotype_mismatches(carries, carries) == []

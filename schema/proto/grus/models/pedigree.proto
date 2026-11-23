@@ -210,6 +210,14 @@ message Locus {
 // One person's genotype at one locus. `alleles` are copies, so zygosity is how often a symbol repeats: [M, M]
 // homozygous, [M, +] heterozygous, [M] hemizygous.
 message Genotype {
+  option (buf.validate.message).cel = {
+    id: "genotype.unstated_copies_unphased", message: "a genotype whose copies are not stated has no phase set",
+    expression: "!(this.copies_unstated && has(this.phase_set))"
+  };
+  option (buf.validate.message).cel = {
+    id: "genotype.unstated_copies_distinct", message: "a genotype whose copies are not stated lists each allele once",
+    expression: "!this.copies_unstated || this.alleles.size() == 1 || this.alleles[0] != this.alleles[1]"
+  };
   string locus_id = 1 [(buf.validate.field).string.min_len = 1];
   repeated string alleles = 2 [(buf.validate.field).repeated = {
     min_items: 1, max_items: 2, items: {string: {min_len: 1}}
@@ -217,6 +225,9 @@ message Genotype {
   // Stated phase, as VCF's PS: one person's genotypes sharing a phase set align slot by slot, slot i across them
   // being one haplotype — so l1 [M, +] and l2 [+, M] in one set are in trans. Absent = phase not stated.
   optional string phase_set = 3 [(buf.validate.field).string.min_len = 1];
+  // The source says the person carries each of `alleles` but not how many copies: [M] is "carries M", not hemizygous.
+  // Each allele is listed once, and the genotype has no phase set.
+  bool copies_unstated = 4;
 }
 
 // ── Matings ─────────────────────────────────────────────────────────────────────────────────────

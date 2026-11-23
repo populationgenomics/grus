@@ -515,15 +515,19 @@ def _resolve(ind: pb.Individual, loci: dict[str, pb.Locus]) -> list[tuple[pb.Gen
 def _genotypes_sig(ind: pb.Individual, loci: dict[str, pb.Locus]) -> tuple[object, ...]:
     """What ``ind``'s genotypes state, independent of ids and of how phase sets are named or their slots ordered.
 
-    An unphased genotype is its locus and its alleles as a multiset. A phase set of several genotypes is the multiset
-    of its haplotypes, each the (locus, allele) pairs in one slot across its genotypes: swapping every slot at once
-    states the same phase. Phase relates heterozygous genotypes only, so a homozygous or hemizygous member compares as
-    unphased, and so does a phase set left with one heterozygous genotype.
+    A genotype whose copies are not stated is its locus and the set of alleles carried, unequal to any genotype that
+    states copies. An unphased genotype is its locus and its alleles as a multiset. A phase set of several genotypes is
+    the multiset of its haplotypes, each the (locus, allele) pairs in one slot across its genotypes: swapping every slot
+    at once states the same phase. Phase relates heterozygous genotypes only, so a homozygous or hemizygous member
+    compares as unphased, and so does a phase set left with one heterozygous genotype.
     """
     out: list[object] = []
     unphased: list[_Called] = []
     phased: dict[str, list[_Called]] = defaultdict(list)
     for g, called, _ in _resolve(ind, loci):
+        if g.copies_unstated:
+            out.append(("carries", called[0], tuple(sorted(called[1]))))
+            continue
         heterozygous = len(set(g.alleles)) > 1
         (phased[g.phase_set] if g.HasField("phase_set") and heterozygous else unphased).append(called)
     for members in phased.values():
@@ -542,6 +546,9 @@ def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
     parts = []
     for g, ((gene, name, _), _), alleles in _resolve(ind, loci):
         where = " ".join(x for x in (gene, name) if x) or "-"
+        if g.copies_unstated:
+            parts.append(f"{where}: carries {', '.join(alleles)}")
+            continue
         sep = "|" if g.HasField("phase_set") else "/"
         parts.append(f"{where}: {sep.join(alleles)}" + (f" [{g.phase_set}]" if g.HasField("phase_set") else ""))
     return "; ".join(sorted(parts)) if parts else "none"

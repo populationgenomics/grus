@@ -319,14 +319,16 @@ class Locus(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., gene: _Optional[str] = ..., alleles: _Optional[_Iterable[_Union[Allele, _Mapping]]] = ...) -> None: ...
 
 class Genotype(_message.Message):
-    __slots__ = ("locus_id", "alleles", "phase_set")
+    __slots__ = ("locus_id", "alleles", "phase_set", "copies_unstated")
     LOCUS_ID_FIELD_NUMBER: _ClassVar[int]
     ALLELES_FIELD_NUMBER: _ClassVar[int]
     PHASE_SET_FIELD_NUMBER: _ClassVar[int]
+    COPIES_UNSTATED_FIELD_NUMBER: _ClassVar[int]
     locus_id: str
     alleles: _containers.RepeatedScalarFieldContainer[str]
     phase_set: str
-    def __init__(self, locus_id: _Optional[str] = ..., alleles: _Optional[_Iterable[str]] = ..., phase_set: _Optional[str] = ...) -> None: ...
+    copies_unstated: bool
+    def __init__(self, locus_id: _Optional[str] = ..., alleles: _Optional[_Iterable[str]] = ..., phase_set: _Optional[str] = ..., copies_unstated: _Optional[bool] = ...) -> None: ...
 
 class Mating(_message.Message):
     __slots__ = ("partner_a", "partner_b", "consanguineous", "status", "childlessness", "offspring", "annotations")

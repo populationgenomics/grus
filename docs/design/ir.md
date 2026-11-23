@@ -242,6 +242,14 @@ So the IR records the table directly, in three parts:
 - A **genotype** is one person's alleles at one locus, as copies. Zygosity is how often a symbol repeats, so no separate
   field can disagree with it: `[M, M]` is homozygous, `[M, +]` heterozygous, `[M]` hemizygous. One or two copies.
 
+**Copies not stated.** A source often says that a person carries a variant without saying how many copies: a fill keyed
+to the variant, "mutation present", a Phenopacket with no allelic state. Copies cannot record that, since `[M]` already
+means hemizygous, and guessing `[M, +]` would state a zygosity the source does not. So a genotype may say that its
+copies are not stated: it lists each allele the person carries once, and states nothing about how many copies of each
+there are or what the other copy is. Such a genotype has no phase set, since phase needs slots, and the diff never
+treats it as equal to a genotype that states copies: "carries M" and `[M, +]` are different claims, even though one is
+consistent with the other.
+
 ```
 locus l1 "c.1234A>G" gene SLC26A4: + (reference), M1 "c.1234A>G"
 locus l2 "c.2000del" gene SLC26A4: + (reference), M2 "c.2000del"
@@ -278,7 +286,8 @@ second-guess them.
 - allele symbols are unique within a locus, and at most one allele is the reference;
 - every genotype's locus resolves, each of its alleles is one of that locus's symbols, and a person has at most one
   genotype per locus;
-- genotypes sharing a phase set have equal copies;
+- genotypes sharing a phase set have equal copies, and a genotype whose copies are not stated lists each allele once and
+  is in no phase set;
 - an annotation names loci only if it is a `GENOTYPE` or `VARIANT` annotation of a person genotyped at each of them, and
   a mating's annotation names none;
 - a declaration no genotype references is an error, as for conditions. A locus is a column of the table: declaring one

@@ -17,8 +17,8 @@ whose ``subject.id`` matches a person:
 - ``interpretations[].diagnosis.genomicInterpretations[].variantInterpretation.variationDescriptor`` -> a locus
   per distinct variant (one locus per variant, alleles ``ref`` and ``alt``) and a genotype for the person
   ``subjectOrBiosampleId`` names (a biosample id: the packet's subject) by ``allelicState``: heterozygous (or
-  compound heterozygous) ``[ref, alt]``, homozygous ``[alt, alt]``, hemizygous ``[alt]``. A variant whose allelic
-  state is absent or another term states no genotype and is dropped.
+  compound heterozygous) ``[ref, alt]``, homozygous ``[alt, alt]``, hemizygous ``[alt]``; an absent or unspecified
+  allelic state carries ``alt`` with its copies not stated. Another term fails the import.
 
 Unmapped Phenopacket content (phenotypic features, measurements, gene-level interpretations, files, metadata) is
 dropped. Importing from Phenopackets does not require its Python package: the JSON is read structurally.
@@ -113,7 +113,7 @@ _ALLELIC_LABEL = {
     "hemizygous x-linked": "GENO:0000604",
     "hemizygous y-linked": "GENO:0000605",
 }
-_UNSTATED_STATE = {"", "GENO:0000137"}  # absent, or "unspecified zygosity": no genotype
+_UNSTATED_STATE = {"", "GENO:0000137"}  # absent, or "unspecified zygosity": carries alt, copies not stated
 # Expression syntax prefix -> identifier scheme; any other syntax is OTHER.
 _SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI, "vrs": pb.IDENTIFIER_SCHEME_VRS}
 
@@ -230,8 +230,8 @@ def _locus(locus_id: str, vd: dict[str, Any]) -> pb.Locus:
     return locus
 
 
-def _copies(vd: dict[str, Any]) -> tuple[str, ...] | None:
-    """The copies ``vd``'s allelic state gives, or None when it states no zygosity.
+def _genotype(vd: dict[str, Any], locus_id: str) -> pb.Genotype:
+    """The genotype ``vd``'s allelic state gives at ``locus_id``: its copies, or ``alt`` carried when it states none.
 
     Raises:
         PedigreeImportError: the allelic state is a term this importer does not know.
@@ -240,9 +240,9 @@ def _copies(vd: dict[str, Any]) -> tuple[str, ...] | None:
     geno, label = str(_get(state, "id", "")), str(_get(state, "label", "")).lower()
     geno = geno if geno in _ALLELIC_STATE else _ALLELIC_LABEL.get(label, geno)
     if geno in _ALLELIC_STATE:
-        return _ALLELIC_STATE[geno]
+        return pb.Genotype(locus_id=locus_id, alleles=_ALLELIC_STATE[geno])
     if geno in _UNSTATED_STATE:
-        return None
+        return pb.Genotype(locus_id=locus_id, alleles=["alt"], copies_unstated=True)
     raise _core.PedigreeImportError(f"unrecognised allelicState {geno!r} ({label!r})")
 
 
@@ -277,11 +277,8 @@ def _genotypes(packet: dict[str, Any], subject: str, known: set[str], loci: _Loc
             vd = _get(_get(gi, "variantInterpretation", {}) or {}, "variationDescriptor")
             if not vd:
                 continue  # a gene-level interpretation states no genotype
-            copies = _copies(vd)
-            if copies is None:
-                continue
             who = _owner(str(_get(gi, "subjectOrBiosampleId", "")), subject, known, biosamples)
-            out.setdefault(who, []).append(pb.Genotype(locus_id=loci.locus_id(vd), alleles=copies))
+            out.setdefault(who, []).append(_genotype(vd, loci.locus_id(vd)))
     return out
 
 
