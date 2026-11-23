@@ -7,9 +7,9 @@ entry points and are not dispatched from here.
 
 Input is a ``PedigreeSet`` or a bare ``Pedigree`` in either text surface (pbtxt / proto3-JSON); the
 surface is taken from the file suffix (``.json`` -> JSON, anything else -> pbtxt) unless ``--format``
-says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure. Conditions
-are declared at set level, so a pedigree with condition entries is a one-pedigree set; ``migrate`` rewrites a
-pre-1.0 record (conditions by name on each entry) as one.
+says otherwise. A bare ``Pedigree`` renders as a single drawing; a set renders as the composed figure. The key
+is declared at set level, so a pedigree with marks is a one-pedigree set; ``migrate`` rewrites a record written before
+the key (0.4's conditions, or earlier) as one.
 
 ``layout`` writes an IR file's stored layout (a ``PedigreeLayout``, or a ``PedigreeSetLayout`` for a set) in the
 same text surfaces, chosen by the output suffix; ``render --layout`` draws from it instead of laying out
@@ -58,7 +58,7 @@ def load_ir(path: pathlib.Path, fmt: TextFormat) -> pb.PedigreeSet | pb.Pedigree
         ps = parse(text, pb.PedigreeSet())
     except (json_format.ParseError, text_format.ParseError):
         ps = None
-    if ps is not None and (ps.pedigrees or ps.conditions or ps.loci or ps.HasField("provenance")):
+    if ps is not None and (ps.pedigrees or ps.key_entries or ps.loci or ps.HasField("provenance")):
         ir.validate_set(ps)
         return ps
     p = parse(text, pb.Pedigree())
@@ -204,7 +204,7 @@ def _cmd_layout(args: argparse.Namespace) -> int:
     record: lpb.PedigreeLayout | lpb.PedigreeSetLayout = (
         lpb.PedigreeSetLayout(
             pedigrees=[
-                render.store_layout(p, geom, conditions=loaded.conditions, loci=loaded.loci) for p in loaded.pedigrees
+                render.store_layout(p, geom, key_entries=loaded.key_entries, loci=loaded.loci) for p in loaded.pedigrees
             ]
         )
         if isinstance(loaded, pb.PedigreeSet)
@@ -288,7 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_cmd.add_argument(
         "--colour",
         action="store_true",
-        help="paint conditions in a colour-blind-safe palette instead of greys (default: greyscale)",
+        help="paint fills in a colour-blind-safe palette instead of greys (default: greyscale)",
     )
     render_cmd.add_argument(
         "--layout",
@@ -324,7 +324,7 @@ def build_parser() -> argparse.ArgumentParser:
     imp.set_defaults(func=_cmd_import)
 
     migrate = sub.add_parser(
-        "migrate", help="rewrite a pre-1.0 IR file (conditions named on each entry) as a 1.0 PedigreeSet"
+        "migrate", help="rewrite an IR file written before the key (0.4 conditions, or earlier) as a PedigreeSet"
     )
     migrate.add_argument("input", type=pathlib.Path)
     migrate.add_argument("-o", "--output", type=pathlib.Path, help="output path (default: stdout)")

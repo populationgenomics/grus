@@ -63,8 +63,8 @@ def test_a_probe_reads_entries_through_the_declarations_it_is_given() -> None:
     from tools.fuzz import probe
 
     p = gen.gen(3, 4)
-    p.individuals[0].conditions.add(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)
-    defs = pb.PedigreeSet(conditions=[pb.ConditionDef(id="k1", name="CF")]).SerializeToString()
+    p.individuals[0].marks.add(key_id="k1", status=pb.CONDITION_STATUS_AFFECTED)
+    defs = pb.PedigreeSet(key_entries=[pb.KeyEntry(id="k1", text="CF", phenotype=pb.Phenotype())]).SerializeToString()
     assert probe.outcome_of(p.SerializeToString(), False).startswith("invalid: ")
     assert not probe.outcome_of(p.SerializeToString(), False, defs).startswith(("invalid", "defer"))
     outs = probe.shuffle_outcomes_of(p.SerializeToString(), 2, False, defs)

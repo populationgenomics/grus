@@ -23,10 +23,11 @@ text = ir.dump_set_pbtxt(ps)  # canonical, diffable text form
 
 Who is in the pedigree, their gender and clinical status, and how they relate — never coordinates. Identity is
 `Position{generation, index}` (the drawn "II-3"); relationships are `Mating{partner_a?, partner_b?, offspring[]}` so
-single parents, founder sibships, consanguinity, separated couples and childlessness are first-class; clinical status is
-a per-condition list (affected / carrier / presymptomatic, with inheritance and onset when stated); twins, adoption,
-donor parentage, pregnancy outcomes and collapsed sibships live where the standard draws them. The schema covers the
-whole Bennett 2008 + 2022 vocabulary and evolves additively. Contract:
+single parents, founder sibships, consanguinity, separated couples and childlessness are first-class; what a symbol
+shows is read through the figure's key — a phenotype with its clinical status (affected / carrier / presymptomatic, with
+inheritance and onset when stated), a genotype, or an entry that is neither; twins, adoption, donor parentage, pregnancy
+outcomes and collapsed sibships live where the standard draws them. The schema covers the whole Bennett 2008 + 2022
+vocabulary and evolves additively. Contract:
 [`schema/proto/grus/models/pedigree.proto`](schema/proto/grus/models/pedigree.proto); rationale and the assessment of
 Phenopackets / GA4GH Pedigree as alternatives: [`docs/design/ir.md`](docs/design/ir.md).
 

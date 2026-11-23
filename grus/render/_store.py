@@ -49,8 +49,8 @@ class StaleLayoutError(Exception):
 
 
 # Every field of every message the digest reaches: LAYOUT_READS is hashed, LAYOUT_IGNORES cleared first. Keys are the
-# pre-1.0 messages the digest serializes (a Condition carries its declaration's name and inheritance), plus
-# ConditionDef, whose fields reach the digest only through those entries.
+# pre-0.4 messages the digest serializes (a Condition carries what one shown key entry states), plus the key's
+# messages, whose fields reach the digest only through those conditions.
 LAYOUT_READS: dict[str, frozenset[str]] = {
     "Pedigree": frozenset({"individuals", "matings"}),
     "Individual": frozenset(
@@ -64,8 +64,12 @@ LAYOUT_READS: dict[str, frozenset[str]] = {
             "annotations",  # label width
         }
     ),
-    "Condition": frozenset({"name", "status", "inheritance"}),  # inheritance: the X-linked carrier dot
-    "ConditionDef": frozenset({"name", "inheritance"}),
+    # inheritance: the X-linked carrier dot; kind: a genotype or other entry's flat fill; grade: a deferral
+    "Condition": frozenset({"name", "status", "inheritance", "kind", "grade"}),
+    "KeyEntry": frozenset({"text", "phenotype", "genotype", "other"}),
+    "Phenotype": frozenset({"inheritance", "grades"}),
+    "GenotypePattern": frozenset({"locus_id", "alleles", "copies_unstated"}),  # who shows the entry
+    "Other": frozenset(),
     "Annotation": frozenset({"text"}),
     "Mating": frozenset({"partner_a", "partner_b", "consanguineous", "childlessness", "offspring"}),
     "Offspring": frozenset({"child", "twin_group", "twin_type"}),
@@ -84,11 +88,14 @@ LAYOUT_IGNORES: dict[str, frozenset[str]] = {
             "reproductive_outcome",
             "reproductive_role",
             "documented_evaluation",
-            "genotypes",  # meaning only; drawn, if at all, as an annotation's text
+            "genotypes",  # read only through the genotype entries they show, which enter as conditions
         }
     ),
     "Condition": frozenset({"onset_age"}),
-    "ConditionDef": frozenset({"id"}),
+    "KeyEntry": frozenset({"id"}),
+    "Phenotype": frozenset(),
+    "GenotypePattern": frozenset(),
+    "Other": frozenset(),
     "Annotation": frozenset({"type", "loci"}),
     "Mating": frozenset({"status", "annotations"}),
     "Offspring": frozenset({"parentage", "adoption"}),
@@ -107,20 +114,20 @@ def _layout_reads_only(msg: message.Message) -> None:
                 _layout_reads_only(item)
 
 
-def pedigree_digest(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = ()) -> bytes:
+def pedigree_digest(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = ()) -> bytes:
     """SHA-256 of what layout reads of ``p``, canonically: independent of individual and mating order.
 
     Only the ``LAYOUT_READS`` fields are hashed; the rest (``LAYOUT_IGNORES``) are cleared first, so editing them leaves
     a stored layout valid. Drawing re-reads the pedigree, so a field only drawing reads need not enter. Individuals sort
-    by ``Position``, matings by their own serialized bytes; offspring (birth) order is kept. A condition entry enters
-    resolved through ``conditions``, the set's declarations, in the 0.x encoding (its declaration's name and
-    inheritance in place of its ``condition_id``): renaming a declaration or changing its inheritance changes the
-    digest; renaming its id does not.
+    by ``Position``, matings by their own serialized bytes; offspring (birth) order is kept. What each person shows
+    enters resolved through ``key_entries``, the set's key, in the pre-0.4 encoding (each shown entry a condition
+    carrying its text, status and inheritance): changing an entry's text or inheritance changes the digest; renaming
+    its id does not. A pedigree of phenotype marks with standard statuses digests as it did before the key.
 
     Raises:
-        grus.ir.UndeclaredConditionError: an entry names a ``condition_id`` no declaration has.
+        grus.ir.UndeclaredKeyEntryError: a mark names a ``key_id`` no entry has.
     """
-    canon: Any = _migrate.legacy_pedigree(p, conditions)
+    canon: Any = _migrate.legacy_pedigree(p, key_entries)
     _layout_reads_only(canon)
     # Copies, so clearing the repeated fields below cannot touch them.
     individuals = [copy.deepcopy(ind) for ind in sorted(canon.individuals, key=lambda i: (i.generation, i.index))]
@@ -147,11 +154,11 @@ def layout_geometry(geom: _geometry.Geometry) -> lpb.LayoutGeometry:
     )
 
 
-def layout_key(p: pb.Pedigree, geom: _geometry.Geometry, conditions: Sequence[pb.ConditionDef] = ()) -> lpb.LayoutKey:
-    """The key a layout of ``p`` (its set's condition declarations ``conditions``) under ``geom`` carries."""
+def layout_key(p: pb.Pedigree, geom: _geometry.Geometry, key_entries: Sequence[pb.KeyEntry] = ()) -> lpb.LayoutKey:
+    """The key a layout of ``p`` (its set's key entries ``key_entries``) under ``geom`` carries."""
     return lpb.LayoutKey(
         algorithm_version=LAYOUT_VERSION,
-        pedigree_digest=pedigree_digest(p, conditions),
+        pedigree_digest=pedigree_digest(p, key_entries),
         geometry=layout_geometry(geom),
     )
 
@@ -160,23 +167,23 @@ def store_layout(
     p: pb.Pedigree,
     geometry: _geometry.Geometry | None = None,
     *,
-    conditions: Sequence[pb.ConditionDef] = (),
+    key_entries: Sequence[pb.KeyEntry] = (),
     loci: Sequence[pb.Locus] = (),
 ) -> lpb.PedigreeLayout:
     """Lay ``p`` out under ``geometry`` and record the result, a deferral included.
 
-    ``conditions`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.conditions``, ``.loci``); a
-    pedigree with no condition entries or genotypes needs none.
+    ``key_entries`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.key_entries``, ``.loci``); a
+    pedigree with no marks or genotypes needs none.
 
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     try:
-        lay = _layout2.layout(p, geom, conditions=conditions, loci=loci)
+        lay = _layout2.layout(p, geom, key_entries=key_entries, loci=loci)
     except _layout.DeferredFeatureError as deferred:
-        return lpb.PedigreeLayout(key=layout_key(p, geom, conditions), deferred=str(deferred))
-    return to_proto(p, lay, geom, conditions, loci)
+        return lpb.PedigreeLayout(key=layout_key(p, geom, key_entries), deferred=str(deferred))
+    return to_proto(p, lay, geom, key_entries, loci)
 
 
 def load_layout(
@@ -184,12 +191,12 @@ def load_layout(
     stored: lpb.PedigreeLayout,
     geometry: _geometry.Geometry | None = None,
     *,
-    conditions: Sequence[pb.ConditionDef] = (),
+    key_entries: Sequence[pb.KeyEntry] = (),
     loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """The ``Layout`` of ``p`` under ``geometry`` that ``stored`` records, after checking it is not stale.
 
-    ``conditions`` and ``loci`` are the declarations of ``p``'s set, as for ``store_layout``.
+    ``key_entries`` and ``loci`` are the declarations of ``p``'s set, as for ``store_layout``.
 
     Raises:
         grus.ir.ValidationError: ``stored`` breaks a field rule of the layout schema.
@@ -199,14 +206,14 @@ def load_layout(
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
     protovalidate.validate(stored)
-    _check_key(stored.key, p, geom, conditions)
+    _check_key(stored.key, p, geom, key_entries)
     if stored.WhichOneof("outcome") == "deferred":
         raise _layout.DeferredFeatureError(stored.deferred)
-    return from_proto(p, stored.placement, geom, conditions, loci)
+    return from_proto(p, stored.placement, geom, key_entries, loci)
 
 
 def _check_key(
-    key: lpb.LayoutKey, p: pb.Pedigree, geom: _geometry.Geometry, conditions: Sequence[pb.ConditionDef]
+    key: lpb.LayoutKey, p: pb.Pedigree, geom: _geometry.Geometry, key_entries: Sequence[pb.KeyEntry]
 ) -> None:
     if key.algorithm_version != LAYOUT_VERSION:
         raise StaleLayoutError(
@@ -218,7 +225,7 @@ def _check_key(
         stored_value, value = getattr(key.geometry, field.name), getattr(want, field.name)
         if stored_value != value:
             raise StaleLayoutError(f"stored layout has {field.name}={stored_value!r}; the geometry has {value!r}")
-    if key.pedigree_digest != pedigree_digest(p, conditions):
+    if key.pedigree_digest != pedigree_digest(p, key_entries):
         raise StaleLayoutError("stored layout is of different pedigree content (its digest does not match)")
 
 
@@ -226,11 +233,11 @@ def to_proto(
     p: pb.Pedigree,
     lay: _layout.Layout,
     geom: _geometry.Geometry,
-    conditions: Sequence[pb.ConditionDef] = (),
+    key_entries: Sequence[pb.KeyEntry] = (),
     loci: Sequence[pb.Locus] = (),
 ) -> lpb.PedigreeLayout:
     """Record ``lay``, a layout of ``p`` under ``geom``, as a ``PedigreeLayout``."""
-    keys = _cell_keys(p, _layout2._prepare(p, conditions, loci))
+    keys = _cell_keys(p, _layout2._prepare(p, key_entries, loci))
     placement = lpb.Placement(first_generation=lay.first_generation)
     for level, row in enumerate(lay.nid):
         out = placement.rows.add()
@@ -247,14 +254,14 @@ def to_proto(
         placement.founder_sibships.add(row=level, columns=cols)
     for tg in lay.twin_groups:
         placement.twin_groups.add(row=tg.level, columns=tg.columns, zygosity=pb.ZygosityType.ValueType(tg.zygosity))
-    return lpb.PedigreeLayout(key=layout_key(p, geom, conditions), placement=placement)
+    return lpb.PedigreeLayout(key=layout_key(p, geom, key_entries), placement=placement)
 
 
 def from_proto(
     p: pb.Pedigree,
     placement: lpb.Placement,
     geom: _geometry.Geometry,
-    conditions: Sequence[pb.ConditionDef] = (),
+    key_entries: Sequence[pb.KeyEntry] = (),
     loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """The ``Layout`` a stored placement of ``p`` under ``geom`` records — equal to the fresh layout it was taken from.
@@ -268,7 +275,7 @@ def from_proto(
     Raises:
         StaleLayoutError: any check above fails.
     """
-    prep = _layout2._prepare(p, conditions, loci)
+    prep = _layout2._prepare(p, key_entries, loci)
     g = prep.graph
     index = {key: idx for idx, key in _cell_keys(p, prep).items()}
     nid: list[list[int]] = []
@@ -312,7 +319,7 @@ def from_proto(
         phantom=prep.phantom,
         lone=[[c.lone for c in row] for row in rows],
     )
-    _verify(p, prep, stored, geom, _labels.Clinical.of(p, ir.Conditions(conditions)))
+    _verify(p, prep, stored, geom, _labels.Clinical.of(p, ir.Key(key_entries)))
     return stored
 
 

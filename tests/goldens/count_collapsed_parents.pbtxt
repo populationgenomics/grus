@@ -1,4 +1,4 @@
-conditions { id: "k1" }
+key_entries { id: "k1" phenotype {} }
 pedigrees {
   id: "count_collapsed_parents"
   labels { text: "Count-collapsed siblings each with offspring of unknown number drop straight down; a lone parent keeps its omitted partner" kind: LABEL_KIND_OTHER }
@@ -10,12 +10,12 @@ pedigrees {
   individuals { generation: 2 index: 4 gender: GENDER_MAN }
   individuals { generation: 3 index: 1 gender: GENDER_WOMAN count: 3 }
   individuals { generation: 3 index: 2 gender: GENDER_MAN count: 3 }
-  individuals { generation: 3 index: 3 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 3 index: 3 gender: GENDER_MAN marks { key_id: "k1" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 3 index: 4 gender: GENDER_MAN count: 6 }
   individuals { generation: 3 index: 5 gender: GENDER_WOMAN count: 2 }
   individuals { generation: 4 index: 1 gender: GENDER_UNKNOWN count_unspecified: true }
   individuals { generation: 4 index: 2 gender: GENDER_UNKNOWN count_unspecified: true }
-  individuals { generation: 4 index: 3 gender: GENDER_WOMAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 4 index: 3 gender: GENDER_WOMAN marks { key_id: "k1" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 4 index: 4 gender: GENDER_MAN }
   individuals { generation: 4 index: 5 gender: GENDER_UNKNOWN count_unspecified: true }
   individuals { generation: 4 index: 6 gender: GENDER_UNKNOWN count_unspecified: true }

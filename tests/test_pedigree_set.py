@@ -25,7 +25,7 @@ def _trio(title: str) -> pb.Pedigree:
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
+                marks=[pb.Mark(key_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -38,13 +38,13 @@ def _trio(title: str) -> pb.Pedigree:
     )
 
 
-_DEFS = [pb.ConditionDef(id="k1")]  # the trios' one condition, unnamed
+_DEFS = [pb.KeyEntry(id="k1", phenotype=pb.Phenotype())]  # the trios' one condition, unnamed
 
 
 def _set_of(*pedigrees: pb.Pedigree) -> pb.PedigreeSet:
     """The pedigrees as a set, declaring the trios' condition when some entry references it."""
-    referenced = any(ind.conditions for p in pedigrees for ind in p.individuals)
-    return pb.PedigreeSet(pedigrees=list(pedigrees), conditions=_DEFS if referenced else [])
+    referenced = any(ind.marks for p in pedigrees for ind in p.individuals)
+    return pb.PedigreeSet(pedigrees=list(pedigrees), key_entries=_DEFS if referenced else [])
 
 
 def _broken() -> pb.Pedigree:
@@ -192,33 +192,34 @@ def test_diff_set_reference_vs_empty_candidate() -> None:
 def test_diff_set_generalizes_single_pedigree_diff() -> None:
     a = _trio("F1")
     b = _trio("F1")
-    b.individuals[2].ClearField("conditions")  # II-1 affected -> unaffected: a per-pedigree discrepancy
+    b.individuals[2].ClearField("marks")  # II-1 affected -> unaffected: a per-pedigree discrepancy
     d = ir.diff_set(_set_of(a), _set_of(b))
     assert len(d.matched) == 1
-    assert d.matched[0].diff == ir.diff(a, b, a_conditions=_DEFS)  # the pair's diff is exactly the single-pedigree diff
+    # the pair's diff is exactly the single-pedigree diff
+    assert d.matched[0].diff == ir.diff(a, b, a_key_entries=_DEFS)
 
 
 def _named(title: str, cid: str, name: str, inheritance: pb.Inheritance | None = None) -> pb.PedigreeSet:
-    """A one-trio set whose condition is declared ``cid`` with ``name`` (and ``inheritance``)."""
+    """A one-trio set whose phenotype is declared ``cid`` with text ``name`` (and ``inheritance``)."""
     p = _trio(title)
-    p.individuals[2].conditions[0].condition_id = cid
-    d = pb.ConditionDef(id=cid, name=name)
+    p.individuals[2].marks[0].key_id = cid
+    d = pb.KeyEntry(id=cid, text=name, phenotype=pb.Phenotype())
     if inheritance is not None:
-        d.inheritance = inheritance
-    return pb.PedigreeSet(pedigrees=[p], conditions=[d])
+        d.phenotype.inheritance = inheritance
+    return pb.PedigreeSet(pedigrees=[p], key_entries=[d])
 
 
-def test_diff_set_compares_conditions_by_declared_name_not_id() -> None:
-    # An id is the record's own handle: two records naming one condition by different ids agree.
+def test_diff_set_compares_marks_by_declared_text_not_id() -> None:
+    # An id is the record's own handle: two records naming one entry by different ids agree.
     d = ir.diff_set(_named("F1", "k1", "cystic fibrosis"), _named("F1", "cf", "cystic fibrosis"))
     assert len(d.matched) == 1 and not d.matched[0].diff.mismatches
 
 
-def test_diff_set_reports_a_different_declared_name_or_inheritance() -> None:
+def test_diff_set_reports_a_different_declared_text_or_inheritance() -> None:
     ref = _named("F1", "k1", "cystic fibrosis", pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
     for cand in (
         _named("F1", "k1", "sickle cell", pb.INHERITANCE_AUTOSOMAL_RECESSIVE),
         _named("F1", "k1", "cystic fibrosis"),
     ):
         (pair,) = ir.diff_set(ref, cand).matched
-        assert "conditions" in {m.field for m in pair.diff.mismatches}
+        assert "marks" in {m.field for m in pair.diff.mismatches}

@@ -4,10 +4,10 @@ A format module parses its file into ``Person`` records (opaque ids, parent ids,
 format-level extras; ``build_set`` groups them into pedigrees, derives one ``Mating`` per distinct parent
 pair, synthesises the ``Position`` identity (kinship2-style ``kindepth`` with couple alignment for the
 generation; source order within the generation for the index), and validates the result through
-``grus.ir`` so no importer ever returns an invalid IR. A person's conditions are stated by name (``Condition``);
-``build_set`` declares one ``ConditionDef`` per distinct name, ids ``k1``, ``k2``, … in order of first appearance
-across the set, and points each entry at its declaration. Loci are the format's to declare (it knows what identifies
-one): it passes them to ``build_set`` and states each person's genotypes against their ids.
+``grus.ir`` so no importer ever returns an invalid IR. A person's conditions are phenotypes stated by name
+(``Condition``); ``build_set`` declares one phenotype ``KeyEntry`` per distinct name, ids ``k1``, ``k2``, … in order of
+first appearance across the set, and marks each person with it. Loci are the format's to declare (it knows what
+identifies one): it passes them to ``build_set`` and states each person's genotypes against their ids.
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ def build_sets(
             for name in names:
                 ids.setdefault(name, f"k{len(ids) + 1}")
     ps = pb.PedigreeSet()
-    ps.conditions.extend(pb.ConditionDef(id=cid, name=name) for name, cid in ids.items())
+    ps.key_entries.extend(pb.KeyEntry(id=cid, text=name, phenotype=pb.Phenotype()) for name, cid in ids.items())
     ps.loci.extend(loci)
     for people, extras in sources:
         by_family: dict[str, list[Person]] = defaultdict(list)
@@ -189,9 +189,9 @@ def build_pedigree(
         for c in p.conditions:
             if c.name not in condition_ids:
                 raise PedigreeImportError(f"individual {p.id!r}: condition {c.name!r} has no declared id")
-            entry = ind.conditions.add(condition_id=condition_ids[c.name], status=c.status)
+            mark = ind.marks.add(key_id=condition_ids[c.name], status=c.status)
             if c.onset_age is not None:
-                entry.onset_age = c.onset_age
+                mark.onset_age = c.onset_age
         ind.deceased = p.deceased
         ind.proband = p.proband
         ind.consultand = p.consultand

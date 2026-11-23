@@ -16,21 +16,21 @@ from grus.ir._validate import validate, validate_set
 from grus.models import pedigree_pb2 as pb
 
 
-def load_pbtxt(text: str, conditions: Sequence[pb.ConditionDef] = (), *, loci: Sequence[pb.Locus] = ()) -> pb.Pedigree:
+def load_pbtxt(text: str, key_entries: Sequence[pb.KeyEntry] = (), *, loci: Sequence[pb.Locus] = ()) -> pb.Pedigree:
     """Parse canonical pbtxt into a validated ``Pedigree`` (raises on parse or invariant failure).
 
-    Conditions and loci are declared at set level: ``conditions`` and ``loci`` are the declarations its entries and
+    Key entries and loci are declared at set level: ``key_entries`` and ``loci`` are the declarations its marks and
     genotypes reference, if it has any.
     """
     p = text_format.Parse(text, pb.Pedigree())
-    validate(p, conditions, loci=loci)
+    validate(p, key_entries, loci=loci)
     return p
 
 
-def load_json(text: str, conditions: Sequence[pb.ConditionDef] = (), *, loci: Sequence[pb.Locus] = ()) -> pb.Pedigree:
+def load_json(text: str, key_entries: Sequence[pb.KeyEntry] = (), *, loci: Sequence[pb.Locus] = ()) -> pb.Pedigree:
     """Parse proto3-JSON (the LLM emission surface) into a validated ``Pedigree``; declarations as for pbtxt."""
     p = json_format.Parse(text, pb.Pedigree())
-    validate(p, conditions, loci=loci)
+    validate(p, key_entries, loci=loci)
     return p
 
 

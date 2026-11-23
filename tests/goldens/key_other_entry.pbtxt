@@ -1,0 +1,18 @@
+key_entries { id: "k1" text: "hearing loss" phenotype { inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE } }
+key_entries { id: "k2" text: "examined" other {} }
+pedigrees {
+  id: "key-other-entry"
+  labels { text: "A key entry that is not a phenotype" kind: LABEL_KIND_OTHER }
+  individuals { generation: 1 index: 1 gender: GENDER_MAN marks { key_id: "k1" status: CONDITION_STATUS_CARRIER } marks { key_id: "k2" } }
+  individuals { generation: 1 index: 2 gender: GENDER_WOMAN marks { key_id: "k1" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 2 index: 1 gender: GENDER_WOMAN proband: true marks { key_id: "k1" status: CONDITION_STATUS_AFFECTED } marks { key_id: "k2" } }
+  individuals { generation: 2 index: 2 gender: GENDER_MAN marks { key_id: "k2" } }
+  individuals { generation: 2 index: 3 gender: GENDER_MAN }
+  matings {
+    partner_a { generation: 1 index: 1 }
+    partner_b { generation: 1 index: 2 }
+    offspring { child { generation: 2 index: 1 } }
+    offspring { child { generation: 2 index: 2 } }
+    offspring { child { generation: 2 index: 3 } }
+  }
+}

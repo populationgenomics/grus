@@ -4,7 +4,7 @@
   proto3-JSON.
 * **Provenance, not meaning** — ``diff_set`` and the renderer ignore citations, evidence and supports.
 * **Loud** — a malformed citation, a duplicate or dangling id, an unknown field, a scope not in the pedigree, and a
-  condition no one in scope has all fail to load, naming the pedigree and the item.
+  key entry no one in scope shows all fail to load, naming the pedigree and the item.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from grus.models import pedigree_pb2 as pb
 _GOLDENS = pathlib.Path(__file__).parent / "goldens"
 
 # The ir.md example: "II-1, the proband, and her affected sibs II-2 and II-3" backs `proband` for II-1 and
-# `condition.status` for II-1..II-3 through one shared citation; the caption names the condition for everyone.
+# `mark.status` for II-1..II-3 through one shared citation; the caption names the phenotype for everyone.
 _CITED = """
 citations { id: "fig" region { page: 3 x0: 72 y0: 144 x1: 540 y1: 420 } }
 citations { id: "cap" quote: "Figure 2. Pedigree of family A with cystic fibrosis." }
@@ -31,17 +31,17 @@ citations { id: "panel-a" region { page: 3 x0: 72 y0: 144 x1: 300 y1: 420 } }
 citations { id: "s1" quote: "II-1, the proband, and her affected sibs II-2 and II-3" }
 evidence: "fig"
 evidence: "cap"
-conditions { id: "cf" name: "cystic fibrosis" inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE }
+key_entries { id: "cf" text: "cystic fibrosis" phenotype { inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE } }
 pedigrees {
   labels { text: "Family A" kind: LABEL_KIND_FAMILY }
   individuals { generation: 1 index: 1 gender: GENDER_MAN }
   individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
   individuals { generation: 2 index: 1 gender: GENDER_WOMAN proband: true
-                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
+                marks { key_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 2 index: 2 gender: GENDER_MAN
-                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
+                marks { key_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 2 index: 3 gender: GENDER_WOMAN
-                conditions { condition_id: "cf" status: CONDITION_STATUS_AFFECTED } }
+                marks { key_id: "cf" status: CONDITION_STATUS_AFFECTED } }
   matings {
     partner_a { generation: 1 index: 1 } partner_b { generation: 1 index: 2 } consanguineous: true
     offspring { child { generation: 2 index: 1 } }
@@ -49,8 +49,8 @@ pedigrees {
     offspring { child { generation: 2 index: 3 } twin_group: 1 twin_type: ZYGOSITY_TYPE_DIZYGOTIC }
   }
   evidence: "panel-a"
-  supports { citations: "cap" field: "condition.name" condition_id: "cf" }
-  supports { citations: "s1" field: "condition.status" condition_id: "cf"
+  supports { citations: "cap" field: "key.text" key_id: "cf" }
+  supports { citations: "s1" field: "mark.status" key_id: "cf"
              individuals { generation: 2 index: 1 } individuals { generation: 2 index: 2 }
              individuals { generation: 2 index: 3 } }
   supports { citations: "s1" field: "proband" individuals { generation: 2 index: 1 } }
@@ -99,8 +99,8 @@ def test_diff_and_render_ignore_citations() -> None:
     assert d == ir.diff_set(uncited, uncited), "a record with and without citations diffs the same"
     assert len(d.matched) == 1 and not d.only_in_a and not d.only_in_b and not d.matched[0].diff.mismatches
     assert render.render_set_svg(cited) == render.render_set_svg(uncited)
-    assert render.render_svg(cited.pedigrees[0], conditions=cited.conditions) == render.render_svg(
-        uncited.pedigrees[0], conditions=uncited.conditions
+    assert render.render_svg(cited.pedigrees[0], key_entries=cited.key_entries) == render.render_svg(
+        uncited.pedigrees[0], key_entries=uncited.key_entries
     )
 
 
@@ -108,30 +108,28 @@ def test_support_fields_name_real_schema_fields() -> None:
     # The closed path list cannot drift from the schema: every path is a field of the message it scopes.
     messages = {
         "individual": pb.Individual,
-        "condition": pb.Condition,
-        "declaration": pb.ConditionDef,
+        "mark": pb.Mark,
+        "key": pb.KeyEntry,
         "genotype": pb.Genotype,
         "locus": pb.Locus,
         "mating": pb.Mating,
         "offspring": pb.Offspring,
         "pedigree": pb.Pedigree,
     }
-    prefixes = {"condition": "condition.", "declaration": "condition.", "genotype": "genotype.", "locus": "locus."}
+    prefixes = {"mark": "mark.", "key": "key.", "genotype": "genotype.", "locus": "locus."}
     for path, kinds in _validate.SUPPORT_FIELDS.items():
         for kind in kinds:
             prefix = prefixes.get(kind, "")
             assert path.startswith(prefix) and (prefix or "." not in path)
             name = path.removeprefix(prefix)
-            assert name in messages[kind].DESCRIPTOR.fields_by_name, f"{path} is not a {kind} field"
+            fields = dict(messages[kind].DESCRIPTOR.fields_by_name)
+            if kind == "key":  # a phenotype's own facts are the entry's
+                fields |= pb.Phenotype.DESCRIPTOR.fields_by_name
+            assert name in fields, f"{path} is not a {kind} field"
     assert _validate.SUPPORT_FIELDS["annotations"] == {"individual", "mating"}
     assert ir.SUPPORT_FIELDS is _validate.SUPPORT_FIELDS, "exported for callers listing the valid paths"
-    assert all(
-        p.startswith(ir.SUPPORT_CONDITION_PREFIX)
-        for p, k in ir.SUPPORT_FIELDS.items()
-        if k & {"condition", "declaration"}
-    )
-    assert _validate.SUPPORT_FIELDS["condition.name"] == {"declaration"}
-    assert _validate.SUPPORT_FIELDS["condition.status"] == {"condition"}
+    assert all(p.startswith(ir.SUPPORT_MARK_PREFIX) for p, k in ir.SUPPORT_FIELDS.items() if "mark" in k)
+    assert all(p.startswith(ir.SUPPORT_KEY_PREFIX) for p, k in ir.SUPPORT_FIELDS.items() if "key" in k)
 
 
 # --- loud ---------------------------------------------------------------------------------------------------------
@@ -169,26 +167,26 @@ def _broken(edit: str, old: str) -> str:
             r"no mating of \[\(1, 1\), \(2, 2\)\]",
         ),
         (
-            'field: "condition.name" condition_id: "cf"',
-            'field: "condition.name" condition_id: "sc"',
-            r"condition_id 'sc' is not declared",
+            'field: "key.text" key_id: "cf"',
+            'field: "key.text" key_id: "sc"',
+            r"key_id 'sc' is not declared",
         ),
         (
             "individuals { generation: 2 index: 1 } individuals { generation: 2 index: 2 }\n"
             "             individuals { generation: 2 index: 3 } }",
             "individuals { generation: 1 index: 1 } }",
-            r"no one in scope has condition 'cf'",
+            r"no one in scope marks key entry 'cf'",
         ),
         (
-            'field: "condition.name" condition_id: "cf" }',
-            'field: "condition.name" condition_id: "cf" individuals { generation: 2 index: 1 } }',
-            r"condition.name describes the declaration, so it scopes the whole pedigree",
+            'field: "key.text" key_id: "cf" }',
+            'field: "key.text" key_id: "cf" individuals { generation: 2 index: 1 } }',
+            r"key.text describes the declaration, so it scopes the whole pedigree",
         ),
-        ('field: "condition.name" condition_id: "cf"', 'field: "condition.name"', r"names a condition_id iff"),
+        ('field: "key.text" key_id: "cf"', 'field: "key.text"', r"names a key_id iff"),
         (
             'field: "proband" individuals',
-            'field: "proband" condition_id: "cf" individuals',
-            r"names a condition_id iff",
+            'field: "proband" key_id: "cf" individuals',
+            r"names a key_id iff",
         ),
         (
             'field: "twin_type" individuals { generation: 2 index: 2 }',

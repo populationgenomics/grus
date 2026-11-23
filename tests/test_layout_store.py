@@ -38,7 +38,7 @@ from grus.render import _store
 _GEOM = render.DEFAULT_GEOMETRY
 
 
-_Defs = tuple[pb.ConditionDef, ...]
+_Defs = tuple[pb.KeyEntry, ...]
 
 
 def _fixtures() -> dict[str, tuple[pb.Pedigree, _Defs]]:
@@ -54,11 +54,11 @@ _FIXTURES = _fixtures()
 
 
 def _record(p: pb.Pedigree, defs: _Defs = ()) -> lpb.PedigreeLayout:
-    return _store.to_proto(p, render.layout(p, _GEOM, conditions=defs), _GEOM, defs)
+    return _store.to_proto(p, render.layout(p, _GEOM, key_entries=defs), _GEOM, defs)
 
 
 def test_fixtures_cover_every_kind_of_cell() -> None:
-    layouts = [render.layout(p, conditions=defs) for p, defs in _FIXTURES.values()]
+    layouts = [render.layout(p, key_entries=defs) for p, defs in _FIXTURES.values()]
     assert any(lay.ghost_of for lay in layouts)
     assert any(lay.phantom for lay in layouts)
     assert any(lay.passthrough for lay in layouts)
@@ -68,7 +68,7 @@ def test_fixtures_cover_every_kind_of_cell() -> None:
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
 def test_round_trip_is_lossless(name: str) -> None:
     p, defs = _FIXTURES[name]
-    lay = render.layout(p, _GEOM, conditions=defs)
+    lay = render.layout(p, _GEOM, key_entries=defs)
     record = _store.to_proto(p, lay, _GEOM, defs)
     protovalidate.validate(record)
     back = lpb.PedigreeLayout.FromString(record.SerializeToString())
@@ -95,7 +95,7 @@ def test_ghost_records_are_independent_of_mating_order(name: str) -> None:
         del q.matings[:]
         q.matings.extend(perm)
         assert _record(q, defs).SerializeToString(deterministic=True) == ref.SerializeToString(deterministic=True)
-        assert render.render_svg(q, stored_layout=ref, conditions=defs) == render.render_svg(q, conditions=defs)
+        assert render.render_svg(q, stored_layout=ref, key_entries=defs) == render.render_svg(q, key_entries=defs)
 
 
 def test_repeated_avuncular_marriages_store_distinct_ghosts() -> None:
@@ -109,7 +109,7 @@ def test_record_reads_back_into_a_shuffled_pedigree() -> None:
     p, defs = _FIXTURES["two_ghosts"]
     record = _record(p, defs)
     q = test_layout2._shuffled(p, 1)
-    assert _store.from_proto(q, record.placement, _GEOM, defs) == render.layout(q, _GEOM, conditions=defs)
+    assert _store.from_proto(q, record.placement, _GEOM, defs) == render.layout(q, _GEOM, key_entries=defs)
 
 
 def test_digest_ignores_order_but_not_content() -> None:
@@ -178,7 +178,7 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> N
     problems = [f"{name}: its golden is gone; remove the pin" for name in sorted(set(pinned) - set(test_render._NAMES))]
     for name in test_render._NAMES:
         p, defs = test_render._golden(name)
-        record = render.store_layout(p, geom, conditions=defs)
+        record = render.store_layout(p, geom, key_entries=defs)
         now = {
             "pedigree": record.key.pedigree_digest.hex(),
             "placement": hashlib.sha256(record.placement.SerializeToString(deterministic=True)).hexdigest(),
@@ -200,30 +200,30 @@ def test_layout_version_is_bumped_when_a_golden_layout_changes(solver: str) -> N
 @pytest.mark.parametrize("name", sorted(_FIXTURES))
 def test_drawing_from_a_stored_layout_is_byte_identical(name: str) -> None:
     p, defs = _FIXTURES[name]
-    stored = lpb.PedigreeLayout.FromString(render.store_layout(p, conditions=defs).SerializeToString())
-    assert render.render_svg(p, stored_layout=stored, id_prefix="f-", conditions=defs) == render.render_svg(
-        p, id_prefix="f-", conditions=defs
+    stored = lpb.PedigreeLayout.FromString(render.store_layout(p, key_entries=defs).SerializeToString())
+    assert render.render_svg(p, stored_layout=stored, id_prefix="f-", key_entries=defs) == render.render_svg(
+        p, id_prefix="f-", key_entries=defs
     )
 
 
 def test_drawing_only_geometry_may_vary() -> None:
     p, defs = _FIXTURES["carrier_inheritance"]
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     # Row pitch, margins, stubs and the vertical label rhythm move nothing horizontally. symbol_size and carrier_style
     # did, once count marks and labels beside a drop entered the spacing; they are in the key now.
     geom = dataclasses.replace(
         _GEOM, gen_height=120.0, margin=10.0, sib_stub=30.0, elbow_gap=10.0, label_line_gap=4.0, label_box_height=3.0
     )
-    assert render.render_svg(p, geom, stored_layout=stored, conditions=defs) == render.render_svg(
-        p, geom, conditions=defs
+    assert render.render_svg(p, geom, stored_layout=stored, key_entries=defs) == render.render_svg(
+        p, geom, key_entries=defs
     )
 
 
 def test_a_stored_layout_draws_a_shuffled_pedigree() -> None:
     p, defs = _FIXTURES["two_ghosts"]
     q = test_layout2._shuffled(p, 2)
-    assert render.render_svg(q, stored_layout=render.store_layout(p, conditions=defs)) == render.render_svg(
-        q, conditions=defs
+    assert render.render_svg(q, stored_layout=render.store_layout(p, key_entries=defs)) == render.render_svg(
+        q, key_entries=defs
     )
 
 
@@ -243,38 +243,38 @@ _KEY_FIELDS = (
 @pytest.mark.parametrize("field", _KEY_FIELDS)
 def test_a_layout_under_other_layout_geometry_is_stale(field: str) -> None:
     p, defs = _FIXTURES["three_generation"]
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     enums = {"x_solver": render.XSolver.HIGHS, "carrier_style": render.CarrierStyle.INHERITANCE_GLYPH}
     changed = enums[field] if field in enums else getattr(_GEOM, field) + 1.0
     geom = dataclasses.replace(_GEOM, **{field: changed})
     with pytest.raises(render.StaleLayoutError, match=field):
-        render.render_svg(p, geom, stored_layout=stored, conditions=defs)
+        render.render_svg(p, geom, stored_layout=stored, key_entries=defs)
 
 
 def test_a_layout_of_other_pedigree_content_is_stale() -> None:
     p, defs = _FIXTURES["three_generation"]
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     q = pb.Pedigree()
     q.CopyFrom(p)
     q.individuals[0].deceased = not q.individuals[0].deceased
     with pytest.raises(render.StaleLayoutError, match="digest"):
-        render.render_svg(q, stored_layout=stored, conditions=defs)
+        render.render_svg(q, stored_layout=stored, key_entries=defs)
 
 
 def test_a_layout_from_another_algorithm_version_is_stale() -> None:
     p, defs = _FIXTURES["three_generation"]
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     stored.key.algorithm_version = render.LAYOUT_VERSION + 1
     with pytest.raises(render.StaleLayoutError, match="version"):
-        render.render_svg(p, stored_layout=stored, conditions=defs)
+        render.render_svg(p, stored_layout=stored, key_entries=defs)
 
 
 def test_a_malformed_record_is_refused() -> None:
     p, defs = _FIXTURES["three_generation"]
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     stored.key.ClearField("geometry")
     with pytest.raises(ir.ValidationError):
-        render.render_svg(p, stored_layout=stored, conditions=defs)
+        render.render_svg(p, stored_layout=stored, key_entries=defs)
 
 
 def test_a_deferral_is_stored_and_replayed() -> None:
@@ -287,7 +287,7 @@ def test_a_deferral_is_stored_and_replayed() -> None:
         render.render_svg(p, stored_layout=stored)
     ps = test_render._set_of("trio")
     ps.pedigrees.append(p)
-    stored_set = [render.store_layout(ped, conditions=ps.conditions) for ped in ps.pedigrees]
+    stored_set = [render.store_layout(ped, key_entries=ps.key_entries) for ped in ps.pedigrees]
     assert render.render_set_svg(ps, stored_layouts=stored_set) == render.render_set_svg(ps)
     assert render.render_svgs(ps, stored_layouts=stored_set) == render.render_svgs(ps)
 
@@ -295,7 +295,7 @@ def test_a_deferral_is_stored_and_replayed() -> None:
 def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
     ps = test_render._set_of("trio", "sibship")
     with pytest.raises(render.StaleLayoutError, match="1 stored layouts for a set of 2"):
-        render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0], conditions=ps.conditions)])
+        render.render_set_svg(ps, stored_layouts=[render.store_layout(ps.pedigrees[0], key_entries=ps.key_entries)])
 
 
 # --- an internally inconsistent record (a serializer or version bug) ------------------------------------------------
@@ -304,7 +304,7 @@ def test_a_set_needs_one_stored_layout_per_pedigree() -> None:
 def _edited(name: str, edit: Callable[[lpb.Placement], None]) -> lpb.PedigreeLayout:
     """``name``'s stored layout with ``edit`` applied to its placement."""
     p, defs = _FIXTURES[name]
-    record = render.store_layout(p, conditions=defs)
+    record = render.store_layout(p, key_entries=defs)
     edit(record.placement)
     return record
 
@@ -370,7 +370,7 @@ def test_an_inconsistent_record_is_refused(case: str) -> None:
     name, edit, why = _EDITS[case]
     p, defs = _FIXTURES[name]
     with pytest.raises(render.StaleLayoutError, match=why):
-        render.render_svg(p, stored_layout=_edited(name, edit), conditions=defs)
+        render.render_svg(p, stored_layout=_edited(name, edit), key_entries=defs)
 
 
 def _deferred_pedigree() -> pb.Pedigree:
@@ -410,13 +410,13 @@ def test_citation_supports_leave_a_stored_layout_valid() -> None:
     # Evidence and supports are provenance the layout never reads: adding them keeps the digest, so a layout stored
     # before they were added draws without a relayout.
     p, defs = test_render._golden("trio")
-    stored = render.store_layout(p, conditions=defs)
+    stored = render.store_layout(p, key_entries=defs)
     cited = pb.Pedigree()
     cited.CopyFrom(p)
     cited.evidence.append("panel-a")
     cited.supports.add(citations=["cap"], field="proband", individuals=[pb.Position(generation=2, index=1)])
     assert _store.pedigree_digest(cited, defs) == _store.pedigree_digest(p, defs)
-    assert render.render_svg(cited, stored_layout=stored, conditions=defs) == render.render_svg(p, conditions=defs)
+    assert render.render_svg(cited, stored_layout=stored, key_entries=defs) == render.render_svg(p, key_entries=defs)
 
 
 # --- the digest covers what layout reads, and only that -----------------------------------------------------------
@@ -439,8 +439,9 @@ def _reachable(
 
 
 def _classified() -> dict[str, descriptor.Descriptor]:
-    """Every classified message: those the digest walks into, and the declarations their entries are resolved by."""
-    return _reachable(_DIGESTED) | {"ConditionDef": cast(descriptor.Descriptor, pb.ConditionDef.DESCRIPTOR)}
+    """Every classified message: those the digest walks into, and the key's, which what people show is read through."""
+    key = (pb.KeyEntry, pb.Phenotype, pb.GenotypePattern, pb.Other)
+    return _reachable(_DIGESTED) | {m.DESCRIPTOR.name: cast(descriptor.Descriptor, m.DESCRIPTOR) for m in key}
 
 
 def test_every_digested_field_is_classified() -> None:
@@ -456,12 +457,13 @@ def test_every_digested_field_is_classified() -> None:
 _LOCI = [pb.Locus(id="l1", alleles=[pb.Allele(symbol="N", reference=True), pb.Allele(symbol="M")])]
 
 
-def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
-    """A golden with a condition on every person, plus a mating, an annotation, a genotype and a count to edit.
+def _sample() -> tuple[pb.Pedigree, list[pb.KeyEntry]]:
+    """A golden with a mark on every person, plus a mating, an annotation, a genotype and a count to edit.
 
-    The genotype is at ``_LOCI``, which every render of the sample passes.
+    The genotype is at ``_LOCI``, which every render of the sample passes, and shows the key's genotype entry
+    ("carries M").
 
-    A fifth condition puts it in sixths, where any one fill has borders, so the count sits beside its symbol.
+    A fifth phenotype puts it in sixths, where any one fill has borders, so the count sits beside its symbol.
     """
     p, defs = test_render._golden("condition_fills")
     p.matings.add(
@@ -472,26 +474,32 @@ def _sample() -> tuple[pb.Pedigree, list[pb.ConditionDef]]:
     p.individuals[0].annotations.add(text="N/M", type=pb.ANNOTATION_TYPE_OTHER)
     p.individuals[0].genotypes.add(locus_id="l1", alleles=["N", "M"])
     p.individuals[2].count = 3
-    p.individuals[3].conditions.add(condition_id="k5", status=pb.CONDITION_STATUS_AFFECTED)
-    return p, [*defs, pb.ConditionDef(id="k5", name="E")]
+    p.individuals[3].marks.add(key_id="k5", status=pb.CONDITION_STATUS_AFFECTED)
+    return p, [
+        *defs,
+        pb.KeyEntry(id="k5", text="E", phenotype=pb.Phenotype()),
+        pb.KeyEntry(
+            id="k6", text="variant M", genotype=pb.GenotypePattern(locus_id="l1", alleles=["M"], copies_unstated=True)
+        ),
+    ]
 
 
-def _reverse_phenotype_labels(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
+def _reverse_phenotype_labels(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
     labels = [label for label in p.labels if label.kind == pb.LABEL_KIND_PHENOTYPE]
     for label, text in zip(labels, reversed([label.text for label in labels]), strict=True):
         label.text = text
 
 
-def _rename_declaration(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
+def _rename_declaration(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
     old, defs[0].id = defs[0].id, "renamed"
     for ind in p.individuals:
-        for c in ind.conditions:
-            if c.condition_id == old:
-                c.condition_id = "renamed"
+        for c in ind.marks:
+            if c.key_id == old:
+                c.key_id = "renamed"
 
 
 # One edit per LAYOUT_IGNORES field, made to _sample(): the digest and the stored layout must not move.
-_IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
+_IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.KeyEntry]], object]] = {
     ("Pedigree", "id"): lambda p, defs: setattr(p, "id", "another-id"),
     ("Pedigree", "provenance"): lambda p, defs: setattr(p.provenance, "doi", "10.1/x"),
     ("Pedigree", "evidence"): lambda p, defs: p.evidence.append("c1"),
@@ -513,14 +521,15 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDe
         p.individuals[0], "reproductive_role", pb.REPRODUCTIVE_ROLE_GAMETE_DONOR
     ),
     ("Individual", "documented_evaluation"): lambda p, defs: setattr(p.individuals[0], "documented_evaluation", True),
-    ("ConditionDef", "id"): _rename_declaration,
-    ("Condition", "onset_age"): lambda p, defs: setattr(p.individuals[0].conditions[0], "onset_age", "40s"),
+    ("KeyEntry", "id"): _rename_declaration,
+    ("Condition", "onset_age"): lambda p, defs: setattr(p.individuals[0].marks[0], "onset_age", "40s"),
     ("Annotation", "type"): lambda p, defs: setattr(
         p.individuals[0].annotations[0], "type", pb.ANNOTATION_TYPE_GENOTYPE
     ),
     ("Annotation", "loci"): lambda p, defs: (
         p.individuals[0].annotations[0].MergeFrom(pb.Annotation(type=pb.ANNOTATION_TYPE_GENOTYPE, loci=["l1"]))
     ),
+    # [M, M] still carries M: the genotype entry it shows is unchanged
     ("Individual", "genotypes"): lambda p, defs: p.individuals[0].genotypes[0].alleles.__setitem__(0, "M"),
     ("Mating", "status"): lambda p, defs: setattr(p.matings[-1], "status", pb.RELATIONSHIP_STATUS_DIVORCED),
     ("Mating", "annotations"): lambda p, defs: p.matings[-1].annotations.add(
@@ -542,37 +551,55 @@ def test_an_edit_to_an_ignored_field_leaves_the_stored_layout(key: tuple[str, st
     base, base_defs = _sample()
     edited, defs = _sample()
     _IGNORED_EDITS[key](edited, defs)
-    stored = render.store_layout(base, conditions=base_defs, loci=_LOCI)
-    assert render.store_layout(edited, conditions=defs, loci=_LOCI) == stored
-    fresh = render.render_svg(edited, conditions=defs, loci=_LOCI)
-    assert render.render_svg(edited, stored_layout=stored, conditions=defs, loci=_LOCI) == fresh
-    edited_set = pb.PedigreeSet(pedigrees=[edited], conditions=defs, loci=_LOCI)
+    stored = render.store_layout(base, key_entries=base_defs, loci=_LOCI)
+    assert render.store_layout(edited, key_entries=defs, loci=_LOCI) == stored
+    fresh = render.render_svg(edited, key_entries=defs, loci=_LOCI)
+    assert render.render_svg(edited, stored_layout=stored, key_entries=defs, loci=_LOCI) == fresh
+    edited_set = pb.PedigreeSet(pedigrees=[edited], key_entries=defs, loci=_LOCI)
     assert render.render_set_svg(edited_set, stored_layouts=[stored]) == render.render_set_svg(edited_set)
 
 
-def _declared_name(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
-    defs[0].name = "Z"
+def _declared_text(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    defs[0].text = "Z"
 
 
-def _declared_inheritance(p: pb.Pedigree, defs: list[pb.ConditionDef]) -> None:
-    defs[0].inheritance = pb.INHERITANCE_X_LINKED_RECESSIVE
+def _declared_inheritance(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    defs[0].phenotype.inheritance = pb.INHERITANCE_X_LINKED_RECESSIVE
 
 
-# One edit per LAYOUT_READS scalar field, made to _sample(): the digest must move. A declaration's name and
-# inheritance reach the digest only as an entry's (pre-1.0 Condition), so each is keyed both ways.
-_READ_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.ConditionDef]], object]] = {
+def _graded(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    defs[0].phenotype.grades.append("suspected")
+    p.individuals[0].marks[0].grade = "suspected"
+
+
+def _shows_other(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    defs.append(pb.KeyEntry(id="k7", text="Control", other=pb.Other()))
+    p.individuals[0].marks.add(key_id="k7")
+
+
+def _pattern_alleles(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    defs[-1].genotype.alleles[:] = ["X"]
+
+
+# One edit per LAYOUT_READS scalar field, made to _sample(): the digest must move. A key entry's text and
+# inheritance reach the digest only as a shown entry's (pre-0.4 Condition), so each is keyed both ways.
+_READ_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.KeyEntry]], object]] = {
     ("Individual", "generation"): lambda p, defs: setattr(p.individuals[-1], "generation", 9),
     ("Individual", "index"): lambda p, defs: setattr(p.individuals[-1], "index", 99),
     ("Individual", "deceased"): lambda p, defs: setattr(p.individuals[0], "deceased", True),
     ("Individual", "count"): lambda p, defs: setattr(p.individuals[0], "count", 3),
     ("Individual", "count_unspecified"): lambda p, defs: setattr(p.individuals[0], "count_unspecified", True),
-    ("Condition", "name"): _declared_name,
-    ("Condition", "status"): lambda p, defs: setattr(
-        p.individuals[0].conditions[0], "status", pb.CONDITION_STATUS_UNKNOWN
-    ),
+    ("Condition", "name"): _declared_text,
+    ("Condition", "status"): lambda p, defs: setattr(p.individuals[0].marks[0], "status", pb.CONDITION_STATUS_UNKNOWN),
     ("Condition", "inheritance"): _declared_inheritance,
-    ("ConditionDef", "name"): _declared_name,
-    ("ConditionDef", "inheritance"): _declared_inheritance,
+    ("Condition", "kind"): _shows_other,
+    ("Condition", "grade"): _graded,
+    ("KeyEntry", "text"): _declared_text,
+    ("Phenotype", "inheritance"): _declared_inheritance,
+    ("Phenotype", "grades"): _graded,
+    ("GenotypePattern", "locus_id"): lambda p, defs: setattr(defs[-1].genotype, "locus_id", "l9"),
+    ("GenotypePattern", "alleles"): _pattern_alleles,
+    ("GenotypePattern", "copies_unstated"): lambda p, defs: setattr(defs[-1].genotype, "copies_unstated", False),
     ("Annotation", "text"): lambda p, defs: setattr(p.individuals[0].annotations[0], "text", "a much wider label line"),
     ("Mating", "consanguineous"): lambda p, defs: setattr(p.matings[-1], "consanguineous", True),
     ("Mating", "childlessness"): lambda p, defs: setattr(p.matings[-1], "childlessness", pb.CHILDLESSNESS_BY_CHOICE),

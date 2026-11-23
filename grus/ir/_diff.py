@@ -17,8 +17,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from grus.ir import _validate
-from grus.ir._conditions import Conditions
+from grus.ir import _key_entries, _validate
 from grus.models import pedigree_pb2 as pb
 
 # The hashable identity + reference key of an individual within one pedigree.
@@ -42,7 +41,7 @@ class Mismatch:
         subject: the entity that differs — an individual's position ``"<gen>-<idx>"`` (A-side) for a
             per-person attribute, or a mating key ``"mating(a x b)"`` (A-side partner positions, sorted)
             for a relationship attribute.
-        field: the attribute that differs, e.g. ``"gender"``, ``"conditions"``, ``"consanguineous"``.
+        field: the attribute that differs, e.g. ``"gender"``, ``"marks"``, ``"consanguineous"``.
         a_value: the A-side (reference) value, rendered as an enum name or ``str``.
         b_value: the B-side (candidate) value, rendered the same way.
     """
@@ -142,7 +141,7 @@ class _Relations:
     partners: dict[Key, frozenset[Key]]  # individual -> mates
     children: dict[Key, frozenset[Key]]  # individual -> children across all its matings
     birth_rank: dict[Key, int]  # child -> 0-based index within its sibship (semantic); -1 if founder
-    conditions: Conditions  # the set's declarations, for reading each entry's name and inheritance
+    key: _key_entries.Key  # the set's key, for reading what each mark's entry states
 
 
 def _partner_keys(m: pb.Mating) -> list[Key]:
@@ -159,7 +158,7 @@ def _partner_keys(m: pb.Mating) -> list[Key]:
     return keys
 
 
-def _relations(p: pb.Pedigree, conditions: Conditions) -> _Relations:
+def _relations(p: pb.Pedigree, key: _key_entries.Key) -> _Relations:
     by_pos = {(ind.generation, ind.index): ind for ind in p.individuals}
     parents: dict[Key, set[Key]] = defaultdict(set)
     partners: dict[Key, set[Key]] = defaultdict(set)
@@ -183,7 +182,7 @@ def _relations(p: pb.Pedigree, conditions: Conditions) -> _Relations:
         partners={k: frozenset(v) for k, v in partners.items()},
         children={k: frozenset(v) for k, v in children.items()},
         birth_rank=birth_rank,
-        conditions=conditions,
+        key=key,
     )
 
 
@@ -191,8 +190,8 @@ def match_individuals(
     a: pb.Pedigree,
     b: pb.Pedigree,
     *,
-    a_conditions: Iterable[pb.ConditionDef] = (),
-    b_conditions: Iterable[pb.ConditionDef] = (),
+    a_key_entries: Iterable[pb.KeyEntry] = (),
+    b_key_entries: Iterable[pb.KeyEntry] = (),
 ) -> dict[Key, Key]:
     """Map each matchable A individual ``Position`` to a B individual ``Position``.
 
@@ -201,17 +200,17 @@ def match_individuals(
 
     1. exact ``Position`` equality — the fast path when the as-drawn ids are preserved (golden-vs-golden);
     2. structural fingerprint — 1-WL colour refinement over the *disjoint union* of both mating/sibship
-       graphs. Each node is seeded with its relational fingerprint (gender, its conditions signature,
+       graphs. Each node is seeded with its relational fingerprint (gender, its marks signature,
        birth-order-within-sibship, and partner/child/parent degrees) and refined by its sorted neighbour
        colours until the partition is stable. Colours are content-derived and shared across both graphs,
        so a node and its structural twin converge to the same colour; individuals sharing a stable colour
        are structurally interchangeable and paired deterministically. Nothing positional enters it.
 
     Returns a partial injection A-pos -> B-pos; unmatched individuals surface via ``diff`` as
-    only_in_a / only_in_b. ``a_conditions`` / ``b_conditions`` are each side's set-level declarations: entries
-    compare by declared name, so ids assigned differently in two records still match.
+    only_in_a / only_in_b. ``a_key_entries`` / ``b_key_entries`` are each side's set-level key entries: marks
+    compare by what their entries state, so ids assigned differently in two records still match.
     """
-    ra, rb = _relations(a, Conditions(a_conditions)), _relations(b, Conditions(b_conditions))
+    ra, rb = _relations(a, _key_entries.Key(a_key_entries)), _relations(b, _key_entries.Key(b_key_entries))
     a_to_b: dict[Key, Key] = {}
     b_taken: set[Key] = set()
 
@@ -240,13 +239,16 @@ def match_individuals(
     return a_to_b
 
 
-def _conditions_sig(ind: pb.Individual, conditions: Conditions) -> tuple[tuple[str, int, int], ...]:
-    """Return a hashable, order-independent signature of an individual's conditions.
+def _marks_sig(ind: pb.Individual, key: _key_entries.Key) -> tuple[tuple[str, str, int, str, int], ...]:
+    """Return a hashable, order-independent signature of an individual's marks.
 
-    Sorted ``(declared name, status, declared inheritance)`` triples — never the ids, which are local to a record;
-    inheritance is included so a carrier's mode (which picks its glyph) is a scored difference.
+    Sorted ``(kind, text, status, grade, inheritance)`` per mark, read through its entry — never the ids, which are
+    local to a record; inheritance is included so a carrier's mode (which picks its glyph) is a scored difference.
+    Genotype entries are not marked: what a person shows of them follows from their genotypes, compared on their own.
     """
-    return tuple(sorted((e.name, int(e.status), int(e.inheritance or 0)) for e in conditions.entries(ind)))
+    return tuple(
+        sorted((m.kind, m.text, int(m.status or 0), m.grade or "", int(m.inheritance or 0)) for m in key.marked(ind))
+    )
 
 
 def _wl_colours(ra: _Relations, rb: _Relations) -> dict[tuple[str, Key], int]:
@@ -266,7 +268,7 @@ def _wl_colours(ra: _Relations, rb: _Relations) -> dict[tuple[str, Key], int]:
         ind = r.by_pos[i]
         seed[tag, i] = (
             int(ind.gender),
-            _conditions_sig(ind, r.conditions),
+            _marks_sig(ind, r.key),
             r.birth_rank[i],
             len(r.partners.get(i, ())),
             len(r.children.get(i, ())),
@@ -307,23 +309,24 @@ def diff(
     a: pb.Pedigree,
     b: pb.Pedigree,
     *,
-    a_conditions: Iterable[pb.ConditionDef] = (),
-    b_conditions: Iterable[pb.ConditionDef] = (),
+    a_key_entries: Iterable[pb.KeyEntry] = (),
+    b_key_entries: Iterable[pb.KeyEntry] = (),
     a_loci: Iterable[pb.Locus] = (),
     b_loci: Iterable[pb.Locus] = (),
 ) -> Diff:
     """Structurally diff two IRs. See the module docstring; ``a`` is the reference, ``b`` the candidate.
 
-    ``a_conditions`` / ``b_conditions`` and ``a_loci`` / ``b_loci`` are each side's set-level declarations. Genotypes
-    compare by what their loci and alleles state (``_genotypes_sig``), never by id.
+    ``a_key_entries`` / ``b_key_entries`` and ``a_loci`` / ``b_loci`` are each side's set-level declarations. Marks
+    compare by what their entries state and genotypes by what their loci and alleles state (``_genotypes_sig``), never
+    by id.
 
     Raises:
-        UndeclaredConditionError | UndeclaredLocusError: an entry or genotype names an undeclared condition or locus.
+        UndeclaredKeyEntryError | UndeclaredLocusError: a mark or genotype names an undeclared entry or locus.
     """
-    a_defs, b_defs = list(a_conditions), list(b_conditions)
+    a_entries, b_entries = list(a_key_entries), list(b_key_entries)
     la, lb = {x.id: x for x in a_loci}, {x.id: x for x in b_loci}
-    ra, rb = _relations(a, Conditions(a_defs)), _relations(b, Conditions(b_defs))
-    a_to_b = match_individuals(a, b, a_conditions=a_defs, b_conditions=b_defs)
+    ra, rb = _relations(a, _key_entries.Key(a_entries)), _relations(b, _key_entries.Key(b_entries))
+    a_to_b = match_individuals(a, b, a_key_entries=a_entries, b_key_entries=b_entries)
     b_to_a = {v: k for k, v in a_to_b.items()}
 
     matched = sorted(_label(k) for k in a_to_b)
@@ -333,9 +336,7 @@ def diff(
     mismatches: list[Mismatch] = []
     for a_pos in sorted(a_to_b):
         mismatches.extend(
-            _individual_mismatches(
-                _label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], ra.conditions, rb.conditions
-            )
+            _individual_mismatches(_label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], ra.key, rb.key)
         )
         mismatches.extend(_genotype_mismatches(_label(a_pos), ra.by_pos[a_pos], rb.by_pos[a_to_b[a_pos]], la, lb))
     mismatches.extend(_mating_mismatches(a, b, a_to_b, b_to_a))
@@ -389,8 +390,8 @@ def _diff_in_sets(a: pb.PedigreeSet, b: pb.PedigreeSet, ai: int, bi: int) -> Dif
     return diff(
         a.pedigrees[ai],
         b.pedigrees[bi],
-        a_conditions=a.conditions,
-        b_conditions=b.conditions,
+        a_key_entries=a.key_entries,
+        b_key_entries=b.key_entries,
         a_loci=a.loci,
         b_loci=b.loci,
     )
@@ -454,7 +455,7 @@ _ENUM = {
 
 
 def _individual_mismatches(
-    subject: str, ia: pb.Individual, ib: pb.Individual, ca: Conditions, cb: Conditions
+    subject: str, ia: pb.Individual, ib: pb.Individual, ka: _key_entries.Key, kb: _key_entries.Key
 ) -> list[Mismatch]:
     """Compare the gender / clinical / reproductive / annotation attributes of a matched pair."""
     out: list[Mismatch] = []
@@ -462,8 +463,8 @@ def _individual_mismatches(
         va, vb = getattr(ia, f), getattr(ib, f)
         if va != vb:
             out.append(Mismatch(subject, f, _ENUM[f].Name(va), _ENUM[f].Name(vb)))
-    if _conditions_sig(ia, ca) != _conditions_sig(ib, cb):
-        out.append(Mismatch(subject, "conditions", _fmt_conditions(ia, ca), _fmt_conditions(ib, cb)))
+    if _marks_sig(ia, ka) != _marks_sig(ib, kb):
+        out.append(Mismatch(subject, "marks", _fmt_marks(ia, ka), _fmt_marks(ib, kb)))
     for f in ("deceased", "proband", "consultand", "count", "count_unspecified"):
         va, vb = getattr(ia, f), getattr(ib, f)
         if va != vb:
@@ -554,10 +555,19 @@ def _fmt_genotypes(ind: pb.Individual, loci: dict[str, pb.Locus]) -> str:
     return "; ".join(sorted(parts)) if parts else "none"
 
 
-def _fmt_conditions(ind: pb.Individual, conditions: Conditions) -> str:
-    """Render an individual's conditions as ``name:STATUS`` pairs (``none`` if there are none)."""
-    parts = [f"{e.name or '-'}:{pb.ConditionStatus.Name(e.status)}" for e in conditions.entries(ind)]
+def _fmt_marks(ind: pb.Individual, key: _key_entries.Key) -> str:
+    """Render an individual's marks as ``text:STATUS``, ``text:"grade"`` or ``text`` (``none`` if there are none)."""
+    parts = [_fmt_mark(m) for m in key.marked(ind)]
     return ", ".join(sorted(parts)) if parts else "none"
+
+
+def _fmt_mark(m: _key_entries.Shown) -> str:
+    text = m.text or "-"
+    if m.status is not None:
+        return f"{text}:{pb.ConditionStatus.Name(m.status)}"
+    if m.grade is not None:
+        return f"{text}:{m.grade!r}"
+    return f"{text} ({m.kind})"
 
 
 def _annotation_mismatches(subject: str, ia: pb.Individual, ib: pb.Individual) -> list[Mismatch]:

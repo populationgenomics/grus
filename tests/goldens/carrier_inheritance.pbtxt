@@ -1,10 +1,10 @@
-conditions { id: "cf" name: "CF" inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE }
-conditions { id: "dmd" name: "DMD" inheritance: INHERITANCE_X_LINKED_RECESSIVE }
-conditions { id: "unnamed" }
+key_entries { id: "cf" text: "CF" phenotype { inheritance: INHERITANCE_AUTOSOMAL_RECESSIVE } }
+key_entries { id: "dmd" text: "DMD" phenotype { inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
+key_entries { id: "unnamed" phenotype {} }
 pedigrees {
   id: "carrier-inheritance"
   labels { text: "Carriers by inheritance: AR and X-linked alike under PARTITION_FILL, a dot for X-linked under INHERITANCE_GLYPH" kind: LABEL_KIND_OTHER }
-  individuals { generation: 1 index: 1 gender: GENDER_WOMAN conditions { condition_id: "cf" status: CONDITION_STATUS_CARRIER } }
-  individuals { generation: 1 index: 2 gender: GENDER_WOMAN conditions { condition_id: "dmd" status: CONDITION_STATUS_CARRIER } }
-  individuals { generation: 1 index: 3 gender: GENDER_WOMAN conditions { condition_id: "unnamed" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 1 index: 1 gender: GENDER_WOMAN marks { key_id: "cf" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 1 index: 2 gender: GENDER_WOMAN marks { key_id: "dmd" status: CONDITION_STATUS_CARRIER } }
+  individuals { generation: 1 index: 3 gender: GENDER_WOMAN marks { key_id: "unnamed" status: CONDITION_STATUS_AFFECTED } }
 }

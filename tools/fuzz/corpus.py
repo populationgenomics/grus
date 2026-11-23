@@ -3,7 +3,7 @@
 A case names one pedigree and loads it where it is laid out, so a worker parses it with the grus tree under test. A
 case's ``key`` is its identity across runs and trees: ``g{maxgen}:{seed}`` for a generated pedigree, the path for a
 ``Pedigree`` pbtxt file, ``path#k`` for the ``k``-th pedigree of a ``PedigreeSet`` file. A case loads as its pedigree
-and the declarations its entries and genotypes reference (its set's ``conditions`` and ``loci``; none for a generated
+and the declarations its marks and genotypes reference (its set's ``key_entries`` and ``loci``; none for a generated
 or bare pedigree).
 """
 
@@ -26,7 +26,7 @@ _SPEC = re.compile(r"(\d+):(\d+)(?:-(\d+))?")
 
 
 class Loaded(NamedTuple):
-    """A case's pedigree and its set's declarations (a ``PedigreeSet`` of ``conditions`` and ``loci`` only)."""
+    """A case's pedigree and its set's declarations (a ``PedigreeSet`` of ``key_entries`` and ``loci`` only)."""
 
     pedigree: pb.Pedigree
     declarations: pb.PedigreeSet
@@ -61,18 +61,25 @@ class FileCase:
         ps = ir.load_set_pbtxt(text)
         p = ps.pedigrees[self.member]
         # Only what this member references, so a tree without a kind of declaration still probes a member without it.
-        referenced = {c.condition_id for ind in p.individuals for c in ind.conditions}
-        genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
-        return Loaded(
-            p,
-            pb.PedigreeSet(
-                conditions=[d for d in ps.conditions if d.id in referenced],
-                loci=[locus for locus in ps.loci if locus.id in genotyped],
-            ),
-        )
+        return Loaded(p, referenced_declarations(p, ps))
 
 
 Case = GenCase | FileCase
+
+
+def referenced_declarations(p: pb.Pedigree, ps: pb.PedigreeSet) -> pb.PedigreeSet:
+    """The key entries and loci of ``ps`` that ``p`` references.
+
+    Its marks' entries, the loci its people are genotyped at, and the genotype entries at those loci.
+    """
+    marked = {m.key_id for ind in p.individuals for m in ind.marks}
+    genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
+    return pb.PedigreeSet(
+        key_entries=[
+            e for e in ps.key_entries if e.id in marked or (e.HasField("genotype") and e.genotype.locus_id in genotyped)
+        ],
+        loci=[locus for locus in ps.loci if locus.id in genotyped],
+    )
 
 
 def parse_spec(spec: str) -> list[GenCase]:

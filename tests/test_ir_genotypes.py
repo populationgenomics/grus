@@ -135,7 +135,7 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
     ),
     "locus id is a citation id": (
         lambda ps: ps.citations.add(id="l2", quote="x"),
-        r"locus id 'l2' is also a citation or condition id",
+        r"locus id 'l2' is also a citation or key entry id",
     ),
     "allele symbol twice": (lambda ps: ps.loci[0].alleles.add(symbol="M1"), r"allele symbol\(s\) \['M1'\]"),
     "two reference alleles": (

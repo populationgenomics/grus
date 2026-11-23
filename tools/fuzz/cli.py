@@ -86,14 +86,9 @@ def _minimize(args: argparse.Namespace) -> int:
         search = minimize.tree_search(args.predicate, pools, args.reason, args.shuffles, args.highs, declarations)
         n = len(p.individuals)
         q, renumbered = minimize.minimize(p, search, batch=args.jobs)
-    referenced = {c.condition_id for ind in q.individuals for c in ind.conditions}
-    genotyped = {g.locus_id for ind in q.individuals for g in ind.genotypes}
-    if referenced or genotyped:  # declarations live at set level: write a one-pedigree set with those still referenced
-        out = pb.PedigreeSet(
-            conditions=[d for d in declarations.conditions if d.id in referenced],
-            loci=[locus for locus in declarations.loci if locus.id in genotyped],
-            pedigrees=[q],
-        )
+    out = corpus.referenced_declarations(q, declarations)
+    if out.key_entries or out.loci:  # declarations live at set level: write a one-pedigree set with those still used
+        out.pedigrees.append(q)
         args.output.write_text(ir.dump_set_pbtxt(out))
     else:
         args.output.write_text(ir.dump_pbtxt(q))

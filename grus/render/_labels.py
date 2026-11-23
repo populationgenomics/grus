@@ -84,6 +84,24 @@ _COUNT_FIT_DIAMOND = 0.5
 COUNT_OUTSIDE_SCALE = 0.35
 COUNT_OUTSIDE_DX = 8.0
 _X_LINKED = frozenset({pb.INHERITANCE_X_LINKED_RECESSIVE, pb.INHERITANCE_X_LINKED_DOMINANT})
+# What a genotype or other entry is drawn as: a flat fill like an affected phenotype's, never a clinical status.
+SHOWN = -1
+
+
+def paint(s: ir.Shown) -> int:
+    """The ``ConditionStatus`` a shown entry is drawn as, or ``SHOWN`` for a genotype or other entry.
+
+    Raises:
+        ValueError: a key-defined grade, which has no drawing; layout defers a pedigree with one before drawing.
+    """
+    if s.grade is not None:
+        raise ValueError(f"grade {s.grade!r} of {s.text!r} has no drawing")
+    return SHOWN if s.status is None else s.status
+
+
+def fills(s: ir.Shown) -> bool:
+    """Whether ``s`` is drawn as a flat fill: an affected phenotype, or a genotype or other entry."""
+    return paint(s) in (pb.CONDITION_STATUS_AFFECTED, SHOWN)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -101,23 +119,22 @@ class CountMark:
     inside: bool
 
 
-def data_legend(p: pb.Pedigree, conditions: ir.Conditions) -> list[str]:
-    """The pedigree's condition legend (``data-conditions``), whose index keys each condition's fills and section.
+def data_legend(p: pb.Pedigree, key: ir.Key) -> list[str]:
+    """The pedigree's legend (``data-conditions``), whose index keys each shown entry's fills and section.
 
-    The declared names of the conditions this pedigree's entries reference (docs/design/ir.md, "Conditions are
-    declared once, by id"). The **primary** condition comes first, so it draws in the most distinct fill: the
-    proband's affected condition when the proband is affected, else the condition with the most affected individuals —
-    named or unnamed alike. After it, and breaking ties, the base order: the phenotype labels that name one of those
-    conditions (their drawn order; a label that names none takes no index), then the remaining conditions' names by
-    first appearance, walking individuals in ``Position`` order (never input order, so the legend and every fill are
-    independent of how the IR lists its individuals), then ``""`` for the unnamed condition when it occurs. So ``""``
-    is last unless the unnamed condition is the primary, when it is first.
+    The texts of the key entries this pedigree's people show (docs/design/ir.md, "The key"). The **primary** entry
+    comes first, so it draws in the most distinct fill: the proband's affected phenotype when the proband is affected,
+    else the phenotype with the most affected individuals — named or unnamed alike. After it, and breaking ties, the
+    base order: the phenotype labels that name one of those entries (their drawn order; a label that names none takes
+    no index), then the remaining entries' texts by first appearance, walking individuals in ``Position`` order (never
+    input order, so the legend and every fill are independent of how the IR lists its individuals), then ``""`` for the
+    implied key's phenotype when it occurs. So ``""`` is last unless it is the primary, when it is first.
     """
     order: list[str] = []
     seen: set[str] = set()
     people = sorted(p.individuals, key=lambda ind: (ind.generation, ind.index))
-    entries = {(ind.generation, ind.index): conditions.entries(ind) for ind in people}
-    names = {e.name for es in entries.values() for e in es}
+    entries = {(ind.generation, ind.index): key.shown(ind) for ind in people}
+    names = {e.text for es in entries.values() for e in es}
     for label in p.labels:
         # A phenotype label orders the conditions it names; one that names none (a family's name, say) takes no
         # index, so it never makes a section or a key entry.
@@ -126,9 +143,9 @@ def data_legend(p: pb.Pedigree, conditions: ir.Conditions) -> list[str]:
             order.append(label.text)
     for ind in people:
         for e in entries[(ind.generation, ind.index)]:
-            if e.name and e.name not in seen:
-                seen.add(e.name)
-                order.append(e.name)
+            if e.text and e.text not in seen:
+                seen.add(e.text)
+                order.append(e.text)
     if "" in names:
         order.append("")
     primary = _primary_condition(people, entries, order)
@@ -136,12 +153,12 @@ def data_legend(p: pb.Pedigree, conditions: ir.Conditions) -> list[str]:
 
 
 def _primary_condition(
-    people: list[pb.Individual], entries: dict[tuple[int, int], list[ir.Entry]], order: list[str]
+    people: list[pb.Individual], entries: dict[tuple[int, int], list[ir.Shown]], order: list[str]
 ) -> str | None:
-    """The condition drawn first: a proband's affected one, else the most affected; ties go to ``order``."""
+    """The entry drawn first: a proband's affected phenotype, else the most affected; ties go to ``order``."""
 
     def affected(ind: pb.Individual) -> set[str]:
-        return {e.name for e in entries[(ind.generation, ind.index)] if e.status == pb.CONDITION_STATUS_AFFECTED}
+        return {e.text for e in entries[(ind.generation, ind.index)] if e.status == pb.CONDITION_STATUS_AFFECTED}
 
     for ind in people:
         if ind.proband and (named := affected(ind)):
@@ -153,32 +170,31 @@ def _primary_condition(
 
 @dataclasses.dataclass(frozen=True)
 class Clinical:
-    """What layout and drawing need to read a pedigree's clinical status: the declarations, and whether it is in sixths.
+    """What layout and drawing need to read what a pedigree's symbols show: the key, and whether it is in sixths.
 
     Attributes:
-        conditions: the set's condition declarations, for reading each entry's name and inheritance.
-        sixths: the pedigree is drawn in sixths (five or six conditions), where a lone affected condition keeps its
-            wedge.
+        key: the set's key, for reading each person's shown entries.
+        sixths: the pedigree is drawn in sixths (five or six legend entries), where a lone fill keeps its wedge.
     """
 
-    conditions: ir.Conditions
+    key: ir.Key
     sixths: bool
 
     @classmethod
-    def of(cls, p: pb.Pedigree, conditions: ir.Conditions) -> Clinical:
-        return cls(conditions, len(data_legend(p, conditions)) > 4)
+    def of(cls, p: pb.Pedigree, key: ir.Key) -> Clinical:
+        return cls(key, len(data_legend(p, key)) > 4)
 
 
 def has_borders(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clinical) -> bool:
     """Whether ``ind``'s symbol draws a filled section's border through its centre.
 
-    A symbol with any section fill does: several conditions, or in sixths any one. A symbol wholly in one fill
-    (affected or carrier), or with none, is its outline alone; the X-linked dot is no section.
+    A symbol with any section fill does: several entries, or in sixths any one. A symbol wholly in one fill
+    (affected, shown or carrier), or with none, is its outline alone; the X-linked dot is no section.
     """
-    entries = clinical.conditions.entries(ind)
-    affected = {e.name for e in entries if e.status == pb.CONDITION_STATUS_AFFECTED}
-    carriers = [e for e in entries if e.status == pb.CONDITION_STATUS_CARRIER and e.name not in affected]
-    carried = len({e.name for e in carriers})
+    entries = clinical.key.shown(ind)
+    affected = {e.text for e in entries if fills(e)}
+    carriers = [e for e in entries if paint(e) == pb.CONDITION_STATUS_CARRIER and e.text not in affected]
+    carried = len({e.text for e in carriers})
     if (
         geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
         and not affected
@@ -196,13 +212,13 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clin
     border (``has_borders``), the presymptomatic line and the deceased slash — the same conditions under which
     ``_draw`` emits them.
     """
-    entries = clinical.conditions.entries(ind)
-    statuses = {e.status for e in entries}
-    affected = pb.CONDITION_STATUS_AFFECTED in statuses
+    entries = clinical.key.shown(ind)
+    statuses = {paint(e) for e in entries}
+    affected = any(fills(e) for e in entries)
     x_linked_dot = (
         geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
         and not affected
-        and any(e.status == pb.CONDITION_STATUS_CARRIER and e.inheritance in _X_LINKED for e in entries)
+        and any(paint(e) == pb.CONDITION_STATUS_CARRIER and e.inheritance in _X_LINKED for e in entries)
     )
     return (
         ind.deceased
