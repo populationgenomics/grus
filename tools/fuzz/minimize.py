@@ -10,9 +10,9 @@ sibship left with fewer than two children, an individual in no mating). It stops
 renumbers each generation 1..n in the original order, so the result reads as a figure would.
 
 Predicates run in worker pools on the trees they name, so a pedigree can be minimised against a baseline and a branch
-at once. A candidate that is not valid IR never counts as failing. A pedigree with condition entries is probed with its
-set's declarations; a move that drops everyone with a condition leaves its declaration unreferenced, which a probe of
-one pedigree allows.
+at once. A candidate that is not valid IR never counts as failing. A pedigree with marks or genotypes is probed with
+its set's declarations; a move that drops everyone who shows a key entry leaves it unshown, which a probe of one
+pedigree allows.
 """
 
 from __future__ import annotations

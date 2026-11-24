@@ -166,13 +166,13 @@ def _primary_condition(
 ) -> str | None:
     """The entry drawn first: a proband's affected phenotype, else the most affected; ties go to ``order``."""
 
-    def affected(ind: pb.Individual) -> set[str]:
+    def affected_texts(ind: pb.Individual) -> set[str]:
         return {e.text for e in entries[(ind.generation, ind.index)] if e.status == pb.CONDITION_STATUS_AFFECTED}
 
     for ind in people:
-        if ind.proband and (named := affected(ind)):
+        if ind.proband and (named := affected_texts(ind)):
             return min(named, key=order.index)
-    counts = {name: sum(name in affected(ind) for ind in people) for name in order}
+    counts = {name: sum(name in affected_texts(ind) for ind in people) for name in order}
     best = max(counts.values(), default=0)
     return next(name for name in order if counts[name] == best) if best else None
 

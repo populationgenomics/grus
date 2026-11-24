@@ -334,6 +334,8 @@ The residual deferrals (raised as `DeferredFeatureError`, surfaced as a placehol
   ([`layout-v2.md`](layout-v2.md), Alternatives considered), so it defers (`_layout2.layout`).
 - **A seventh filled condition** — a fill (not the X-linked dot) for a condition at legend index 6 or above. There are
   six sections and six fills per status, and reusing one would draw two conditions alike (`_draw`).
+- **A key-defined grade** — a mark graded by its phenotype's key ("suspected, not examined") in place of a standard
+  status. It has no fill (Clinical status, "Entries that are not a phenotype status").
 - **A torn sibship** — two sibships whose children's spans overlap on a row, which reads as one sibship with several
   sets of parents; or a drawn group that is not exactly one mating's children from that mating's partners, a layout bug
   the check keeps from reaching a figure (`_overlapping_sibships`).

@@ -352,6 +352,18 @@ def test_phenopackets_a_stated_zygosity_wins_over_an_unstated_one() -> None:
         assert list(g.alleles) == ["alt", "alt"] and not g.copies_unstated
 
 
+def test_phenopackets_unspecified_zygosity_by_label() -> None:
+    ps = _import(("c", _variant(allelicState={"id": "CUSTOM:1", "label": "Unspecified zygosity"})))
+    (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+    assert g.copies_unstated
+
+
+def test_phenopackets_an_unknown_label_alone_fails_loud() -> None:
+    # A label with no id is a stated allelic state, not an absent one: unknown, it fails rather than reads as unstated.
+    with pytest.raises(convert.PedigreeImportError, match="unrecognised allelicState"):
+        _import(("c", _variant(allelicState={"label": "somatic mosaicism"})))
+
+
 def test_phenopackets_allelic_state_by_label() -> None:
     ps = _import(("c", _variant(allelicState={"id": "GENO:9999999", "label": "Homozygous"})))
     assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": ["alt", "alt"]}

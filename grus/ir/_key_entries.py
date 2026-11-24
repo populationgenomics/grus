@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Iterable
+from typing import Literal, cast
 
 from grus.models import pedigree_pb2 as pb
 
-PHENOTYPE, GENOTYPE, OTHER = "phenotype", "genotype", "other"
+Kind = Literal["phenotype", "genotype", "other"]  # what a key entry denotes: its `denotes` oneof
+PHENOTYPE: Kind = "phenotype"
+GENOTYPE: Kind = "genotype"
+OTHER: Kind = "other"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -31,7 +35,7 @@ class Shown:
     """
 
     key_id: str
-    kind: str
+    kind: Kind
     text: str
     status: int | None = None
     grade: str | None = None
@@ -111,7 +115,7 @@ class Key:
         inheritance = e.phenotype.inheritance if kind == PHENOTYPE and e.phenotype.HasField("inheritance") else None
         return Shown(
             key_id=m.key_id,
-            kind=kind,
+            kind=cast(Kind, kind),
             text=e.text,
             status=m.status if m.WhichOneof("state") == "status" else None,
             grade=m.grade if m.WhichOneof("state") == "grade" else None,

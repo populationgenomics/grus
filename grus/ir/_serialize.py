@@ -12,7 +12,7 @@ from collections.abc import Sequence
 
 from google.protobuf import json_format, text_format
 
-from grus.ir._validate import validate, validate_set
+from grus.ir import _validate
 from grus.models import pedigree_pb2 as pb
 
 
@@ -23,14 +23,14 @@ def load_pbtxt(text: str, key_entries: Sequence[pb.KeyEntry] = (), *, loci: Sequ
     genotypes reference, if it has any.
     """
     p = text_format.Parse(text, pb.Pedigree())
-    validate(p, key_entries, loci=loci)
+    _validate.validate(p, key_entries, loci=loci)
     return p
 
 
 def load_json(text: str, key_entries: Sequence[pb.KeyEntry] = (), *, loci: Sequence[pb.Locus] = ()) -> pb.Pedigree:
     """Parse proto3-JSON (the LLM emission surface) into a validated ``Pedigree``; declarations as for pbtxt."""
     p = json_format.Parse(text, pb.Pedigree())
-    validate(p, key_entries, loci=loci)
+    _validate.validate(p, key_entries, loci=loci)
     return p
 
 
@@ -47,14 +47,14 @@ def dump_json(p: pb.Pedigree) -> str:
 def load_set_pbtxt(text: str) -> pb.PedigreeSet:
     """Parse pbtxt into a validated ``PedigreeSet`` — the figure-level unit (0..N pedigrees, each valid)."""
     ps = text_format.Parse(text, pb.PedigreeSet())
-    validate_set(ps)
+    _validate.validate_set(ps)
     return ps
 
 
 def load_set_json(text: str) -> pb.PedigreeSet:
     """Parse proto3-JSON (the LLM emission surface) into a validated ``PedigreeSet``."""
     ps = json_format.Parse(text, pb.PedigreeSet())
-    validate_set(ps)
+    _validate.validate_set(ps)
     return ps
 
 

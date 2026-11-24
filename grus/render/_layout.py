@@ -52,8 +52,9 @@ class DeferredFeatureError(Exception):
     cross-lineage joins — ``_detect_loops``); an individual who is a child of more than one mating
     (``_derive``); a couple whose partners are on different generations other than an avuncular join between
     two born-in partners, which draws via the ghost (``_rank``); a routed mating, whose partners cannot stand
-    side by side (``_layout2.layout``); and a torn sibship whose descent bars would overlap. The IR still
-    round-trips; the gap is meant to surface in the eval diff rather than a wrong drawing.
+    side by side (``_layout2.layout``); a torn sibship whose descent bars would overlap; and a mark with a grade the key
+    defines, which has no drawing (``_layout2._defer_grades``). The IR still round-trips; the gap is meant to surface in
+    the eval diff rather than a wrong drawing.
     """
 
 

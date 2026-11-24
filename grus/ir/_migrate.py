@@ -8,8 +8,9 @@ Two older shapes are read:
   as the text, each entry a ``Mark``, and each support citing a condition cites the entry, its path renamed.
 * **pre-0.4**: each condition entry carried its own ``name`` and ``inheritance``, and a support named its condition by
   name. It is first brought to 0.4 by declaring one condition per distinct name in order of first appearance (``k1``,
-  ``k2``, …). Entries of one name that state different modes of inheritance cannot become one declaration, and two
-  entries of one name on one person (allowed then, say affected and carrier) have no later form; both fail loudly.
+  ``k2``, …, skipping an id a citation or locus has). Entries of one name that state different modes of inheritance
+  cannot become one declaration, and two entries of one name on one person (allowed then, say affected and carrier)
+  have no later form; both fail loudly.
 
 Both are read through the frozen 0.4 descriptor (``_schema_0_4``), the pre-0.4 schema derived from it. A record already
 in the current shape migrates to itself. The result is validated.
@@ -18,20 +19,22 @@ in the current shape migrates to itself. The result is validated.
 from __future__ import annotations
 
 import functools
+import itertools
 from collections.abc import Iterable
 from typing import Any
 
 from google.protobuf import descriptor_pb2, descriptor_pool, json_format, message_factory, text_format
 from google.protobuf.message import Message
 
-from grus.ir import _key_entries, _schema_0_4
-from grus.ir._validate import validate_set
+from grus.ir import _key_entries, _schema_0_4, _validate
 from grus.models import pedigree_pb2 as pb
 
 _PACKAGE = pb.DESCRIPTOR.package
 _V0_4 = f"{_PACKAGE}.v0_4"
 _PRE_0_4 = f"{_PACKAGE}.pre_0_4"
 _DIGEST = f"{_PACKAGE}.digest"
+# Records of the 0.4, pre-0.4 and digest schemas are messages of classes built at run time (message_factory), so
+# no stub types their fields: they are annotated Any.
 # 0.4's support paths, by what each became.
 _PATHS = {
     "condition.status": "mark.status",
@@ -236,7 +239,9 @@ def _to_0_4(old: Any) -> Any:
         if len(modes) > 1:
             names = sorted(pb.Inheritance.Name(m) for m in modes)
             raise MigrationError(f"entries of condition {name!r} disagree on inheritance: {names}")
-    ids = {name: f"k{i + 1}" for i, name in enumerate(stated)}
+    taken = {c.id for c in old.citations} | {locus.id for locus in old.loci}
+    fresh = (f"k{i}" for i in itertools.count(1) if f"k{i}" not in taken)
+    ids = {name: next(fresh) for name in stated}
     new: Any = _v0_4()["PedigreeSet"].FromString(old.SerializeToString())
     new.DiscardUnknownFields()  # the entries' old name and inheritance, and supports' old condition
     for name, cid in ids.items():
@@ -299,7 +304,7 @@ def _migrate(text: str, *, json: bool) -> pb.PedigreeSet:
         new = _from_0_4(_to_0_4(older))
     else:
         raise MigrationError("not a pedigree set or pedigree in the current, 0.4 or pre-0.4 schema")
-    validate_set(new)
+    _validate.validate_set(new)
     return new
 
 

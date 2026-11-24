@@ -63,8 +63,8 @@ def validate(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), *, loci: S
     known, and references before generation order so every edge endpoint is a real node.
 
     ``key_entries`` and ``loci`` are the declarations of ``p``'s set, which its marks and genotypes reference; a
-    pedigree with none of either needs none. The key entries are checked as ``validate_set`` checks them, short of
-    each being shown by someone in ``p`` (another pedigree of the set may show it).
+    pedigree with none of either needs none. Both are checked as ``validate_set`` checks them, short of each being
+    shown or genotyped by someone in ``p`` (another pedigree of the set may be).
 
     Raises:
         protovalidate.ValidationError: a field-local / single-message rule failed.
@@ -77,6 +77,7 @@ def validate(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), *, loci: S
     _check_reproductive_outcome_terminal(p)
     _check_generation_order(p)
     by_locus = {locus.id: locus for locus in loci}
+    _check_loci(loci, {e.id for e in key_entries})
     _check_key_entries(key_entries, set(), by_locus)
     key = {e.id: e for e in key_entries}
     _check_marks(p, key)
@@ -102,7 +103,7 @@ def validate_set(ps: pb.PedigreeSet) -> None:
             malformed, duplicated or dangling, or a declaration is malformed, duplicated or unreferenced.
     """
     ids = _check_citations(ps)
-    _check_loci(ps, ids | {e.id for e in ps.key_entries})
+    _check_loci(ps.loci, ids | {e.id for e in ps.key_entries})
     _check_key_entries(ps.key_entries, ids, {locus.id: locus for locus in ps.loci})
     for i, p in enumerate(ps.pedigrees):
         labels = [label.text for label in p.labels]
@@ -373,7 +374,7 @@ def _check_pattern(
     patterns[stated] = entry_id
 
 
-def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
+def _check_loci(loci: Sequence[pb.Locus], other_ids: set[str]) -> None:
     """Each locus is well-formed, its id unique and no citation's or key entry's, and told apart by what it states.
 
     A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene but not all of
@@ -381,7 +382,7 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
     """
     ids: set[str] = set()
     names: dict[LocusIdentity, str] = {}
-    for k, locus in enumerate(ps.loci):
+    for k, locus in enumerate(loci):
         where = f"loci[{k}] ({locus.id!r})"
         try:
             protovalidate.validate(locus)

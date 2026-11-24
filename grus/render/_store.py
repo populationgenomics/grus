@@ -128,7 +128,7 @@ def pedigree_digest(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = ()) -> 
     Raises:
         grus.ir.UndeclaredKeyEntryError: a mark names a ``key_id`` no entry has.
     """
-    canon: Any = _migrate.legacy_pedigree(p, key_entries)
+    canon: Any = _migrate.legacy_pedigree(p, key_entries)  # a run-time class: no stub types its fields
     _layout_reads_only(canon)
     # Copies, so clearing the repeated fields below cannot touch them.
     individuals = [copy.deepcopy(ind) for ind in sorted(canon.individuals, key=lambda i: (i.generation, i.index))]

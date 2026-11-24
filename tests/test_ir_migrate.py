@@ -170,6 +170,13 @@ def test_a_field_only_the_layout_digest_writes_is_not_read() -> None:
         )
 
 
+def test_pre_0_4_ids_skip_those_a_citation_has() -> None:
+    old = _PRE_0_4.replace('citations { id: "cap"', 'citations { id: "k1"').replace(
+        'citations: "cap"', 'citations: "k1"'
+    )
+    assert [e.id for e in ir.migrate_pbtxt(old).key_entries] == ["k2", "k3", "k4"]
+
+
 def test_text_in_no_known_schema_fails_loud() -> None:
     with pytest.raises(ir.MigrationError, match="not a pedigree set or pedigree"):
         ir.migrate_pbtxt('individuals { generation: 1 index: 1 gender: GENDER_MAN favourite_colour: "blue" }')

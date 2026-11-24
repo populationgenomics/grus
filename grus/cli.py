@@ -240,8 +240,6 @@ def _cmd_migrate(args: argparse.Namespace) -> int:
         cause = f"cannot read it: {e.strerror or e}"
     except UnicodeDecodeError as e:
         cause = f"not UTF-8 text: {e.reason} at byte {e.start}"
-    except (json_format.ParseError, text_format.ParseError) as e:
-        cause = f"not a pre-1.0 pedigree IR: {e}"
     except ir.MigrationError as e:
         cause = f"cannot migrate: {e}"
     except (ir.ValidationError, ir.IntegrityError) as e:

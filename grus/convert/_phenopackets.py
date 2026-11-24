@@ -113,8 +113,9 @@ _ALLELIC_LABEL = {
     "hemizygous": "GENO:0000134",
     "hemizygous x-linked": "GENO:0000604",
     "hemizygous y-linked": "GENO:0000605",
+    "unspecified zygosity": "GENO:0000137",
 }
-_UNSTATED_STATE = {"", "GENO:0000137"}  # absent, or "unspecified zygosity": carries alt, copies not stated
+_UNSTATED = "GENO:0000137"  # "unspecified zygosity", like an absent state: carries alt, copies not stated
 # Expression syntax prefix -> identifier scheme; any other syntax is OTHER.
 _SYNTAX = {"hgvs": pb.IDENTIFIER_SCHEME_HGVS, "spdi": pb.IDENTIFIER_SCHEME_SPDI, "vrs": pb.IDENTIFIER_SCHEME_VRS}
 
@@ -238,13 +239,18 @@ def _genotype(vd: dict[str, Any], locus_id: str) -> pb.Genotype:
         PedigreeImportError: the allelic state is a term this importer does not know.
     """
     state = _get(vd, "allelicState", {}) or {}
-    geno, label = str(_get(state, "id", "")), str(_get(state, "label", "")).lower()
-    geno = geno if geno in _ALLELIC_STATE else _ALLELIC_LABEL.get(label, geno)
-    if geno in _ALLELIC_STATE:
-        return pb.Genotype(locus_id=locus_id, alleles=_ALLELIC_STATE[geno])
-    if geno in _UNSTATED_STATE:
+    term, label = str(_get(state, "id", "")), str(_get(state, "label", "")).lower()
+    if not term and not label:
+        geno = _UNSTATED  # no allelic state at all
+    elif term in _ALLELIC_STATE or term == _UNSTATED:
+        geno = term
+    elif label in _ALLELIC_LABEL:
+        geno = _ALLELIC_LABEL[label]  # an id this importer does not know, with a label it does
+    else:
+        raise _core.PedigreeImportError(f"unrecognised allelicState {term!r} ({label!r})")
+    if geno == _UNSTATED:
         return pb.Genotype(locus_id=locus_id, alleles=["alt"], copies_unstated=True)
-    raise _core.PedigreeImportError(f"unrecognised allelicState {geno!r} ({label!r})")
+    return pb.Genotype(locus_id=locus_id, alleles=_ALLELIC_STATE[geno])
 
 
 def _merged(a: pb.Genotype, b: pb.Genotype) -> pb.Genotype | None:

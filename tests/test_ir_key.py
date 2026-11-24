@@ -244,6 +244,11 @@ def test_a_bare_pedigree_checks_the_key_entries_it_is_given() -> None:
         ir.validate(p, kindless, loci=ps.loci)
     with pytest.raises(ValueError, match="denotes nothing"):
         ir.Key(kindless).shown(_ind(ps, 1, 1))
+    clashing = pb.Locus()
+    clashing.CopyFrom(ps.loci[0])
+    clashing.id = "k3"  # a key entry's id
+    with pytest.raises(ir.IntegrityError, match=r"locus id 'k3' is also a citation or key entry id"):
+        ir.validate(p, ps.key_entries, loci=[clashing])
 
 
 def test_a_key_support_may_cite_a_genotype_entry() -> None:

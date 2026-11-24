@@ -17,22 +17,24 @@ generation marker (Roman numeral) is drawn once per row in a reserved left gutte
 fact it draws, so a consumer can select and restyle parts without reading coordinates:
 
 * The root ``<svg>`` (or, in a composed figure, each tile's nested ``<svg>``) is ``class="pedigree"`` with
-  ``data-title`` and ``data-conditions``, a JSON array of the declared names of the pedigree's conditions in
-  legend order — the same order that keys every fill and section — ``""`` standing for the unnamed condition,
-  so every condition has an index. A deferred pedigree's placeholder is ``pedigree
+  ``data-title`` and ``data-conditions``, a JSON array of the texts of the key entries the pedigree's people show,
+  in legend order — the same order that keys every fill and section — ``""`` standing for the unnamed phenotype,
+  so every entry has an index. A deferred pedigree's placeholder is ``pedigree
   deferred``.
 * ``<g class="individual …" id="{prefix}ind-{position}">`` per drawn cell: ``data-position`` (``"II-3"``),
   ``data-generation``, ``data-index``, ``data-gender`` (man / woman / nonbinary / unknown),
   ``data-count`` on a count-collapsed symbol (the number, or ``n`` for an unknown number; absent for one
-  person), ``data-external-id`` when set, and one ``data-condition-{i}`` per condition whose value is its status
-  (affected / carrier / presymptomatic / unknown / …; a person has one entry per condition). State classes
+  person), ``data-external-id`` when set, and one ``data-condition-{i}`` per key entry shown, whose value is its
+  mark's status (affected / carrier / presymptomatic / unknown / …; a person marks an entry once), or ``shown`` for a
+  genotype or other entry, which has no status. State classes
   mirror the IR, not the subset of marks the drawer chose: ``affected``, ``carrier``, ``presymptomatic``, ``unknown``,
   ``deceased``, ``proband``, ``consultand``. A cross-generation duplicate is ``individual ghost`` with the
   same classes and data attributes as its real cell and id ``{prefix}ghost-{position}`` (``-2``, ``-3``, …
   when one individual is ghosted more than once), so ``[data-position]`` lights both and
   ``.individual:not(.ghost)`` counts drawn symbols.
   Parts, in draw order: ``backing`` (the shape, white, no stroke), ``fill`` (status paint inside the shape — the whole
-  shape for one affected condition (not in sixths), else a legend-keyed section per affected or carried condition —
+  shape for one affected or shown entry (not in sixths), else a legend-keyed section per affected, shown or carried
+  entry —
   a clipped ``rect``, or in sixths a clipped wedge ``polygon`` — or the X-linked
   ``fill dot`` under ``CarrierStyle.INHERITANCE_GLYPH`` — each with ``data-condition`` and ``data-status`` naming what
   it paints, and every section or whole shape painted ``url(#{prefix}fill-{status}-{i})``), ``divider`` (a filled
@@ -50,9 +52,9 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
   ``<g class="ghost-link" data-position=…>`` per dashed same-individual connector.
   ``<g class="generation" data-generation=…>`` per Roman-numeral marker, numbered by IR generation.
 * ``<defs>`` first in the body: one ``<pattern class="fill-pattern" id="{prefix}fill-{status}-{i}">`` per (condition
-  index ``i``, status ``affected`` / ``carrier``) the pedigree draws, with ``data-condition`` and ``data-status``.
-  Each holds a ``tone`` rect, and a carrier's also a ``hatch`` path. Restyle a fill everywhere, key included, by
-  restyling or replacing its pattern.
+  index ``i``, status ``affected`` / ``shown`` / ``carrier``) the pedigree draws, with ``data-condition`` and
+  ``data-status``. Each holds a ``tone`` rect, and a carrier's also a ``hatch`` path. Restyle a fill everywhere, key
+  included, by restyling or replacing its pattern.
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot, ``key-presymptomatic-{i}`` with ``data-status="presymptomatic"`` and a

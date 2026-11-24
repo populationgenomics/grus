@@ -1,5 +1,7 @@
 """The minimiser shrinks to a small pedigree that still fails, whatever the batch size."""
 
+from __future__ import annotations
+
 import pathlib
 from collections.abc import Callable, Sequence
 
