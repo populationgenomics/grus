@@ -18,7 +18,8 @@ whose ``subject.id`` matches a person:
   per distinct variant (one locus per variant, alleles ``ref`` and ``alt``) and a genotype for the person
   ``subjectOrBiosampleId`` names (a biosample id: the packet's subject) by ``allelicState``: heterozygous (or
   compound heterozygous) ``[ref, alt]``, homozygous ``[alt, alt]``, hemizygous ``[alt]``; an absent or unspecified
-  allelic state carries ``alt`` with its copies not stated. Another term fails the import.
+  allelic state carries ``alt`` with its copies not stated, and gives way to a stated zygosity for the same variant.
+  Another term fails the import.
 
 Unmapped Phenopacket content (phenotypic features, measurements, gene-level interpretations, files, metadata) is
 dropped. Importing from Phenopackets does not require its Python package: the JSON is read structurally.
@@ -246,6 +247,20 @@ def _genotype(vd: dict[str, Any], locus_id: str) -> pb.Genotype:
     raise _core.PedigreeImportError(f"unrecognised allelicState {geno!r} ({label!r})")
 
 
+def _merged(a: pb.Genotype, b: pb.Genotype) -> pb.Genotype | None:
+    """One variant's genotype from two interpretations of it, or None when they disagree.
+
+    Equal genotypes agree. One whose copies are not stated agrees with one that states copies of the alleles it
+    carries, which says more and is kept.
+    """
+    if a == b:
+        return a
+    for unstated, stated in ((a, b), (b, a)):
+        if unstated.copies_unstated and not stated.copies_unstated and set(unstated.alleles) <= set(stated.alleles):
+            return stated
+    return None
+
+
 def _owner(who: str, subject: str, known: set[str], biosamples: dict[str, str]) -> str:
     """The person ``subjectOrBiosampleId`` names: a person, a biosample's individual, or (absent) the subject.
 
@@ -307,13 +322,17 @@ def _family(fam: dict[str, Any], loci: _Loci) -> tuple[list[_core.Person], _core
     for subject, packet in packets.items():
         for who, stated in _genotypes(packet, subject, known, loci).items():
             for g in stated:
-                same = [x for x in genotypes.get(who, []) if x.locus_id == g.locus_id]
-                if same and same[0] != g:
+                held = genotypes.setdefault(who, [])
+                same = [k for k, x in enumerate(held) if x.locus_id == g.locus_id]
+                if not same:
+                    held.append(g)
+                    continue
+                merged = _merged(held[same[0]], g)
+                if merged is None:
                     raise _core.PedigreeImportError(
                         f"person {who!r}: interpretations state different allelic states for one variant"
                     )
-                if not same:
-                    genotypes.setdefault(who, []).append(g)
+                held[same[0]] = merged
 
     people: list[_core.Person] = []
     for p in persons:

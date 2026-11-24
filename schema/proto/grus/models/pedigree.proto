@@ -77,14 +77,14 @@ enum Inheritance {
   INHERITANCE_MITOCHONDRIAL = 6;
 }
 // One entry of the figure's key, declared once per set (PedigreeSet.key_entries) and referenced by id. A figure with no
-// key has an implied one: a single phenotype entry with empty text ("filled = affected").
+// key has an implied one: the unnamed phenotype, an entry with empty text ("filled = affected").
 message KeyEntry {
   string id = 1 [(buf.validate.field).string.min_len = 1];  // local ("k1"), unique in the set
-  string text = 2;                        // as printed in the key, unique in the set; "" only for the implied key's
-                                          // phenotype
+  string text = 2;                        // as printed in the key, unique in the set; "" only for the unnamed
+                                          // phenotype ("filled = affected")
   oneof denotes {
     option (buf.validate.oneof).required = true;
-    Phenotype phenotype = 3;              // a disease, trait or finding, named by `text`; people mark it with a status
+    Phenotype phenotype = 3;              // a disease, trait or finding, named by `text`; marked with a status or grade
     GenotypePattern genotype = 4;         // never marked: a person shows it when their genotype matches
     Other other = 5;                      // neither: "Control", "examined"; `text` is all it says
   }
@@ -157,7 +157,9 @@ message Individual {
   optional SexAssignedAtBirth sex_assigned_at_birth = 4;       // AMAB/AFAB/UAAB when annotated
   reserved 5;                                                  // was conditions (0.4): now marks
   reserved "conditions";
-  repeated Mark marks = 17;                                    // the key entries the symbol shows; empty = none
+  repeated Mark marks = 17;                                    // phenotype and other entries the symbol shows (a
+                                                               // genotype entry shows through genotypes); empty =
+                                                               // none marked, status not indicated
   bool deceased = 6;                                           // slash
   bool proband = 7;                                            // arrow + P
   bool consultand = 8;                                         // arrow, no P

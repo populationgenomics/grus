@@ -10,9 +10,9 @@ Shared terms across grus docs and code. Pedigree conventions follow Bennett/NSGC
   The symbol denotes gender identity (Bennett 2022); sex assigned at birth is a separate optional annotation.
 - **Affection status** — whether an individual has the condition: unaffected (empty symbol), affected (filled), unknown
   ("?").
-- **Carrier** — heterozygous for a recessive allele; drawn as the condition's tone with contrasting dots, a fill the key
-  defines (NSGC 2022; older figures use a central dot). **Obligate carrier** — a carrier inferred from the inheritance
-  pattern rather than tested.
+- **Carrier** — heterozygous for a recessive allele; drawn as the condition's tone with a contrasting hatch, a fill the
+  key defines (NSGC 2022; older figures use a central dot). **Obligate carrier** — a carrier inferred from the
+  inheritance pattern rather than tested.
 - **Proband** — the first affected individual who sought evaluation, marked with an arrow + "P". **Consultand** — the
   individual who consulted (may be unaffected); also an arrow.
 - **Deceased** — drawn with a diagonal slash through the symbol.
@@ -26,12 +26,13 @@ Shared terms across grus docs and code. Pedigree conventions follow Bennett/NSGC
 - **Founder** — an individual with no parents drawn; sits at the top of a lineage.
 - **Locus** — a place people are genotyped at: one variant, a gene with several alleles, or a marker. **Allele** — one
   form at a locus, named in genotypes by a symbol (`+`, `M1`, `G`); may be several variants in cis. **Genotype** — the
-  alleles one person carries at one locus, as copies (`[M, +]` heterozygous, `[M, M]` homozygous, `[M]` hemizygous).
+  alleles one person carries at one locus, as copies (`[M, +]` heterozygous, `[M, M]` homozygous, `[M]` hemizygous), or,
+  when the source does not say how many, the alleles carried.
 - **Key** (legend) — what a figure's marks mean, as a list of **key entries**, each denoting a **phenotype** (a disease,
   trait or finding, with any **grades** the key defines beyond the standard statuses), a **genotype** at a locus, or
-  **other** (an entry that is neither: "control", "examined"). A figure with no key has an implied one: a single unnamed
-  phenotype ("filled = affected"). A person's **marks** say which phenotype and other entries their symbol shows; a
-  genotype entry is shown by anyone whose genotype matches it.
+  **other** (an entry that is neither: "control", "examined"). An unnamed phenotype ("filled = affected") has empty
+  text; a figure with no key has it as its whole key. A person's **marks** say which phenotype and other entries their
+  symbol shows; a genotype entry is shown by anyone whose genotype matches it.
 - **Phase** — which of a person's alleles lie on the same chromosome copy (a **haplotype**): variants on one are **in
   cis**, on different ones **in trans** (compound heterozygous). A **phase set** groups genotypes whose phase is stated.
 

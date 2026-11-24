@@ -159,10 +159,11 @@ says one copy is the variant; the importer records the other as the reference, t
 is wrong only at a multiallelic site where the other copy is a second variant, and one descriptor cannot state that.
 Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so their phase is not
 recorded. An absent or unspecified allelic state says the person carries the variant but not how many copies, so the
-genotype carries `alt` with its copies not stated; an unknown term fails loud. An interpretation naming a biosample is
-that biosample's individual's (the subject's when it names none), and one naming neither a person nor a biosample fails
-loud. A packet whose subject is not in `persons` fails loud. Not expressible: twins, adoption, outcomes, counts,
-consultand, carrier, consanguinity on any other couple.
+genotype carries `alt` with its copies not stated; another interpretation of the same variant that states a zygosity
+says more and wins. An unknown term fails loud. An interpretation naming a biosample is that biosample's individual's
+(the subject's when it names none), and one naming neither a person nor a biosample fails loud. A packet whose subject
+is not in `persons` fails loud. Not expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity
+on any other couple.
 
 **Open Pedigree / PhenoTips simple JSON** (`_openpedigree.py`; a JSON array of person and relationship objects, keys
 case-insensitive; fixture `simple.openpedigree.json`)

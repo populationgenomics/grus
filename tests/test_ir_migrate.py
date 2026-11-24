@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 import pytest
 import test_render
@@ -126,6 +127,35 @@ def test_a_record_with_nothing_to_migrate_migrates_to_itself(old: str) -> None:
     except text_format.ParseError:
         expected = pb.PedigreeSet(pedigrees=[text_format.Parse(old, pb.Pedigree())])
     assert ir.migrate_pbtxt(old) == expected
+
+
+@pytest.mark.parametrize(
+    "migrate",
+    [
+        lambda: ir.migrate_pbtxt(
+            "pedigrees { individuals { generation: 1 index: 1 gender: GENDER_MAN "
+            "conditions { status: CONDITION_STATUS_AFFECTED } } }"
+        ),
+        lambda: ir.migrate_json(
+            '{"individuals": [{"generation": 1, "index": 1, "gender": "GENDER_MAN", '
+            '"conditions": [{"status": "CONDITION_STATUS_AFFECTED"}]}]}'
+        ),
+    ],
+    ids=["pbtxt", "json"],
+)
+def test_a_pre_0_4_record_of_only_unnamed_conditions_migrates(migrate: Callable[[], pb.PedigreeSet]) -> None:
+    # Its entries parse as 0.4 entries with no condition_id too; 0.4 requires one, so the record is pre-0.4.
+    ps = migrate()
+    assert [(e.id, e.text) for e in ps.key_entries] == [("k1", "")]
+    assert _marks(ps) == [[("k1", pb.CONDITION_STATUS_AFFECTED)]]
+
+
+def test_a_field_only_the_layout_digest_writes_is_not_read() -> None:
+    with pytest.raises(ir.MigrationError, match="not a pedigree set or pedigree"):
+        ir.migrate_pbtxt(
+            'individuals { generation: 1 index: 1 gender: GENDER_MAN conditions { name: "C" '
+            'status: CONDITION_STATUS_AFFECTED kind: "other" } }'
+        )
 
 
 def test_text_in_no_known_schema_fails_loud() -> None:

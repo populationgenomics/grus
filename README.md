@@ -27,7 +27,7 @@ single parents, founder sibships, consanguinity, separated couples and childless
 shows is read through the figure's key — a phenotype with its clinical status (affected / carrier / presymptomatic, with
 inheritance and onset when stated), a genotype, or an entry that is neither; twins, adoption, donor parentage, pregnancy
 outcomes and collapsed sibships live where the standard draws them. The schema covers the whole Bennett 2008 + 2022
-vocabulary and evolves additively. Contract:
+vocabulary and evolves additively within a release line; a break raises the minor version below 1.0. Contract:
 [`schema/proto/grus/models/pedigree.proto`](schema/proto/grus/models/pedigree.proto); rationale and the assessment of
 Phenopackets / GA4GH Pedigree as alternatives: [`docs/design/ir.md`](docs/design/ir.md).
 

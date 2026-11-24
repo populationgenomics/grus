@@ -87,6 +87,7 @@ class Key:
 
         Raises:
             UndeclaredKeyEntryError: a mark names an undeclared entry.
+            ValueError: a marked entry denotes nothing (``validate`` refuses such an entry).
         """
         return [self._resolve(m) for m in ind.marks]
 
@@ -105,10 +106,12 @@ class Key:
     def _resolve(self, m: pb.Mark) -> Shown:
         e = self.entry(m.key_id)
         kind = e.WhichOneof("denotes")
+        if kind is None:
+            raise ValueError(f"key entry {e.id!r} denotes nothing; an entry is a phenotype, a genotype or other")
         inheritance = e.phenotype.inheritance if kind == PHENOTYPE and e.phenotype.HasField("inheritance") else None
         return Shown(
             key_id=m.key_id,
-            kind=kind or "",
+            kind=kind,
             text=e.text,
             status=m.status if m.WhichOneof("state") == "status" else None,
             grade=m.grade if m.WhichOneof("state") == "grade" else None,

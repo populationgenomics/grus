@@ -64,10 +64,10 @@ LAYOUT_READS: dict[str, frozenset[str]] = {
             "annotations",  # label width
         }
     ),
-    # inheritance: the X-linked carrier dot; kind: a genotype or other entry's flat fill; grade: a deferral
-    "Condition": frozenset({"name", "status", "inheritance", "kind", "grade"}),
+    # inheritance: the X-linked carrier dot; grade: a graded mark defers
+    "Condition": frozenset({"name", "status", "inheritance", "grade"}),
     "KeyEntry": frozenset({"text", "phenotype", "genotype", "other"}),
-    "Phenotype": frozenset({"inheritance", "grades"}),
+    "Phenotype": frozenset({"inheritance"}),
     "GenotypePattern": frozenset({"locus_id", "alleles", "copies_unstated"}),  # who shows the entry
     "Other": frozenset(),
     "Annotation": frozenset({"text"}),
@@ -91,9 +91,10 @@ LAYOUT_IGNORES: dict[str, frozenset[str]] = {
             "genotypes",  # read only through the genotype entries they show, which enter as conditions
         }
     ),
-    "Condition": frozenset({"onset_age"}),
+    # kind: a genotype entry and an other entry draw alike, a flat fill with no status
+    "Condition": frozenset({"onset_age", "kind"}),
     "KeyEntry": frozenset({"id"}),
-    "Phenotype": frozenset(),
+    "Phenotype": frozenset({"grades"}),  # a grade enters as a mark's, through its Condition
     "GenotypePattern": frozenset(),
     "Other": frozenset(),
     "Annotation": frozenset({"type", "loci"}),

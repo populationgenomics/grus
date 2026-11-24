@@ -108,11 +108,12 @@ input to the layout:
   set-level citation list is outside the pedigree and so outside the digest. The set-level key is not (`ir.md`, "The
   key"): what each person shows — their marks, and the genotype entries their genotypes match — enters in the encoding
   that predates declared conditions, one condition per shown entry carrying the entry's text, the mark's status and the
-  entry's inheritance, and the classification runs on that encoding. A genotype or other entry adds its kind and a
-  graded mark its grade, fields absent otherwise, so a pedigree of phenotype marks with standard statuses digests
-  exactly as it did before the key and its stored layouts stay valid. The key's own fields are classified too: an
-  entry's `id` is not read, so renaming it leaves the digest. `store_layout`, `load_layout` and drawing from a stored
-  layout take the key alongside the pedigree (`key_entries=`).
+  entry's inheritance, and the classification runs on that encoding. A genotype or other entry enters with no status,
+  and a graded mark adds its grade, a field absent otherwise, so a pedigree of phenotype marks with standard statuses
+  digests exactly as it did before the key and its stored layouts stay valid. The key's own fields are classified too:
+  an entry's `id` is not read, so renaming it leaves the digest, and neither is whether a flat fill is a genotype or an
+  other entry, which draw alike. `store_layout`, `load_layout` and drawing from a stored layout take the key alongside
+  the pedigree.
 - **the layout-affecting geometry**, stored as values so a mismatch can say which: `couple_gap` and `sib_gap` (the row
   separations), `label_size`, `label_box_width`, `label_gap` and `x_unit` (label clearance is computed in pixels and
   converted to layout units, and a label beside a centre drop reserves `label_gap`), `symbol_size` and `carrier_style`

@@ -341,6 +341,17 @@ def test_phenopackets_unstated_zygosity_carries_alt(vd: dict[str, object]) -> No
     assert g.copies_unstated
 
 
+def test_phenopackets_a_stated_zygosity_wins_over_an_unstated_one() -> None:
+    # One interpretation says homozygous, another only that the variant is there: they agree, and the first says more.
+    for order in (
+        (_variant("GENO:0000136"), _variant("GENO:0000137")),
+        (_variant(allelicState=None), _variant("GENO:0000136")),
+    ):
+        ps = _import(*(("c", vd) for vd in order))
+        (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+        assert list(g.alleles) == ["alt", "alt"] and not g.copies_unstated
+
+
 def test_phenopackets_allelic_state_by_label() -> None:
     ps = _import(("c", _variant(allelicState={"id": "GENO:9999999", "label": "Homozygous"})))
     assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": ["alt", "alt"]}

@@ -60,16 +60,11 @@ once:
   not "square", keeps it meaning-only. Pre-2022 figures draw phenotypic sex; they map onto `gender` by the standard's
   assume-aligned rule (2022 Box 1.1.f), with `sex_assigned_at_birth` unset — and the moment a figure annotates AMAB/AFAB
   or draws nonbinary, it is captured faithfully.
-- **What a person's symbol shows is `repeated Mark`**, each naming an entry of the figure's key (below), not a flat
-  affection+carrier pair. A person can be affected with one condition and a carrier of another — the 2022 standard draws
-  this by partitioning the symbol into per-condition fill regions (and moved carrier itself from a dot to a fill). One
-  mark = one region keyed to the legend; a phenotype mark's status ∈ unaffected/affected/carrier/presymptomatic/
-  unknown, or a grade the key defines. The single-condition case is one mark. The entry's own facts are declared once,
-  by id: its text and, for a phenotype, its mode of inheritance (AD/AR/XLD/XLR/Y/mito, absent = unspecified), recorded
-  **only when the figure states it** — never inferred from the pedigree pattern (see no-inference non-goal); the carrier
-  *glyph* is a render choice, not implied by this field. A mark's onset age is the as-drawn age at onset/diagnosis for
-  **this** person and phenotype, verbatim ("42", "40s", "prenatal") — kept on the mark rather than as a floating
-  annotation so the age↔phenotype binding survives.
+- **What a person's symbol shows is a list of marks**, each naming a phenotype or other entry of the figure's key, not a
+  flat affection+carrier pair. A person can be affected with one condition and a carrier of another — the 2022 standard
+  draws this by partitioning the symbol into per-condition fill regions (and moved carrier itself from a dot to a fill)
+  — so one mark is one region keyed to the legend, and the single-condition case is one mark. What a mark says, and how
+  the key declares what it means, is under "The key" below.
 - **Labels are `repeated Label{text, kind}`** (kind ∈ family/panel/gene/phenotype/other), not a single `title` — a
   pedigree often carries several at once, each a distinct fact for reasoning; the renderer picks the display title. The
   panel label lives here (as-drawn meaning), not in `Provenance`.
@@ -153,15 +148,16 @@ Two levels of evidence, and an optional third:
 
 `field` is a path into the IR, checked against a closed list: the `Individual` fields (`gender`, `deceased`, `proband`,
 `consultand`, `documented_evaluation`, `reproductive_outcome`, `reproductive_role`, `count`, `count_unspecified`,
-`sex_assigned_at_birth`, `external_id`, `annotations`), a person's mark as `mark.status`, `mark.grade` and
-`mark.onset_age`, and the key entry as `key.text`, `key.inheritance` and `key.grades` (each with `key_id` naming the
-entry; a `key.*` path scopes the whole pedigree only, since a text or a mode belongs to the entry, not to one person),
-the `Mating` fields (`consanguineous`, `status`, `childlessness`, `annotations`; a support's scope says whose
-`annotations` it means), the `Offspring` fields (`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the
-child, and `labels` for the pedigree. The loader fails loud on an unknown id, an unknown path, a person or couple not in
-the pedigree, a key entry no one in scope shows, or a region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim
-in its document is checked where the document text is available (the store), as case records check theirs; the IR alone
-cannot.
+`sex_assigned_at_birth`, `external_id`, `annotations`), a person's mark as `mark.key_id` (that they show the entry at
+all, all an other mark states), `mark.status`, `mark.grade` and `mark.onset_age`, and the key entry as `key.text`,
+`key.inheritance` and `key.grades` (each with `key_id` naming the entry; a `key.*` path scopes the whole pedigree only,
+since a text or a mode belongs to the entry, not to one person), the `Mating` fields (`consanguineous`, `status`,
+`childlessness`, `annotations`; a support's scope says whose `annotations` it means), the `Offspring` fields
+(`twin_group`, `twin_type`, `parentage`, `adoption`) scoped by the child, and `labels` for the pedigree. The loader
+fails loud on an unknown id, an unknown path, a person or couple not in the pedigree, a key entry no one in scope shows,
+a fact the cited entry or mark cannot hold (an other entry's inheritance, a grade on a mark that has a status), or a
+region with x1 \<= x0 or y1 \<= y0. That a quote appears verbatim in its document is checked where the document text is
+available (the store), as case records check theirs; the IR alone cannot.
 
 A `Region` locates the **source**, not the drawing, so it does not break meaning-only: it says where on the paper's page
 a pedigree was read, never where anything sits in a rendering.
@@ -243,8 +239,6 @@ second-guess them.
 The identity those checks and the diff use is exported from `grus.ir`, so a caller merging several sets (one per figure
 of a paper, say) can declare one locus per identity and re-point genotypes at it.
 
-A bare `Pedigree` with genotypes is validated and drawn with its set's loci passed alongside, as key entries are.
-
 **Consumers.** `diff_set` compares a person's genotypes by what they state: each locus by its (gene, name) — and an
 unnamed one by its alleles too — each allele by its symbol, printed name and whether it is the reference, unphased
 copies as a multiset and a phase set as its multiset of haplotypes. So ids, phase-set names and swapping every slot of a
@@ -276,16 +270,17 @@ the key into the disease-status enum and the two readings forced it differently.
 So the IR separates the key from what it means. A **key entry** is one thing the figure's key defines, declared once per
 set with a local id (`k1`) and its text as printed, and it says what kind of thing it denotes:
 
-- a **phenotype** — a disease, trait or finding, named as printed — with its mode of inheritance when the figure states
-  it, and any **grades** its key defines beyond the standard ones;
+- a **phenotype** — a disease, trait or finding, named as printed — with its mode of inheritance (AD/AR/XLD/XLR/Y/ mito)
+  when the figure states it, never inferred from the pedigree pattern, and any **grades** its key defines beyond the
+  standard statuses (unaffected, affected, carrier, presymptomatic, unknown);
 - a **genotype** — a genotype at a declared locus, as a pattern: "carries M1", or exactly `[M1, M1]`;
 - **other** — anything that is neither: "Control", "examined". Its text is all it says.
 
 A person's **marks** say which phenotype and other entries their symbol shows, one per entry. A phenotype mark also says
-what is true of the person: a standard status (unaffected, affected, carrier, presymptomatic, unknown — the grades a
-symbol can draw without a key) or one of the entry's grades, and the age at onset when it is drawn. An other mark says
-only that the person shows it. Genotype entries are not marked: a person shows one when their genotype matches it
-(below).
+what is true of the person: a standard status (the grades a symbol can draw without a key) or one of the entry's grades,
+and the age at onset when it is drawn — the as-drawn age for this person and phenotype, verbatim ("42", "40s",
+"prenatal"), kept on the mark so the age stays bound to its phenotype. An other mark says only that the person shows it.
+Genotype entries are not marked: a person shows one when their genotype matches it (below).
 
 ```
 key k1 phenotype "hearing loss"     grades: "suspected from history, not examined"
@@ -305,8 +300,9 @@ two, and a renderer legend or a citation could find the entry only by joining on
 with local ids, as citations and loci are, and at set level: a multi-family figure usually has one key ("EB phenotypes
 in families 1 and 2"), and both families' people reference the same entries.
 
-**A figure with no key has an implied one.** The common "filled = affected" figure is one phenotype entry with empty
-text, so every mark references an entry and there is no special case.
+**An unnamed phenotype has empty text.** The common "filled = affected" figure has no key at all: its implied key is one
+phenotype entry with empty text, so every mark references an entry and there is no special case. A figure's plain
+"affected" beside named entries (often carrier-only conditions) is the same unnamed phenotype.
 
 **Meaning-only.** An entry records what the key says a mark means, never what the mark looks like: not its colour, its
 pattern or which quadrant it fills. Which region an entry occupies is the renderer's choice.
@@ -333,14 +329,14 @@ on.
 nothing else: controls, examined persons, carriers of a keyed variant and suspected cases never count, because none of
 them is recorded as affected.
 
-**A pedigree's key lives in its set.** A bare `Pedigree` has nowhere to declare entries, so one with marks is validated
-and drawn with the set's entries passed alongside (`key_entries=`, as `loci=` for genotypes); a file holding one is a
-one-pedigree `PedigreeSet`.
+**A pedigree's declarations live in its set.** A bare `Pedigree` has nowhere to declare key entries or loci, so one with
+marks or genotypes is validated and drawn with its set's declarations passed alongside, and those declarations are
+checked as they would be in the set; a file holding one is a one-pedigree `PedigreeSet`.
 
 **Checks** (loader, loud):
 
 - entry ids are unique and distinct from citation and locus ids; entry texts are unique across the set, so one entry
-  cannot be declared twice; only a phenotype entry may have empty text, the implied key's;
+  cannot be declared twice; only a phenotype entry may have empty text (the unnamed phenotype);
 - a phenotype's grades are unique and non-empty; a genotype pattern names a declared locus and its alleles, lists each
   allele once when it states no copies, and no two genotype entries state the same pattern;
 - every mark's entry resolves and is a phenotype or other entry, never a genotype one; a person marks an entry at most
@@ -354,10 +350,11 @@ one-pedigree `PedigreeSet`.
 - The renderer draws every entry a person shows in the same legend-keyed fills it draws a phenotype in: an other or
   genotype entry is a flat fill labelled with its text. How to draw a key-defined grade is not settled; until it is, a
   pedigree with one is deferred, as other undrawn features are ([`renderer.md`](renderer.md)).
-- `diff_set` and `match_individuals` compare a person's marks by what their entries state — the kind and the text — so
-  ids assigned differently in two records still match; a phenotype mark's status, grade and onset age are compared.
-  Genotype entries add nothing to compare per person: whether a person shows one follows from their genotype, which is
-  compared already, and whether a reading keyed it as a fill is how the figure draws it, not what it means.
+- `diff_set` and `match_individuals` compare a person's marks by what their entries state — the kind, the text and the
+  inheritance — so ids assigned differently in two records still match, and compare each phenotype mark's status or
+  grade. Onset age is recorded but not scored. Genotype entries add nothing to compare per person: whether a person
+  shows one follows from their genotype, which is compared already, and whether a reading keyed it as a fill is how the
+  figure draws it, not what it means.
 - The stored-layout digest ([`layout-store.md`](layout-store.md)) reads what a person shows through the entries, so an
   entry's id never enters it, and a pedigree recorded only with standard phenotype statuses digests as it did before the
   key existed: its stored layouts stay valid.
@@ -367,14 +364,13 @@ which is easier to get right than repeating a long name. The importers ([`conver
 only: no data format grus imports has a key, so each declares one phenotype entry per distinct stated name, ids `k1`,
 `k2`, … by first appearance.
 
-**Migration.** The key replaces 0.4's condition declarations, and this is a breaking change to the IR's shape, made
-below 1.0 as a minor release with every consumer and golden migrated in it. Every 0.4 condition was a phenotype by
-construction, so the migration (`grus.ir.migrate_pbtxt` / `migrate_json`, and `grus migrate`) is mechanical: each
-condition declaration becomes a phenotype entry with its name as the text, each person's condition entry a mark, and
-each support citing a condition cites the entry. Which old conditions were really variants or controls cannot be
-recovered from the record; that needs the figure read again. The migration also reads records from before conditions
-were declared (when each entry carried its own name and inheritance), declaring one entry per distinct name; entries of
-one name stating different modes, or one person with two entries of one name, have no current form and fail loudly.
+**Migration.** The key replaces 0.4's condition declarations, a breaking change to the IR's shape, made below 1.0 as a
+minor release. Every 0.4 condition was a phenotype by construction, so the migration (`grus migrate`) is mechanical:
+each condition declaration becomes a phenotype entry with its name as the text, each person's condition entry a mark,
+and each support citing a condition cites the entry. Which old conditions were variants or controls cannot be recovered
+from the record; that needs the figure read again. The migration also reads records from before conditions were declared
+(when each entry carried its own name and inheritance), declaring one entry per distinct name; entries of one name
+stating different modes, or one person with two entries of one name, have no current form and fail loudly.
 
 ### Concept coverage — the full Bennett vocabulary, in the schema
 
@@ -420,12 +416,12 @@ from its own protovalidate dependency.
   well-formed (a non-empty id, exactly one anchor, a region with page ≥ 0 and x1 > x0, y1 > y0 — protovalidate), ids are
   unique across the set, every evidence and support id resolves, a support's `field` is on the closed path list
   (`grus.ir.SUPPORT_FIELDS`, exported with the path prefixes so a prompt can list the valid paths), it names a declared
-  `key_id` iff the field is `mark.*` or `key.*` and someone in scope shows that entry, a declaration path scopes the
-  whole pedigree, every person and couple in scope is in the pedigree, an offspring field is scoped by the child, and a
-  mating field by couples. Key entries and marks are checked as listed under "The key", and loci and genotypes as listed
-  under "Genotypes". Each failure names the pedigree and the item. Enum `*_UNSPECIFIED` zeros are sentinels, never
-  domain values; rare axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL / CURRENT / …), so the
-  sentinel is never emitted.
+  `key_id` iff the field is `mark.*` or `key.*` and someone in scope marks (`mark.*`) or shows (`key.*`) that entry, a
+  declaration path scopes the whole pedigree, every person and couple in scope is in the pedigree, an offspring field is
+  scoped by the child, and a mating field by couples. Key entries and marks are checked as listed under "The key", and
+  loci and genotypes as listed under "Genotypes". Each failure names the pedigree and the item. Enum `*_UNSPECIFIED`
+  zeros are sentinels, never domain values; rare axes are `optional` (absent = the natural default — LIVE / BIOLOGICAL /
+  CURRENT / …), so the sentinel is never emitted.
 
 ## Alternatives considered
 

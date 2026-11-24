@@ -125,20 +125,21 @@ primary is the one a reader looks for first, so it gets the fill that survives e
 both the condition's fills and its section, pedigree-wide, so a condition looks the same and sits in the same place on
 every symbol that shows it. The legend holds the key entries someone in the pedigree shows, under any status, each by
 its declaration (`ir.md`, "The key"): the text and the mode of inheritance come from the set's `KeyEntry`, never from
-the mark, so the renderer takes the set's key alongside a pedigree (`key_entries=`; `render_set_svg` and `render_svgs`
-pass the set's own). A phenotype label orders the conditions it names, but one that names no one's condition (a family's
-name, "DUH family" beside the condition "DUH") is not a condition: it takes no index, makes no section and has no key
-entry, so it cannot turn a one-condition pedigree into halves. A condition that occurs only as unaffected still holds
-its index, so the drawing of one individual never depends on another's status.
+the mark, so the renderer takes the set's key alongside a pedigree (`render_set_svg` and `render_svgs` pass the set's
+own). A phenotype label orders the conditions it names, but one that names no one's condition (a family's name, "DUH
+family" beside the condition "DUH") is not a condition: it takes no index, makes no section and has no row in the drawn
+key, so it cannot turn a one-condition pedigree into halves. A condition that occurs only as unaffected still holds its
+index, so the drawing of one individual never depends on another's status.
 
 **Entries that are not a phenotype status.** A key entry that denotes a genotype or something else ("examined",
 "control") is drawn the way an affected phenotype is: a flat fill in its index's tone, whole or in its section, keyed by
-the entry's text alone ("c.1234A>G", never "Affected: …"). It takes an index in the base order and is never the primary,
-which goes to a phenotype by who is affected. A person shows a genotype entry when their genotype matches it, so a
-genotype the figure keys draws as a fill and one it does not key draws nothing. A grade the key defines beyond the
-standard statuses ("suspected, not examined") has no fill yet: drawing it needs a texture that reads as a grade of its
-phenotype's tone, which is a design of its own, so a pedigree with one is deferred rather than drawn as something it is
-not.
+the entry's text alone ("c.1234A>G"). It takes an index in the base order and is never the primary, which goes to a
+phenotype by who is affected. Since it states no status, it neither hides a phenotype's unknown `?` (drawn haloed over a
+flat fill) nor takes away the X-linked carrier dot, which only an affected phenotype does. A person shows a genotype
+entry when their genotype matches it, so a genotype the figure keys draws as a fill and one it does not key draws
+nothing. A grade the key defines beyond the standard statuses ("suspected, not examined") has no fill: drawing it needs
+a texture that reads as a grade of its phenotype's tone, which is a design of its own, so a pedigree with one is
+deferred rather than drawn as something it is not.
 
 **Fills: the tone says the condition, the texture the status.**
 

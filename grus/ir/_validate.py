@@ -63,7 +63,8 @@ def validate(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), *, loci: S
     known, and references before generation order so every edge endpoint is a real node.
 
     ``key_entries`` and ``loci`` are the declarations of ``p``'s set, which its marks and genotypes reference; a
-    pedigree with none of either needs none.
+    pedigree with none of either needs none. The key entries are checked as ``validate_set`` checks them, short of
+    each being shown by someone in ``p`` (another pedigree of the set may show it).
 
     Raises:
         protovalidate.ValidationError: a field-local / single-message rule failed.
@@ -75,9 +76,10 @@ def validate(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), *, loci: S
     _check_references(p, positions)
     _check_reproductive_outcome_terminal(p)
     _check_generation_order(p)
+    by_locus = {locus.id: locus for locus in loci}
+    _check_key_entries(key_entries, set(), by_locus)
     key = {e.id: e for e in key_entries}
     _check_marks(p, key)
-    by_locus = {locus.id: locus for locus in loci}
     _check_genotypes(p, by_locus)
     _check_supports(p, positions, _key_entries.Key(key_entries), set(by_locus))
 
@@ -101,7 +103,7 @@ def validate_set(ps: pb.PedigreeSet) -> None:
     """
     ids = _check_citations(ps)
     _check_loci(ps, ids | {e.id for e in ps.key_entries})
-    _check_key_entries(ps, ids, {locus.id: locus for locus in ps.loci})
+    _check_key_entries(ps.key_entries, ids, {locus.id: locus for locus in ps.loci})
     for i, p in enumerate(ps.pedigrees):
         labels = [label.text for label in p.labels]
         tag = f"pedigrees[{i}]" + (f" (labels={labels})" if labels else "")
@@ -253,8 +255,10 @@ _INDIVIDUAL_FIELDS = (
 )
 SUPPORT_MARK_PREFIX = "mark."  # a person's mark: needs Support.key_id
 SUPPORT_KEY_PREFIX = "key."  # a key entry (the whole pedigree only: a text or a mode belongs to the entry): key_id
-_MARK_FIELDS = tuple(SUPPORT_MARK_PREFIX + name for name in ("status", "grade", "onset_age"))
+# key_id: that the person shows the entry at all, the one fact an other mark states
+_MARK_FIELDS = tuple(SUPPORT_MARK_PREFIX + name for name in ("key_id", "status", "grade", "onset_age"))
 _KEY_FIELDS = tuple(SUPPORT_KEY_PREFIX + name for name in ("text", "inheritance", "grades"))
+_PHENOTYPE_KEY_FIELDS = frozenset(SUPPORT_KEY_PREFIX + name for name in ("inheritance", "grades"))
 SUPPORT_GENOTYPE_PREFIX = "genotype."  # a person's genotypes at some loci: needs Support.loci
 SUPPORT_LOCUS_PREFIX = "locus."  # locus declarations (the whole pedigree only): needs Support.loci
 _GENOTYPE_FIELDS = tuple(SUPPORT_GENOTYPE_PREFIX + name for name in ("alleles", "phase_set"))
@@ -276,6 +280,15 @@ for _kind, _paths in (
 ):
     for _path in _paths:
         SUPPORT_FIELDS[_path] = SUPPORT_FIELDS.get(_path, frozenset()) | {_kind}
+
+
+def _mark_states(m: pb.Mark, fact: str) -> bool:
+    """Whether mark ``m`` states ``fact``, a ``mark.*`` support's field: its status, its grade or its onset age."""
+    if fact == "key_id":
+        return True
+    if fact == "onset_age":
+        return m.HasField("onset_age")
+    return m.WhichOneof("state") == fact
 
 
 def _check_citations(ps: pb.PedigreeSet) -> set[str]:
@@ -300,7 +313,7 @@ def _mating_ref_key(m: pb.Mating | pb.MatingRef) -> frozenset[Key]:
     return frozenset(_key(getattr(m, role)) for role in ("partner_a", "partner_b") if m.HasField(role))
 
 
-def _check_key_entries(ps: pb.PedigreeSet, citation_ids: set[str], loci: dict[str, pb.Locus]) -> None:
+def _check_key_entries(entries: Sequence[pb.KeyEntry], citation_ids: set[str], loci: dict[str, pb.Locus]) -> None:
     """Each key entry is well-formed, its id unique and no citation's, its text and pattern declared once.
 
     Only a phenotype may have empty text (the implied key's); a phenotype's grades are unique; a genotype pattern names
@@ -309,7 +322,7 @@ def _check_key_entries(ps: pb.PedigreeSet, citation_ids: set[str], loci: dict[st
     ids: set[str] = set()
     texts: dict[str, str] = {}
     patterns: dict[tuple[str, tuple[str, ...], bool], str] = {}
-    for k, e in enumerate(ps.key_entries):
+    for k, e in enumerate(entries):
         where = f"key_entries[{k}] ({e.id!r})"
         try:
             protovalidate.validate(e)
@@ -556,10 +569,17 @@ def _check_supports(p: pb.Pedigree, positions: set[Key], key: _key_entries.Key, 
                 raise IntegrityError(f"{where}: key_id {s.key_id!r} is not declared")
             scope = [by_key[pos] for pos in people] or list(p.individuals)
             if kind == "mark":
-                if not any(m.key_id == s.key_id for ind in scope for m in ind.marks):
+                marks = [m for ind in scope for m in ind.marks if m.key_id == s.key_id]
+                if not marks:
                     raise IntegrityError(f"{where}: no one in scope marks key entry {s.key_id!r}")
-            elif not any(x.key_id == s.key_id for ind in scope for x in key.shown(ind)):
-                raise IntegrityError(f"{where}: no one in scope shows key entry {s.key_id!r}")
+                fact = s.field.removeprefix(SUPPORT_MARK_PREFIX)
+                if not any(_mark_states(m, fact) for m in marks):
+                    raise IntegrityError(f"{where}: no mark of {s.key_id!r} in scope has a {fact}")
+            else:
+                if not any(x.key_id == s.key_id for ind in scope for x in key.shown(ind)):
+                    raise IntegrityError(f"{where}: no one in scope shows key entry {s.key_id!r}")
+                if s.field in _PHENOTYPE_KEY_FIELDS and not key.entry(s.key_id).HasField("phenotype"):
+                    raise IntegrityError(f"{where}: {s.key_id!r} is not a phenotype, so it has no {s.field}")
         if (kind in ("genotype", "locus")) != bool(s.loci):
             raise IntegrityError(
                 f"{where}: names loci iff the field is {SUPPORT_GENOTYPE_PREFIX}* or {SUPPORT_LOCUS_PREFIX}*"

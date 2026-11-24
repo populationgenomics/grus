@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
@@ -53,7 +54,7 @@ pedigrees {
   }
   supports { citations: "legend" field: "key.grades" key_id: "k1" }
   supports { citations: "legend" field: "key.text" key_id: "k2" }
-  supports { citations: "legend" field: "mark.status" key_id: "k3" individuals { generation: 1 index: 1 } }
+  supports { citations: "legend" field: "mark.key_id" key_id: "k3" individuals { generation: 1 index: 1 } }
 }
 """
 
@@ -196,6 +197,20 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         lambda ps: _ind(ps, 1, 1).marks.pop(),
         r"no one in scope marks key entry 'k3'",
     ),
+    "a phenotype's fact cited for an other entry": (
+        lambda ps: ps.pedigrees[0].supports.add(citations=["legend"], field="key.inheritance", key_id="k3"),
+        r"'k3' is not a phenotype, so it has no key.inheritance",
+    ),
+    "a grade cited for a mark with a status": (
+        lambda ps: ps.pedigrees[0].supports.add(
+            citations=["legend"], field="mark.grade", key_id="k1", individuals=[pb.Position(generation=2, index=1)]
+        ),
+        r"no mark of 'k1' in scope has a grade",
+    ),
+    "a status cited for an other mark": (
+        _edit(lambda ps: ps.pedigrees[0].supports[2], "field", "mark.status"),
+        r"no mark of 'k3' in scope has a status",
+    ),
     "a key support for a genotype entry no one shows": (
         lambda ps: [
             g.CopyFrom(pb.Genotype(locus_id="l1", alleles=["+", "+"]))
@@ -213,6 +228,18 @@ def test_the_loader_rejects(case: str) -> None:
     edit(ps)
     with pytest.raises(ir.IntegrityError, match=match):
         ir.validate_set(ps)
+
+
+def test_a_bare_pedigree_checks_the_key_entries_it_is_given() -> None:
+    ps = _ungraded()
+    p = ps.pedigrees[0]
+    del p.supports[:]
+    ir.validate(p, ps.key_entries, loci=ps.loci)
+    kindless = [*ps.key_entries[:2], pb.KeyEntry(id="k3", text="control")]
+    with pytest.raises(ir.IntegrityError, match=r"key_entries\[2\] \('k3'\) is malformed"):
+        ir.validate(p, kindless, loci=ps.loci)
+    with pytest.raises(ValueError, match="denotes nothing"):
+        ir.Key(kindless).shown(_ind(ps, 1, 1))
 
 
 def test_a_key_support_may_cite_a_genotype_entry() -> None:
@@ -283,15 +310,15 @@ def test_other_and_genotype_entries_draw_as_flat_fills_keyed_by_text() -> None:
     svg = render.render_svg(p, key_entries=ps.key_entries, loci=ps.loci)
     root = ET.fromstring(svg)
     legend = json.loads(root.get("data-conditions", "null"))
-    assert sorted(legend) == ["c.1234A>G", "control", "hearing loss"]
+    # The affected proband's phenotype is primary; a shown entry takes its index in the base order.
+    assert legend == ["hearing loss", "control", "c.1234A>G"]
     ns = {"s": "http://www.w3.org/2000/svg"}
     by_pos = {g.get("data-position"): g for g in root.iterfind(".//s:g[@data-position]", ns)}
     assert by_pos["I-1"].get(f"data-condition-{legend.index('control')}") == "shown"
     assert by_pos["II-1"].get(f"data-condition-{legend.index('c.1234A>G')}") == "shown"
     assert by_pos["II-1"].get(f"data-condition-{legend.index('hearing loss')}") == "affected"
     labels = [t.text for t in root.iterfind(".//s:g[@class='key']//s:text", ns)]
-    assert "control" in labels and "c.1234A>G" in labels and "hearing loss" in labels
-    assert "Affected" not in labels, "a shown entry is labelled with its text, never as affected"
+    assert {"control", "c.1234A>G", "hearing loss"} <= set(labels)
 
 
 def test_a_genotype_that_stops_matching_changes_the_drawing_and_the_digest() -> None:
@@ -311,3 +338,30 @@ def test_a_shown_entry_is_painted_flat_and_a_grade_not_at_all() -> None:
     assert not _labels.fills(carrier)
     with pytest.raises(ValueError, match="has no drawing"):
         _labels.paint(ir.Shown("k1", "phenotype", "CF", grade="suspected"))
+
+
+def _with_examined(*marks: pb.Mark) -> pb.PedigreeSet:
+    """One woman marked ``marks`` and "examined", in a key of X-linked DMD and an other entry."""
+    ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN, marks=[*marks, pb.Mark(key_id="ex")])
+    return pb.PedigreeSet(
+        key_entries=[
+            pb.KeyEntry(id="dmd", text="DMD", phenotype=pb.Phenotype(inheritance=pb.INHERITANCE_X_LINKED_RECESSIVE)),
+            pb.KeyEntry(id="ex", text="examined", other=pb.Other()),
+        ],
+        pedigrees=[pb.Pedigree(individuals=[ind])],
+    )
+
+
+def test_a_shown_entry_leaves_the_x_linked_carrier_dot() -> None:
+    # The dot is for a symbol with no affected phenotype; a flat fill that states no status does not take it away.
+    ps = _with_examined(pb.Mark(key_id="dmd", status=pb.CONDITION_STATUS_CARRIER))
+    geom = dataclasses.replace(render.DEFAULT_GEOMETRY, carrier_style=render.CarrierStyle.INHERITANCE_GLYPH)
+    svg = render.render_svg(ps.pedigrees[0], geom, key_entries=ps.key_entries)
+    assert 'class="fill dot"' in svg and "X-linked carrier: DMD" in svg
+    assert "Carrier: DMD" not in svg.replace("X-linked carrier: DMD", "")
+
+
+def test_a_shown_entry_leaves_the_unknown_mark() -> None:
+    ps = _with_examined(pb.Mark(key_id="dmd", status=pb.CONDITION_STATUS_UNKNOWN))
+    svg = render.render_svg(ps.pedigrees[0], key_entries=ps.key_entries)
+    assert 'class="mark unknown"' in svg

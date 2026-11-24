@@ -115,20 +115,23 @@ def _v0_4() -> dict[str, type[Message]]:
 
 
 @functools.cache
-def _pre_0_4() -> dict[str, type[Message]]:
+def _pre_0_4(*, digest: bool = False) -> dict[str, type[Message]]:
     """The pre-0.4 classes: 0.4 with each entry's name and inheritance back in place of its id.
 
-    The ``Condition`` also has ``kind`` and ``grade``, which no pre-0.4 record sets: the stored-layout digest
-    (``legacy_pedigree``) writes them for an entry a 0.4 condition could not express, and leaves them unset otherwise.
+    With ``digest``, the ``Condition`` also has ``kind`` and ``grade``, which no pre-0.4 record has: the stored-layout
+    digest (``legacy_pedigree``) writes them for an entry a 0.4 condition could not express, and leaves them unset
+    otherwise. Records are read without them, so a record that sets them fails to parse.
     """
-    fdp, by_name = _schema(_PRE_0_4)
+    package = f"{_PRE_0_4}_digest" if digest else _PRE_0_4
+    fdp, by_name = _schema(package)
     condition = by_name["Condition"]
     _drop(condition, "condition_id")
     _add(condition, "name", 1, type=_STRING)
     _add(condition, "inheritance", 3, optional=True, type=descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
-         type_name=f".{_PRE_0_4}.Inheritance")  # fmt: skip
-    _add(condition, "kind", 10, type=_STRING)
-    _add(condition, "grade", 11, optional=True, type=_STRING)
+         type_name=f".{package}.Inheritance")  # fmt: skip
+    if digest:
+        _add(condition, "kind", 10, type=_STRING)
+        _add(condition, "grade", 11, optional=True, type=_STRING)
     support = by_name["Support"]
     _drop(support, "condition_id")
     _add(support, "condition", 3, optional=True, type=_STRING)
@@ -142,14 +145,14 @@ def legacy_pedigree(p: pb.Pedigree, key_entries: Iterable[pb.KeyEntry]) -> Messa
     What a person shows (``Key.shown``: marks, then matched genotype entries) becomes their conditions in that order:
     the entry's text as the name, a phenotype mark's status and the entry's inheritance. A genotype or other entry adds
     its kind, and a graded mark its grade, fields a pre-0.4 record never sets; so a pedigree of phenotype marks with
-    standard statuses encodes as it did before the key. Supports' entry ids, people's marks and genotypes do not carry
-    over. The stored-layout digest serializes this form, so an entry's id never enters it.
+    standard statuses encodes as it did before the key. Marks and supports' entry ids do not carry over; genotypes do,
+    and the digest clears them. The stored-layout digest serializes this form, so an entry's id never enters it.
 
     Raises:
         UndeclaredKeyEntryError: a mark names an undeclared entry.
     """
     key = _key_entries.Key(key_entries)
-    classes = _pre_0_4()
+    classes = _pre_0_4(digest=True)
     out: Any = classes["Pedigree"].FromString(p.SerializeToString())
     out.DiscardUnknownFields()  # marks and supports' key_id
     for ind, legacy_ind in zip(p.individuals, out.individuals, strict=True):
@@ -246,11 +249,20 @@ def _from_0_4(old: Any) -> pb.PedigreeSet:
     return new
 
 
+def _references(old: Any) -> bool:
+    """Whether every entry of a set parsed as 0.4 names a condition, as 0.4 requires.
+
+    A pre-0.4 entry with neither a name nor an inheritance (the unnamed condition) also parses as a 0.4 entry, with no
+    ``condition_id``; such a record is pre-0.4.
+    """
+    return all(c.condition_id for p in old.pedigrees for ind in p.individuals for c in ind.conditions)
+
+
 def _migrate(text: str, *, json: bool) -> pb.PedigreeSet:
     v0_4, pre = _v0_4(), _pre_0_4()
     if (current := _parse(text, pb.PedigreeSet, pb.Pedigree, json=json)) is not None:
         new: pb.PedigreeSet = current
-    elif (old := _parse(text, v0_4["PedigreeSet"], v0_4["Pedigree"], json=json)) is not None:
+    elif (old := _parse(text, v0_4["PedigreeSet"], v0_4["Pedigree"], json=json)) is not None and _references(old):
         new = _from_0_4(old)
     elif (older := _parse(text, pre["PedigreeSet"], pre["Pedigree"], json=json)) is not None:
         new = _from_0_4(_to_0_4(older))

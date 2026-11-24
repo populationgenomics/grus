@@ -498,6 +498,13 @@ def _rename_declaration(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
                 c.key_id = "renamed"
 
 
+def _genotype_entry_as_other(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
+    """The sample's genotype entry declared as an other entry, marked on the person who showed it: the same fill."""
+    defs[-1].ClearField("genotype")
+    defs[-1].other.SetInParent()
+    p.individuals[0].marks.add(key_id=defs[-1].id)
+
+
 # One edit per LAYOUT_IGNORES field, made to _sample(): the digest and the stored layout must not move.
 _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.KeyEntry]], object]] = {
     ("Pedigree", "id"): lambda p, defs: setattr(p, "id", "another-id"),
@@ -522,6 +529,8 @@ _IGNORED_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.KeyEntry]],
     ),
     ("Individual", "documented_evaluation"): lambda p, defs: setattr(p.individuals[0], "documented_evaluation", True),
     ("KeyEntry", "id"): _rename_declaration,
+    ("Condition", "kind"): _genotype_entry_as_other,
+    ("Phenotype", "grades"): lambda p, defs: defs[0].phenotype.grades.append("suspected"),  # declared, unused
     ("Condition", "onset_age"): lambda p, defs: setattr(p.individuals[0].marks[0], "onset_age", "40s"),
     ("Annotation", "type"): lambda p, defs: setattr(
         p.individuals[0].annotations[0], "type", pb.ANNOTATION_TYPE_GENOTYPE
@@ -572,11 +581,6 @@ def _graded(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
     p.individuals[0].marks[0].grade = "suspected"
 
 
-def _shows_other(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
-    defs.append(pb.KeyEntry(id="k7", text="Control", other=pb.Other()))
-    p.individuals[0].marks.add(key_id="k7")
-
-
 def _pattern_alleles(p: pb.Pedigree, defs: list[pb.KeyEntry]) -> None:
     defs[-1].genotype.alleles[:] = ["X"]
 
@@ -592,11 +596,9 @@ _READ_EDITS: dict[tuple[str, str], Callable[[pb.Pedigree, list[pb.KeyEntry]], ob
     ("Condition", "name"): _declared_text,
     ("Condition", "status"): lambda p, defs: setattr(p.individuals[0].marks[0], "status", pb.CONDITION_STATUS_UNKNOWN),
     ("Condition", "inheritance"): _declared_inheritance,
-    ("Condition", "kind"): _shows_other,
     ("Condition", "grade"): _graded,
     ("KeyEntry", "text"): _declared_text,
     ("Phenotype", "inheritance"): _declared_inheritance,
-    ("Phenotype", "grades"): _graded,
     ("GenotypePattern", "locus_id"): lambda p, defs: setattr(defs[-1].genotype, "locus_id", "l9"),
     ("GenotypePattern", "alleles"): _pattern_alleles,
     ("GenotypePattern", "copies_unstated"): lambda p, defs: setattr(defs[-1].genotype, "copies_unstated", False),
@@ -632,3 +634,14 @@ def test_an_edit_to_a_read_scalar_moves_the_digest(key: tuple[str, str]) -> None
     edited, defs = _sample()
     _READ_EDITS[key](edited, defs)
     assert _store.pedigree_digest(edited, defs) != _store.pedigree_digest(*_sample())
+
+
+def test_a_grade_alone_moves_the_digest() -> None:
+    # _READ_EDITS' grade edit also replaces a status; two grades of one mark differ in the grade alone.
+    def graded(grade: str) -> bytes:
+        p, defs = _sample()
+        defs[0].phenotype.grades.extend(["a", "b"])
+        p.individuals[0].marks[0].grade = grade
+        return _store.pedigree_digest(p, defs)
+
+    assert graded("a") != graded("b")

@@ -459,7 +459,7 @@ class _Draw:
         id_prefix: str = "",
     ) -> None:
         self.p = p
-        self._key_entries = key  # the set's key: what each person's symbol shows
+        self._key_table = key  # the set's key: what each person's symbol shows
         self.lay = lay
         self.geom = geom
         self.id_prefix = id_prefix  # namespaces SVG element ids (clipPaths) so composed tiles don't collide
@@ -519,12 +519,12 @@ class _Draw:
             DeferredFeatureError: a fill for an entry past the sixth (legend index ``_FILLS`` or above).
         """
         index = self._data_legend.index
-        entries = self._key_entries.shown(ind)
+        entries = self._key_table.shown(ind)
         affected = {index(e.text) for e in entries if _labels.paint(e) == pb.CONDITION_STATUS_AFFECTED}
         shown = {index(e.text) for e in entries if _labels.paint(e) == _labels.SHOWN}
         carriers = [e for e in entries if _labels.paint(e) == pb.CONDITION_STATUS_CARRIER]
         dot = None
-        if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected | shown:
+        if self.geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH and not affected:
             x_linked = [e for e in carriers if e.inheritance in _X_LINKED]
             if x_linked:
                 dot = min(
@@ -574,7 +574,7 @@ class _Draw:
             {
                 self._data_legend.index(e.text)
                 for ind in self.p.individuals
-                for e in self._key_entries.shown(ind)
+                for e in self._key_table.shown(ind)
                 if e.status == pb.CONDITION_STATUS_PRESYMPTOMATIC
             }
         )
@@ -842,7 +842,7 @@ class _Draw:
 
     def root_attrs(self) -> str:
         """The ``pedigree`` group's attributes, for the root ``<svg>`` or a composed figure's tile."""
-        return _pedigree_attrs(self.p, self._key_entries)
+        return _pedigree_attrs(self.p, self._key_table)
 
     def svg(self) -> str:
         width, height = self.dimensions()
@@ -1211,7 +1211,7 @@ class _Draw:
 
         ``ghost`` is 0 for the real cell, else the 1-based ordinal of this ghost among the individual's ghosts.
         """
-        statuses = {e.status for e in self._key_entries.marked(ind)}
+        statuses = {e.status for e in self._key_table.marked(ind)}
         classes = ["individual"] + (["ghost"] if ghost else [])
         for status, word in (
             (pb.CONDITION_STATUS_AFFECTED, "affected"),
@@ -1238,7 +1238,7 @@ class _Draw:
         if ind.HasField("external_id"):
             attrs["data-external-id"] = ind.external_id
         # One mark per entry (the loader checks it), so each legend slot holds one status.
-        for e in self._key_entries.shown(ind):
+        for e in self._key_table.shown(ind):
             paint = _labels.paint(e)
             attrs[f"data-condition-{self._data_legend.index(e.text)}"] = (
                 _SHOWN if paint == _labels.SHOWN else _enum_word(pb.ConditionStatus, paint, "CONDITION_STATUS_")
@@ -1289,9 +1289,9 @@ class _Draw:
 
     def _symbol(self, ind: pb.Individual, plan: _FillPlan, cx: float, cy: float, *, side: int) -> list[str]:
         """One ``individual`` group: backing, status fills and dividers, outline, marks, label lines, hit — in order."""
-        shown = self._key_entries.shown(ind)
+        shown = self._key_table.shown(ind)
         statuses = {_labels.paint(e) for e in shown}
-        affected = any(_labels.fills(e) for e in shown)
+        affected = _labels.affected(shown)
         out = [self._open_individual(ind)]
         out.append(self._shape(ind.gender, cx, cy, "#ffffff", stroke=False, cls="backing"))
         out += self._status_fill(ind, plan, cx, cy, clip_id=f"{self.id_prefix}clip-{_position(ind)}")
@@ -1300,7 +1300,8 @@ class _Draw:
         out += self._count_mark(ind, plan, cx, cy)
         if not affected and pb.CONDITION_STATUS_UNKNOWN in statuses:
             mark = _text(cx, cy, "?", 20.0, cls="mark unknown")
-            if plan.sections:  # a white halo keeps it clear of the section borders it sits on
+            # a white halo keeps it clear of the section borders it sits on, or of a flat fill under it
+            if plan.sections or (plan.whole is not None and plan.whole[1] == _SHOWN):
                 mark = mark.replace(
                     " text-anchor=",
                     f' stroke="#ffffff" stroke-width="{_num(_HALO)}" paint-order="stroke" text-anchor=',

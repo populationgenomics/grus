@@ -7,6 +7,7 @@ reserve each label box. One estimate serves both, so what the layout spaced for 
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Sequence
 
 from grus import ir
 from grus.models import pedigree_pb2 as pb
@@ -97,6 +98,14 @@ def paint(s: ir.Shown) -> int:
     if s.grade is not None:
         raise ValueError(f"grade {s.grade!r} of {s.text!r} has no drawing")
     return SHOWN if s.status is None else s.status
+
+
+def affected(shown: Sequence[ir.Shown]) -> bool:
+    """Whether any of ``shown`` is an affected phenotype: what hides the unknown ``?`` and the X-linked carrier dot.
+
+    A genotype or other entry's flat fill does neither: it states nothing about a phenotype's status.
+    """
+    return any(s.status == pb.CONDITION_STATUS_AFFECTED for s in shown)
 
 
 def fills(s: ir.Shown) -> bool:
@@ -192,16 +201,16 @@ def has_borders(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clinical
     (affected, shown or carrier), or with none, is its outline alone; the X-linked dot is no section.
     """
     entries = clinical.key.shown(ind)
-    affected = {e.text for e in entries if fills(e)}
-    carriers = [e for e in entries if paint(e) == pb.CONDITION_STATUS_CARRIER and e.text not in affected]
+    flat = {e.text for e in entries if fills(e)}
+    carriers = [e for e in entries if paint(e) == pb.CONDITION_STATUS_CARRIER and e.text not in flat]
     carried = len({e.text for e in carriers})
     if (
         geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
-        and not affected
+        and not affected(entries)
         and any(e.inheritance in _X_LINKED for e in carriers)
     ):
         carried -= 1  # one carried condition is the dot, not a section
-    filled = len(affected) + carried
+    filled = len(flat) + carried
     return filled > 1 or (filled == 1 and clinical.sixths)
 
 
@@ -214,16 +223,15 @@ def has_centre_mark(ind: pb.Individual, geom: _geometry.Geometry, clinical: Clin
     """
     entries = clinical.key.shown(ind)
     statuses = {paint(e) for e in entries}
-    affected = any(fills(e) for e in entries)
     x_linked_dot = (
         geom.carrier_style is _geometry.CarrierStyle.INHERITANCE_GLYPH
-        and not affected
+        and not affected(entries)
         and any(paint(e) == pb.CONDITION_STATUS_CARRIER and e.inheritance in _X_LINKED for e in entries)
     )
     return (
         ind.deceased
         or pb.CONDITION_STATUS_PRESYMPTOMATIC in statuses
-        or (not affected and pb.CONDITION_STATUS_UNKNOWN in statuses)
+        or (not affected(entries) and pb.CONDITION_STATUS_UNKNOWN in statuses)
         or x_linked_dot
         or has_borders(ind, geom, clinical)
     )

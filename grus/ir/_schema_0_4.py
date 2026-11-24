@@ -1,10 +1,10 @@
-"""The 0.4 pedigree schema, frozen: what ``grus.ir.migrate_*`` reads a record written before the key with.
+"""The pedigree schema just before the key, frozen: what ``grus.ir.migrate_*`` reads a record written before it with.
 
 0.4 recorded what a symbol shows as conditions: ``PedigreeSet.conditions`` declared ``ConditionDef``s and each person's
 ``Individual.conditions`` held ``Condition`` entries referencing them (docs/design/ir.md, "The key", Migration). The
 current schema reserves those fields, so the migration reads an old record through this descriptor instead. It is the
-``FileDescriptorProto`` of ``grus/models/pedigree.proto`` as it stood before the key, serialized and base64-encoded; it
-never changes.
+``FileDescriptorProto`` of ``grus/models/pedigree.proto`` as it stood immediately before the key (0.4.2's, plus the
+additive ``Genotype.copies_unstated``), serialized and base64-encoded; it never changes.
 """
 
 from __future__ import annotations
