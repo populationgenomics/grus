@@ -86,12 +86,12 @@ not depend on styling:
 
 1. **`backing`** — the gender shape filled white, no stroke. It hides the ends of lines drawn under the symbol (a ghost
    link runs centre to centre) and is the surface a consumer paints for a selection or hover highlight.
-1. **`fill`** — status paint inside the shape: the whole shape for an individual showing one condition, affected or
-   carried (outside sixths), else one legend-indexed section per affected or carried condition (a clipped rectangle, or
-   in sixths a clipped wedge polygon), or the central dot an X-linked carrier gets under the inheritance-glyph style
-   (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status (`data-status`) and paints
-   with that pair's named pattern (the dot, a plain glyph, has none); status is never the backing's colour, so one
-   selector reaches all status paint.
+1. **`fill`** — status paint inside the shape: the whole shape for an individual showing one key entry, affected, shown
+   or carried (outside sixths), else one legend-indexed section per affected, shown or carried entry (a clipped
+   rectangle, or in sixths a clipped wedge polygon), or the central dot an X-linked carrier gets under the
+   inheritance-glyph style (`renderer.md`, Clinical status). Each names its condition (`data-condition`) and status
+   (`data-status`) and paints with that pair's named pattern (the dot, a plain glyph, has none); status is never the
+   backing's colour, so one selector reaches all status paint.
 1. **`divider`** — the borders of filled sections inside the symbol: one path of thin rays from the centre along each
    section boundary with a filled section on either side (none on an empty or wholly filled symbol). Under the outline,
    so the outline stays whole.
@@ -115,22 +115,24 @@ The groups, and what each promises:
 
 - **`pedigree`** — one per tile, on the nested `<svg>` a composed figure already wraps each pedigree in (and on the root
   of a single-pedigree render). It carries the pedigree's display title and, as a JSON array, its ordered **condition
-  legend**: the declared names (`ir.md`, "Conditions are declared once, by id") of the conditions this pedigree's
-  entries reference, in the order the drawer uses to pick each condition's fills and its section of a divided symbol
-  (`renderer.md`, Clinical status: the primary condition first, then the base order), so index *i* in the array is the
-  condition `data-condition-i` names on every individual below it. The unnamed condition (the figure's sole, unlabelled
-  one, declared with an empty name) is an empty string, so every condition has an index: last, or first when it is the
-  primary. A phenotype label that names no referenced condition is not in the array and takes no index.
+  legend**: the texts (`ir.md`, "The key") of the key entries this pedigree's people show, in the order the drawer uses
+  to pick each entry's fills and its section of a divided symbol (`renderer.md`, Clinical status: the primary entry
+  first, then the base order), so index *i* in the array is the entry `data-condition-i` names on every individual below
+  it. The implied key's phenotype (the figure's sole, unlabelled one, declared with empty text) is an empty string, so
+  every entry has an index: last, or first when it is the primary. A phenotype label that names no shown entry is not in
+  the array and takes no index. The attributes say `condition` for every kind of entry — a phenotype, a genotype or
+  another — so one selector reaches every fill whatever the key denotes.
 - **`individual`** — one per drawn person (a ghost adds one, below; a descent's pass-through through a row adds none).
   Identity is the drawn position and its two components; gender; the count on a count-collapsed symbol (`data-count`,
-  the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per condition the
-  individual has, whose value is the status of its one entry for it (affected, carrier, presymptomatic, unknown). State
-  classes mirror the IR — `affected`, `carrier`, `presymptomatic`, `unknown`, `deceased`, `proband`, `consultand` — not
-  the subset of marks the drawer chose to draw, so a consumer selects on what is true of the person. A **ghost** — the
-  duplicated partner of a cross-generation join — is an `individual ghost` group with the *same* classes and data
-  attributes as the real cell and a `ghost-` id (with an ordinal suffix when one individual is ghosted more than once),
-  so selecting by position lights both, selecting by id lights one, and `.individual:not(.ghost)` counts drawn symbols
-  (a count-collapsed one stands for several people).
+  the number or `n`, absent for one person); the external id when present; and one `data-condition-i` per key entry the
+  individual shows, whose value is the status of its one mark for it (affected, carrier, presymptomatic, unknown,
+  unaffected), or `shown` for a genotype or other entry, which has no status. State classes mirror the IR — `affected`,
+  `carrier`, `presymptomatic`, `unknown`, `deceased`, `proband`, `consultand` — not the subset of marks the drawer chose
+  to draw, so a consumer selects on what is true of the person. A **ghost** — the duplicated partner of a
+  cross-generation join — is an `individual ghost` group with the *same* classes and data attributes as the real cell
+  and a `ghost-` id (with an ordinal suffix when one individual is ghosted more than once), so selecting by position
+  lights both, selecting by id lights one, and `.individual:not(.ghost)` counts drawn symbols (a count-collapsed one
+  stands for several people).
 - **`mating`** — the line or double line between an adjacent couple, or the childless glyph. It names both partners'
   positions and carries `consanguineous` and the childlessness kind as classes. A lone parent's line to an omitted
   partner is a `mating partner-omitted` group naming the one parent.
@@ -141,7 +143,7 @@ The groups, and what each promises:
 - **`ghost-link`** — the dashed same-individual connector, naming the position it joins.
 - **`generation`** — each Roman-numeral marker, naming its row by IR generation.
 - **`key`** — the drawn key, one group per pedigree that draws any fill, with a stable id (`key`, under the prefix).
-  Each entry is its own `key-entry` group with id `key-{status}-{index}` (status `affected`, `carrier` or
+  Each entry is its own `key-entry` group with id `key-{status}-{index}` (status `affected`, `shown`, `carrier` or
   `presymptomatic`; `key-carrier-dot-{index}`, class `key-entry dot`, for the X-linked dot of the inheritance-glyph
   style) naming its condition index and status as data attributes, holding a swatch painted with the same pattern the
   symbols use and a text label. A fill drawn whole has a whole `swatch` (a filled square); one drawn in a section has a
@@ -151,13 +153,13 @@ The groups, and what each promises:
   the pedigree's condition array.
 
 The fills themselves sit in the pedigree's `defs`: one `<pattern>` per (condition index, status) the pedigree draws,
-with id `fill-{status}-{index}` (`fill-affected-0`, `fill-carrier-1`) under the prefix, carrying the same data
-attributes. An affected pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a `hatch` path. Each
-is a single tile centred on its fill part's frame, larger than any symbol, so a restyle need not worry about tiling.
-Every fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`; none repeats the
-paint. Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre, or for a circle half
-a hatch cell right of it) and placed with a `transform`, so a pattern falls at the same phase on each (`renderer.md`,
-Fills); a consumer reading their geometry applies the transform.
+with id `fill-{status}-{index}` (`fill-affected-0`, `fill-shown-2`, `fill-carrier-1`) under the prefix, carrying the
+same data attributes. An affected or shown pattern holds one `tone` rectangle; a carrier pattern the same `tone` and a
+`hatch` path. Each is a single tile centred on its fill part's frame, larger than any symbol, so a restyle need not
+worry about tiling. Every fill part and key swatch except the X-linked dot references its pattern by `fill="url(#…)"`;
+none repeats the paint. Those parts are drawn in coordinates local to their symbol or swatch (origin at its centre, or
+for a circle half a hatch cell right of it) and placed with a `transform`, so a pattern falls at the same phase on each
+(`renderer.md`, Fills); a consumer reading their geometry applies the transform.
 
 Attribute names and the exact class vocabulary are the drawer's to state, in its module docstring, and a test pins them:
 each golden parses as XML, every individual in the IR has exactly one non-ghost group, ids are unique, and each group's

@@ -33,7 +33,7 @@ def test_hinge_family_is_centred_and_compact() -> None:
     # sweeps drifted along that direction until their pass cap (70 units wide for 12 people). Compactness, ranked
     # below centring, places them: III-5 under II-2 x II-5 and packed against its row.
     p, defs = test_render._golden("hinge_family")
-    lay = render.layout(p, conditions=defs)
+    lay = render.layout(p, key_entries=defs)
     x = _at(p, lay)
     assert abs((x[(2, 2)] + x[(2, 5)]) / 2 - x[(3, 5)]) < _EPS
     assert abs(x[(3, 5)] - x[(3, 4)] - render.DEFAULT_GEOMETRY.sib_gap) < _EPS
@@ -43,16 +43,16 @@ def test_hinge_family_is_centred_and_compact() -> None:
 @pytest.mark.parametrize("name", test_render._NAMES)
 def test_z3_is_repeatable(name: str) -> None:
     p, defs = test_render._golden(name)
-    assert render.layout(p, conditions=defs) == render.layout(p, conditions=defs)
+    assert render.layout(p, key_entries=defs) == render.layout(p, key_entries=defs)
 
 
 @pytest.mark.parametrize("name", test_render._NAMES)
 def test_highs_agrees_with_z3(name: str) -> None:
     pytest.importorskip("highspy")
     p, defs = test_render._golden(name)
-    exact = render.layout(p, conditions=defs)
+    exact = render.layout(p, key_entries=defs)
     floating = render.layout(
-        p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS), conditions=defs
+        p, dataclasses.replace(render.DEFAULT_GEOMETRY, x_solver=render.XSolver.HIGHS), key_entries=defs
     )
     assert floating.nid == exact.nid
     for a, b in zip(exact.pos, floating.pos, strict=True):

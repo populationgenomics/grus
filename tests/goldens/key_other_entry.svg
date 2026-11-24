@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="390.956" viewBox="0 0 340 390.956" class="pedigree" data-title="A key entry that is not a phenotype" data-conditions="[&quot;hearing loss&quot;, &quot;examined&quot;]">
+<defs>
+<pattern id="fill-affected-0" class="fill-pattern" data-condition="0" data-status="affected" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#000000"/></pattern>
+<pattern id="fill-carrier-0" class="fill-pattern" data-condition="0" data-status="carrier" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#000000"/><path class="hatch" d="M0,4.5L4.5,0M0,13.5L13.5,0M0,22.5L22.5,0M0,31.5L31.5,0M0,40.5L40.5,0M0,49.5L49.5,0M0,58.5L58.5,0M0,67.5L67.5,0M0,76.5L76.5,0M0,85.5L85.5,0M0,94.5L94.5,0M0,103.5L103.5,0M0,112.5L112.5,0M0,121.5L121.5,0M0,130.5L130.5,0M0,139.5L139.5,0M0,148.5L148.5,0M0,157.5L157.5,0M0,166.5L166.5,0M0,175.5L175.5,0M0,184.5L184.5,0M0,193.5L193.5,0M0,202.5L202.5,0M0,211.5L211.5,0M0,220.5L220.5,0M0,229.5L229.5,0M0,238.5L238.5,0M0,247.5L247.5,0M0,256.5L256.5,0M0,265.5L265.5,0M0,274.5L274.5,0M0,283.5L283.5,0M0,292.5L292.5,0M0,301.5L301.5,0M0,310.5L310.5,0M0,319.5L319.5,0M0,328.5L328.5,0M0,337.5L337.5,0M0,346.5L346.5,0M0,355.5L355.5,0M4.5,360L360,4.5M13.5,360L360,13.5M22.5,360L360,22.5M31.5,360L360,31.5M40.5,360L360,40.5M49.5,360L360,49.5M58.5,360L360,58.5M67.5,360L360,67.5M76.5,360L360,76.5M85.5,360L360,85.5M94.5,360L360,94.5M103.5,360L360,103.5M112.5,360L360,112.5M121.5,360L360,121.5M130.5,360L360,130.5M139.5,360L360,139.5M148.5,360L360,148.5M157.5,360L360,157.5M166.5,360L360,166.5M175.5,360L360,175.5M184.5,360L360,184.5M193.5,360L360,193.5M202.5,360L360,202.5M211.5,360L360,211.5M220.5,360L360,220.5M229.5,360L360,229.5M238.5,360L360,238.5M247.5,360L360,247.5M256.5,360L360,256.5M265.5,360L360,265.5M274.5,360L360,274.5M283.5,360L360,283.5M292.5,360L360,292.5M301.5,360L360,301.5M310.5,360L360,310.5M319.5,360L360,319.5M328.5,360L360,328.5M337.5,360L360,337.5M346.5,360L360,346.5M355.5,360L360,355.5" fill="none" stroke="#ffffff" stroke-width="1.5"/></pattern>
+<pattern id="fill-shown-1" class="fill-pattern" data-condition="1" data-status="shown" x="-180" y="-180" width="360" height="360" patternUnits="userSpaceOnUse"><rect class="tone" width="360" height="360" fill="#484848"/></pattern>
+</defs>
+<g class="generation" data-generation="1">
+<text x="20" y="66" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">I</text>
+</g>
+<g class="generation" data-generation="2">
+<text x="20" y="156" font-family="sans-serif" font-size="16" fill="#000000" text-anchor="middle" dominant-baseline="central">II</text>
+</g>
+<g class="mating" data-partners="I-1 I-2">
+<line x1="180" y1="66" x2="200" y2="66" stroke="#000000" stroke-width="2"/>
+<line class="hit" x1="180" y1="66" x2="200" y2="66" stroke="none" stroke-width="12" pointer-events="stroke"/>
+</g>
+<g class="sibship" data-parents="I-1 I-2" data-children="II-1 II-2 II-3">
+<line x1="190" y1="66" x2="190" y2="116" stroke="#000000" stroke-width="2"/>
+<path d="M106,138L106,116L274,116L274,138M190,116L190,138" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
+</g>
+<g id="ind-I-1" class="individual carrier" data-position="I-1" data-generation="1" data-index="1" data-gender="man" data-condition-0="carrier" data-condition-1="shown">
+<rect class="backing" x="144" y="48" width="36" height="36" fill="#ffffff"/>
+<clipPath id="clip-I-1"><rect x="-18" y="-18" width="36" height="36" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="carrier" x="-18" y="-18" width="18" height="36" transform="translate(162 66)" fill="url(#fill-carrier-0)" clip-path="url(#clip-I-1)"/>
+<rect class="fill" data-condition="1" data-status="shown" x="0" y="-18" width="18" height="36" transform="translate(162 66)" fill="url(#fill-shown-1)" clip-path="url(#clip-I-1)"/>
+<path class="divider" d="M162,84L162,66L162,48L162,66" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="symbol" x="144" y="48" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="162" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-1</text>
+<rect class="hit" x="144" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-I-2" class="individual carrier" data-position="I-2" data-generation="1" data-index="2" data-gender="woman" data-condition-0="carrier">
+<circle class="backing" cx="218" cy="66" r="18" fill="#ffffff"/>
+<circle class="fill" data-condition="0" data-status="carrier" transform="translate(218 66)" cx="0" cy="0" r="18" fill="url(#fill-carrier-0)"/>
+<circle class="symbol" cx="218" cy="66" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="218" y="95.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">I-2</text>
+<rect class="hit" x="200" y="48" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-1" class="individual affected proband" data-position="II-1" data-generation="2" data-index="1" data-gender="woman" data-condition-0="affected" data-condition-1="shown">
+<circle class="backing" cx="106" cy="156" r="18" fill="#ffffff"/>
+<clipPath id="clip-II-1"><circle cx="0" cy="0" r="18" fill="none"/></clipPath>
+<rect class="fill" data-condition="0" data-status="affected" x="-18" y="-18" width="18" height="36" transform="translate(106 156)" fill="url(#fill-affected-0)" clip-path="url(#clip-II-1)"/>
+<rect class="fill" data-condition="1" data-status="shown" x="0" y="-18" width="18" height="36" transform="translate(106 156)" fill="url(#fill-shown-1)" clip-path="url(#clip-II-1)"/>
+<path class="divider" d="M106,174L106,156L106,138L106,156" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<circle class="symbol" cx="106" cy="156" r="18" fill="none" stroke="#000000" stroke-width="2"/>
+<g class="mark proband">
+<line x1="62.544" y1="199.456" x2="88" y2="174" stroke="#000000" stroke-width="2"/>
+<path class="head" d="M85.671,182.693L88,174L79.307,176.329" fill="none" stroke="#000000" stroke-width="2" stroke-linejoin="miter"/>
+<text x="54.544" y="203.456" font-family="sans-serif" font-size="15" fill="#000000" text-anchor="middle" dominant-baseline="central">P</text>
+</g>
+<text class="label" x="106" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-1</text>
+<rect class="hit" x="50.044" y="138" width="73.956" height="72.956" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-2" class="individual" data-position="II-2" data-generation="2" data-index="2" data-gender="man" data-condition-1="shown">
+<rect class="backing" x="172" y="138" width="36" height="36" fill="#ffffff"/>
+<rect class="fill" data-condition="1" data-status="shown" transform="translate(190 156)" x="-18" y="-18" width="36" height="36" fill="url(#fill-shown-1)"/>
+<rect class="symbol" x="172" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="190" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-2</text>
+<rect class="hit" x="172" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="ind-II-3" class="individual" data-position="II-3" data-generation="2" data-index="3" data-gender="man">
+<rect class="backing" x="256" y="138" width="36" height="36" fill="#ffffff"/>
+<rect class="symbol" x="256" y="138" width="36" height="36" fill="none" stroke="#000000" stroke-width="2"/>
+<text class="label" x="274" y="185.5" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="middle" dominant-baseline="central">II-3</text>
+<rect class="hit" x="256" y="138" width="36" height="53" fill="none" pointer-events="all"/>
+</g>
+<g id="key" class="key">
+<g id="key-affected-0" class="key-entry" data-condition="0" data-status="affected">
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 248.456)" fill="#ffffff"/>
+<clipPath id="key-clip-affected-0"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
+<rect class="swatch" data-condition="0" data-status="affected" x="-13.5" y="-13.5" width="13.5" height="27" transform="translate(101.5 248.456)" fill="url(#fill-affected-0)" clip-path="url(#key-clip-affected-0)"/>
+<path class="divider" d="M101.5,261.956L101.5,248.456L101.5,234.956L101.5,248.456" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 248.456)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="121" y="248.456" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">hearing loss</text>
+</g>
+<g id="key-carrier-0" class="key-entry" data-condition="0" data-status="carrier">
+<rect class="swatch" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 288.956)" fill="url(#fill-carrier-0)" stroke="#000000" stroke-width="1"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(132.5 288.956)" fill="#ffffff"/>
+<clipPath id="key-clip-carrier-0"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
+<rect class="swatch" data-condition="0" data-status="carrier" x="-13.5" y="-13.5" width="13.5" height="27" transform="translate(132.5 288.956)" fill="url(#fill-carrier-0)" clip-path="url(#key-clip-carrier-0)"/>
+<path class="divider" d="M132.5,302.456L132.5,288.956L132.5,275.456L132.5,288.956" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(132.5 288.956)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="152" y="288.956" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">Carrier: hearing loss</text>
+</g>
+<g id="key-shown-1" class="key-entry" data-condition="1" data-status="shown">
+<rect class="swatch" x="-13.5" y="-13.5" width="27" height="27" transform="translate(101.5 329.456)" fill="url(#fill-shown-1)" stroke="#000000" stroke-width="1"/>
+<rect class="swatch-backing" x="-13.5" y="-13.5" width="27" height="27" transform="translate(132.5 329.456)" fill="#ffffff"/>
+<clipPath id="key-clip-shown-1"><rect x="-13.5" y="-13.5" width="27" height="27"/></clipPath>
+<rect class="swatch" data-condition="1" data-status="shown" x="0" y="-13.5" width="13.5" height="27" transform="translate(132.5 329.456)" fill="url(#fill-shown-1)" clip-path="url(#key-clip-shown-1)"/>
+<path class="divider" d="M132.5,342.956L132.5,329.456L132.5,315.956L132.5,329.456" fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round"/>
+<rect class="swatch-outline" x="-13.5" y="-13.5" width="27" height="27" transform="translate(132.5 329.456)" fill="none" stroke="#000000" stroke-width="1"/>
+<text class="key-label" x="152" y="329.456" font-family="sans-serif" font-size="11" fill="#000000" text-anchor="start" dominant-baseline="central">examined</text>
+</g>
+</g>
+</svg>

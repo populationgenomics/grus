@@ -1,11 +1,11 @@
-conditions { id: "k1" }
+key_entries { id: "k1" phenotype {} }
 pedigrees {
   id: "twin_married"
   labels { text: "The older of MZ twins marries in: birth order holds, the spouse stands outside the sibship" kind: LABEL_KIND_OTHER }
   individuals { generation: 1 index: 1 gender: GENDER_MAN }
   individuals { generation: 1 index: 2 gender: GENDER_WOMAN }
-  individuals { generation: 2 index: 1 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } }
-  individuals { generation: 2 index: 2 gender: GENDER_MAN conditions { condition_id: "k1" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 2 index: 1 gender: GENDER_MAN marks { key_id: "k1" status: CONDITION_STATUS_AFFECTED } }
+  individuals { generation: 2 index: 2 gender: GENDER_MAN marks { key_id: "k1" status: CONDITION_STATUS_AFFECTED } }
   individuals { generation: 2 index: 3 gender: GENDER_WOMAN }
   individuals { generation: 2 index: 4 gender: GENDER_WOMAN }
   individuals { generation: 3 index: 1 gender: GENDER_WOMAN }

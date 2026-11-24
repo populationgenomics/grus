@@ -40,7 +40,7 @@ _set_of = test_render._set_of
 
 def _render(p: pb.Pedigree, geometry: render.Geometry | None = None, **kwargs: object) -> str:
     """``render_svg`` of a pedigree built with ``_entry``, declaring each condition it references."""
-    return render.render_svg(p, geometry, conditions=_declared(p), **kwargs)  # type: ignore[arg-type]
+    return render.render_svg(p, geometry, key_entries=_declared(p), **kwargs)  # type: ignore[arg-type]
 
 
 def _parse(svg: str) -> ET.Element:
@@ -120,23 +120,23 @@ def test_golden_hit_rect_covers_symbol_and_label_band(name: str) -> None:
 
 def test_pedigree_group_carries_title_and_condition_legend() -> None:
     p, defs = _golden("carrier_inheritance")
-    root = _parse(render.render_svg(p, conditions=defs))
+    root = _parse(render.render_svg(p, key_entries=defs))
     assert root.get("data-title") == _draw._display_title(p)
     legend = json.loads(root.get("data-conditions", "null"))
-    name = {d.id: d.name for d in defs}
-    names = {name[c.condition_id] for i in p.individuals for c in i.conditions}
+    name = {d.id: d.text for d in defs}
+    names = {name[c.key_id] for i in p.individuals for c in i.marks}
     assert set(legend) == names, "every condition an individual has appears in the legend, unnamed as an empty string"
     for g in _groups(root, "individual"):
         ind = next(i for i in p.individuals if _position(i) == g.get("data-position"))
-        for c in ind.conditions:
+        for c in ind.marks:
             status = pb.ConditionStatus.Name(c.status).removeprefix("CONDITION_STATUS_").lower()
-            assert g.get(f"data-condition-{legend.index(name[c.condition_id])}") == status
+            assert g.get(f"data-condition-{legend.index(name[c.key_id])}") == status
 
 
 def test_fill_part_names_the_condition_it_paints() -> None:
     def carrier(i: int, name: str) -> pb.Individual:
         ind = pb.Individual(generation=1, index=i, gender=pb.GENDER_MAN)
-        ind.conditions.append(_entry(pb.CONDITION_STATUS_CARRIER, name))
+        ind.marks.append(_entry(pb.CONDITION_STATUS_CARRIER, name))
         return ind
 
     root = _parse(_render(pb.Pedigree(individuals=[carrier(1, "varA"), carrier(2, "varB")])))
@@ -151,7 +151,7 @@ def test_fill_part_names_the_condition_it_paints() -> None:
 
 def test_state_classes_mirror_the_ir() -> None:
     ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_WOMAN, deceased=True, proband=True)
-    ind.conditions.append(_entry(pb.CONDITION_STATUS_CARRIER, "x"))
+    ind.marks.append(_entry(pb.CONDITION_STATUS_CARRIER, "x"))
     root = _parse(_render(pb.Pedigree(individuals=[ind])))
     (g,) = _groups(root, "individual")
     assert set(_classes(g)) == {"individual", "carrier", "deceased", "proband"}
@@ -257,11 +257,11 @@ def test_generation_markers_are_groups_naming_their_row() -> None:
 
 def test_id_prefix_namespaces_every_id_and_reference() -> None:
     p, defs = _golden("carrier_inheritance")  # has clip-path references
-    svg = render.render_svg(p, id_prefix="fig2-", conditions=defs)
+    svg = render.render_svg(p, id_prefix="fig2-", key_entries=defs)
     ids = re.findall(r'\bid="([^"]+)"', svg)
     assert ids and all(i.startswith("fig2-") for i in ids)
     assert all(ref in ids for ref in re.findall(r"url\(#([^)]+)\)", svg))
-    assert svg.replace("fig2-", "") == render.render_svg(p, conditions=defs), "the prefix is the only difference"
+    assert svg.replace("fig2-", "") == render.render_svg(p, key_entries=defs), "the prefix is the only difference"
 
 
 def test_set_render_composes_tile_prefix_under_the_caller_prefix() -> None:
@@ -308,23 +308,23 @@ def test_deferred_placeholder_is_a_pedigree_deferred_tile() -> None:
 def test_label_box_smaller_than_content_changes_nothing() -> None:
     p, defs = _golden("trio")
     geom = dataclasses.replace(render.DEFAULT_GEOMETRY, label_box_width=1.0, label_box_height=1.0)
-    assert render.render_svg(p, geom, conditions=defs) == render.render_svg(p, conditions=defs)
+    assert render.render_svg(p, geom, key_entries=defs) == render.render_svg(p, key_entries=defs)
 
 
 def test_label_box_widens_reserved_space() -> None:
     p, defs = _golden("trio")
     for ind in p.individuals:
-        del ind.conditions[:]  # no key: a wider canvas wraps the key's entries less, which can shorten it
+        del ind.marks[:]  # no key: a wider canvas wraps the key's entries less, which can shorten it
     geom = render.DEFAULT_GEOMETRY
     wide = dataclasses.replace(geom, label_box_width=20.0, label_box_height=3.0)
     # The box is a floor under each label's width, and label widths separate neighbours in the solve: every pair
     # on a row sits at least a box plus the label gap apart.
     floor = (20.0 * geom.label_size + geom.label_size) / geom.x_unit
-    for row in render.layout(p, wide, conditions=defs).pos:
+    for row in render.layout(p, wide, key_entries=defs).pos:
         assert all(b - a >= floor - 1e-6 for a, b in itertools.pairwise(row))
     base, boxed = (
-        _parse(render.render_svg(p, geom, conditions=defs)),
-        _parse(render.render_svg(p, wide, conditions=defs)),
+        _parse(render.render_svg(p, geom, key_entries=defs)),
+        _parse(render.render_svg(p, wide, key_entries=defs)),
     )
     assert float(boxed.get("width", "0")) > float(base.get("width", "0"))
     assert float(boxed.get("height", "0")) > float(base.get("height", "0"))
@@ -389,7 +389,7 @@ def test_two_ghosts_of_one_individual_get_distinct_ids() -> None:
 
 def test_text_and_attributes_are_escaped() -> None:
     ind = pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, external_id='ext "1" & <2>')
-    ind.conditions.append(_entry(pb.CONDITION_STATUS_AFFECTED, 'A & "B" <C>'))
+    ind.marks.append(_entry(pb.CONDITION_STATUS_AFFECTED, 'A & "B" <C>'))
     ind.annotations.add(text="c.1<2>&", type=pb.ANNOTATION_TYPE_VARIANT)
     p = pb.Pedigree(individuals=[ind], labels=[pb.Label(text='Fam "Q"\t<&>\nline 2', kind=pb.LABEL_KIND_FAMILY)])
     root = _parse(_render(p))  # well-formed, or this raises
@@ -406,8 +406,8 @@ def test_deferred_document_still_carries_the_legend() -> None:
         individuals=[_ind(1, 1), _ind(1, 2), _ind(1, 3), _ind(2, 1)],
         matings=[_mating((1, 1), (1, 2), (2, 1)), _mating((1, 2), (1, 3), (2, 1))],
     )
-    p.individuals[3].conditions.append(_entry(pb.CONDITION_STATUS_AFFECTED, "cond"))
-    ((_title, doc),) = render.render_svgs(pb.PedigreeSet(pedigrees=[p], conditions=_declared(p)))
+    p.individuals[3].marks.append(_entry(pb.CONDITION_STATUS_AFFECTED, "cond"))
+    ((_title, doc),) = render.render_svgs(pb.PedigreeSet(pedigrees=[p], key_entries=_declared(p)))
     root = _parse(doc)
     assert "deferred" in _classes(root) and json.loads(root.get("data-conditions", "null")) == ["cond"]
 
@@ -428,11 +428,11 @@ def test_hit_rect_covers_the_proband_arrow() -> None:
 def test_id_prefix_must_be_an_id_safe_token(bad: str) -> None:
     p, defs = _golden("trio")
     with pytest.raises(ValueError, match="id_prefix"):
-        render.render_svg(p, id_prefix=bad, conditions=defs)
+        render.render_svg(p, id_prefix=bad, key_entries=defs)
     with pytest.raises(ValueError, match="id_prefix"):
-        render.render_set_svg(pb.PedigreeSet(pedigrees=[p], conditions=defs), id_prefix=bad)
+        render.render_set_svg(pb.PedigreeSet(pedigrees=[p], key_entries=defs), id_prefix=bad)
     with pytest.raises(ValueError, match="id_prefix"):
-        render.render_svgs(pb.PedigreeSet(pedigrees=[p], conditions=defs), id_prefix=bad)
+        render.render_svgs(pb.PedigreeSet(pedigrees=[p], key_entries=defs), id_prefix=bad)
 
 
 def test_ghost_hit_rect_has_no_arrow_extension_and_links_follow_layout_order() -> None:
@@ -515,7 +515,7 @@ def test_every_sibship_is_one_connected_drawing(name: str) -> None:
 def _person(i: int, *conditions: tuple[str, int], gender: pb.Gender = pb.GENDER_MAN) -> pb.Individual:
     ind = pb.Individual(generation=1, index=i, gender=gender)
     for name, status in conditions:
-        ind.conditions.append(_entry(typing.cast(pb.ConditionStatus, status), name))
+        ind.marks.append(_entry(typing.cast(pb.ConditionStatus, status), name))
     return ind
 
 
@@ -532,7 +532,7 @@ def _patterns(root: ET.Element) -> dict[str, ET.Element]:
 
 def test_patterns_are_emitted_only_for_the_fills_drawn() -> None:
     p = pb.Pedigree(individuals=[_person(1, ("A", _AFF)), _person(2, ("B", _CAR)), _person(3, ("C", 0))])
-    p.individuals[2].conditions[0].status = pb.CONDITION_STATUS_PRESYMPTOMATIC  # C is in the legend, never filled
+    p.individuals[2].marks[0].status = pb.CONDITION_STATUS_PRESYMPTOMATIC  # C is in the legend, never filled
     root = _parse(_render(p, id_prefix="f-"))
     pats = _patterns(root)
     assert sorted(pats) == ["f-fill-affected-0", "f-fill-carrier-1"]
@@ -642,9 +642,9 @@ def test_three_or_four_conditions_divide_into_quadrants() -> None:
 
 def test_a_seventh_filled_condition_defers() -> None:
     p = pb.Pedigree(individuals=[_person(i + 1, (name, _AFF)) for i, name in enumerate("ABCDEFG")])
-    with pytest.raises(render.DeferredFeatureError, match="legend index 6; at most 6 conditions can be drawn"):
+    with pytest.raises(render.DeferredFeatureError, match="legend index 6; at most 6 entries can be drawn"):
         _render(p)
-    p.individuals[6].conditions[0].status = pb.CONDITION_STATUS_UNKNOWN  # in the legend, but drawn with no fill
+    p.individuals[6].marks[0].status = pb.CONDITION_STATUS_UNKNOWN  # in the legend, but drawn with no fill
     _render(p)
 
 
@@ -678,8 +678,8 @@ def test_key_has_one_entry_per_fill_drawn_with_its_label() -> None:
 def test_no_fill_draws_no_key_and_no_defs() -> None:
     p, defs = _golden("trio")
     for ind in p.individuals:
-        del ind.conditions[:]
-    svg = render.render_svg(p, conditions=defs)
+        del ind.marks[:]
+    svg = render.render_svg(p, key_entries=defs)
     assert 'class="key"' not in svg and "<defs>" not in svg and "<pattern" not in svg
 
 

@@ -19,8 +19,8 @@ def _by_ext(ped: pb.Pedigree) -> dict[str, pb.Individual]:
 
 def _named(ps: pb.PedigreeSet, ind: pb.Individual) -> list[tuple[str, int]]:
     """``ind``'s conditions as ``(declared name, status)``."""
-    name = {d.id: d.name for d in ps.conditions}
-    return [(name[c.condition_id], c.status) for c in ind.conditions]
+    name = {d.id: d.text for d in ps.key_entries}
+    return [(name[c.key_id], c.status) for c in ind.marks]
 
 
 def _mating_of(ped: pb.Pedigree, child_ext: str) -> pb.Mating:
@@ -58,7 +58,7 @@ def test_linkage_pre_makeped_five_columns() -> None:
     ext = _by_ext(ped)
     assert ped.id == "1" and len(ext) == 6
     assert ext["4"].generation == 2 and ext["5"].generation == 3 and ext["6"].generation == 3
-    assert not ext["4"].conditions  # no phenotype column
+    assert not ext["4"].marks  # no phenotype column
     assert ext["1"].gender == pb.GENDER_MAN and ext["2"].gender == pb.GENDER_WOMAN
 
 
@@ -67,9 +67,9 @@ def test_fam_families_phenotype_and_single_parent() -> None:
     assert [p.id for p in ps.pedigrees] == ["FAM1", "FAM2"]
     f1, f2 = ps.pedigrees
     ext = _by_ext(f1)
-    assert ext["kid1"].conditions[0].status == pb.CONDITION_STATUS_AFFECTED
-    assert ext["dad"].conditions[0].status == pb.CONDITION_STATUS_UNAFFECTED
-    assert not ext["kid2"].conditions  # -9 = missing -> not indicated
+    assert ext["kid1"].marks[0].status == pb.CONDITION_STATUS_AFFECTED
+    assert ext["dad"].marks[0].status == pb.CONDITION_STATUS_UNAFFECTED
+    assert not ext["kid2"].marks  # -9 = missing -> not indicated
     (m,) = f2.matings
     assert m.HasField("partner_a") and not m.HasField("partner_b")  # mother only, no phantom father
     assert ps.provenance.source_format == "ped"
@@ -79,14 +79,14 @@ def test_psam_header_columns() -> None:
     ps = convert.import_file(_FIX / "trio.psam")
     (ped,) = ps.pedigrees
     assert ped.id == "T"
-    assert _by_ext(ped)["kid"].conditions[0].status == pb.CONDITION_STATUS_AFFECTED
+    assert _by_ext(ped)["kid"].marks[0].status == pb.CONDITION_STATUS_AFFECTED
 
 
 def test_ped_pheno_01_flag_and_quantitative_trait() -> None:
     ps = convert._ped.import_ped("F a 0 0 1 1\nF b 0 0 2 0\nF c a b 1 3.5\n", pheno_01=True)
     ext = _by_ext(ps.pedigrees[0])
-    assert ext["a"].conditions[0].status == pb.CONDITION_STATUS_AFFECTED
-    assert ext["b"].conditions[0].status == pb.CONDITION_STATUS_UNAFFECTED
+    assert ext["a"].marks[0].status == pb.CONDITION_STATUS_AFFECTED
+    assert ext["b"].marks[0].status == pb.CONDITION_STATUS_UNAFFECTED
     assert ext["c"].annotations[0].type == pb.ANNOTATION_TYPE_MEASUREMENT and ext["c"].annotations[0].text == "3.5"
 
 
@@ -167,7 +167,7 @@ def test_kinship2_embedded_relation_twins_and_spouse() -> None:
     (ped,) = ps.pedigrees
     ext = _by_ext(ped)
     assert ext["1"].deceased and ext["3"].proband
-    assert ext["3"].conditions[0].status == pb.CONDITION_STATUS_AFFECTED
+    assert ext["3"].marks[0].status == pb.CONDITION_STATUS_AFFECTED
     m = _mating_of(ped, "3")
     twins = [o for o in m.offspring if o.HasField("twin_group")]
     assert len(twins) == 2 and {o.twin_type for o in twins} == {pb.ZYGOSITY_TYPE_MONOZYGOTIC}
@@ -198,7 +198,7 @@ def test_kinship2_multi_trait_affected_matrix() -> None:
     text = "id,dadid,momid,sex,affected.bc,affected.oc\n1,NA,NA,1,1,0\n2,NA,NA,2,NA,1\n"
     ps = convert.import_text(text, "kinship2")
     ext = _by_ext(ps.pedigrees[0])
-    assert [(d.id, d.name) for d in ps.conditions] == [("k1", "bc"), ("k2", "oc")], "declared once, by first use"
+    assert [(d.id, d.text) for d in ps.key_entries] == [("k1", "bc"), ("k2", "oc")], "declared once, by first use"
     assert _named(ps, ext["1"]) == [("bc", pb.CONDITION_STATUS_AFFECTED), ("oc", pb.CONDITION_STATUS_UNAFFECTED)]
     assert _named(ps, ext["2"]) == [("oc", pb.CONDITION_STATUS_AFFECTED)]
 
@@ -218,7 +218,7 @@ def test_kinship2_reads_r_write_table_output() -> None:
     (ped,) = convert.import_text(text, "kinship2").pedigrees
     ext = _by_ext(ped)
     assert ped.id == "1" and set(ext) == {"101", "102", "103"}
-    assert ext["103"].conditions[0].status == pb.CONDITION_STATUS_AFFECTED and ext["101"].gender == pb.GENDER_MAN
+    assert ext["103"].marks[0].status == pb.CONDITION_STATUS_AFFECTED and ext["101"].gender == pb.GENDER_MAN
 
 
 # --- Phenopackets ---------------------------------------------------------------------------------------------------
@@ -230,12 +230,12 @@ def test_phenopackets_family_mapping() -> None:
     assert ped.id == "FAM1" and ps.provenance.source_format == "phenopackets"
     ext = _by_ext(ped)
     assert ext["ch1"].proband
-    (cf,) = ext["ch1"].conditions  # diseases win over the bare affectedStatus
+    (cf,) = ext["ch1"].marks  # diseases win over the bare affectedStatus
     assert _named(ps, ext["ch1"]) == [("cystic fibrosis", pb.CONDITION_STATUS_AFFECTED)] and cf.onset_age == "P2Y"
     assert ext["m11"].deceased
     assert [(a.type, a.text) for a in ext["m11"].annotations] == [(pb.ANNOTATION_TYPE_AGE_AT_DEATH, "P72Y")]
-    assert ext["f11"].conditions[0].status == pb.CONDITION_STATUS_UNAFFECTED
-    assert ext["ch2"].gender == pb.GENDER_UNKNOWN and not ext["ch2"].conditions  # OTHER_SEX, MISSING status
+    assert ext["f11"].marks[0].status == pb.CONDITION_STATUS_UNAFFECTED
+    assert ext["ch2"].gender == pb.GENDER_UNKNOWN and not ext["ch2"].marks  # OTHER_SEX, MISSING status
     assert _mating_of(ped, "ch1").consanguineous is True
 
 
@@ -333,9 +333,35 @@ def test_phenopackets_allelic_states(state: str, alleles: list[str]) -> None:
     assert _genotypes(ps, _by_ext(ps.pedigrees[0])["c"]) == {"c.1521_1523del": alleles}
 
 
-def test_phenopackets_unstated_zygosity_states_no_genotype() -> None:
-    for vd in (_variant("GENO:0000137"), _variant(allelicState=None)):
-        assert not _import(("c", vd)).loci
+@pytest.mark.parametrize("vd", [_variant("GENO:0000137"), _variant(allelicState=None)], ids=["unspecified", "absent"])
+def test_phenopackets_unstated_zygosity_carries_alt(vd: dict[str, object]) -> None:
+    ps = _import(("c", vd))
+    (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+    assert list(g.alleles) == ["alt"]
+    assert g.copies_unstated
+
+
+def test_phenopackets_a_stated_zygosity_wins_over_an_unstated_one() -> None:
+    # One interpretation says homozygous, another only that the variant is there: they agree, and the first says more.
+    for order in (
+        (_variant("GENO:0000136"), _variant("GENO:0000137")),
+        (_variant(allelicState=None), _variant("GENO:0000136")),
+    ):
+        ps = _import(*(("c", vd) for vd in order))
+        (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+        assert list(g.alleles) == ["alt", "alt"] and not g.copies_unstated
+
+
+def test_phenopackets_unspecified_zygosity_by_label() -> None:
+    ps = _import(("c", _variant(allelicState={"id": "CUSTOM:1", "label": "Unspecified zygosity"})))
+    (g,) = _by_ext(ps.pedigrees[0])["c"].genotypes
+    assert g.copies_unstated
+
+
+def test_phenopackets_an_unknown_label_alone_fails_loud() -> None:
+    # A label with no id is a stated allelic state, not an absent one: unknown, it fails rather than reads as unstated.
+    with pytest.raises(convert.PedigreeImportError, match="unrecognised allelicState"):
+        _import(("c", _variant(allelicState={"label": "somatic mosaicism"})))
 
 
 def test_phenopackets_allelic_state_by_label() -> None:
@@ -411,7 +437,7 @@ def test_openpedigree_simple_json_mapping() -> None:
     assert ps.provenance.source_format == "openpedigree"
     assert ext["f11"].deceased and ext["ch1"].proband and ext["ch1"].documented_evaluation
     assert [n for n, _ in _named(ps, ext["f12"])] == ["603235", "142763", "custom disorder"]
-    assert ext["ch5"].conditions[0].status == pb.CONDITION_STATUS_CARRIER
+    assert ext["ch5"].marks[0].status == pb.CONDITION_STATUS_CARRIER
     assert ext["ch4"].reproductive_outcome == pb.REPRODUCTIVE_OUTCOME_MISCARRIAGE
     assert ext["ch4"].annotations[0].type == pb.ANNOTATION_TYPE_GESTATIONAL_AGE
     m = _mating_of(ped, "ch1")
@@ -468,8 +494,8 @@ def test_families_of_one_file_share_the_declarations() -> None:
     packet = '{{"subject": {{"id": "x"}}, "diseases": [{{"term": {{"id": "OMIM:219700", "label": "CF"}}}}]}}'
     fam = '{{"id": "{f}", "proband": ' + packet + ', "pedigree": {{"persons": [' + person + "]}}}}"
     ps = convert.import_text("[" + fam.format(f="A") + ", " + fam.format(f="B") + "]", "phenopackets")
-    assert [(d.id, d.name) for d in ps.conditions] == [("k1", "CF")]
-    assert [c.condition_id for p in ps.pedigrees for c in p.individuals[0].conditions] == ["k1", "k1"]
+    assert [(d.id, d.text) for d in ps.key_entries] == [("k1", "CF")]
+    assert [c.key_id for p in ps.pedigrees for c in p.individuals[0].marks] == ["k1", "k1"]
 
 
 def test_a_person_stating_one_condition_twice_fails_loud() -> None:

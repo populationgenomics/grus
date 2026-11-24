@@ -18,7 +18,7 @@ def _trio() -> pb.Pedigree:
     """The trio golden without its condition entries: a bare ``Pedigree`` has no declarations to reference."""
     p = test_render._load("trio")
     for ind in p.individuals:
-        del ind.conditions[:]
+        del ind.marks[:]
     return p
 
 
@@ -280,28 +280,31 @@ def test_an_unusable_input_is_reported_in_one_line(
     assert "cannot read it" in capsys.readouterr().err
 
 
-def test_a_bare_pedigree_with_conditions_is_invalid(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
-    # Conditions are declared at set level; a bare pedigree has nowhere to declare them.
+def test_a_bare_pedigree_with_marks_is_invalid(tmp_path: pathlib.Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # The key is declared at set level; a bare pedigree has nowhere to declare it.
     src = tmp_path / "p.pbtxt"
     src.write_text(ir.dump_pbtxt(test_render._load("trio")))
     assert cli.main(["validate", str(src)]) == 1
-    assert "condition_id 'k1' is not declared" in capsys.readouterr().err
+    assert "key_id 'k1' is not declared" in capsys.readouterr().err
 
 
-_PRE_1_0 = """
+# Before conditions were declared: each entry names its condition.
+_PRE_0_4 = """
 individuals { generation: 1 index: 1 gender: GENDER_WOMAN
               conditions { name: "DMD" status: CONDITION_STATUS_CARRIER inheritance: INHERITANCE_X_LINKED_RECESSIVE } }
 individuals { generation: 1 index: 2 gender: GENDER_MAN conditions { name: "DMD" status: CONDITION_STATUS_AFFECTED } }
 """
 
 
-def test_migrate_rewrites_a_pre_1_0_record(tmp_path: pathlib.Path) -> None:
+def test_migrate_rewrites_a_pre_0_4_record(tmp_path: pathlib.Path) -> None:
     src, out = tmp_path / "old.pbtxt", tmp_path / "new.json"
-    src.write_text(_PRE_1_0)
+    src.write_text(_PRE_0_4)
     assert cli.main(["migrate", str(src), "-o", str(out), "--to", "json"]) == 0
     ps = ir.load_set_json(out.read_text())
-    assert [(d.id, d.name, d.inheritance) for d in ps.conditions] == [("k1", "DMD", pb.INHERITANCE_X_LINKED_RECESSIVE)]
-    assert [c.condition_id for ind in ps.pedigrees[0].individuals for c in ind.conditions] == ["k1", "k1"]
+    assert [(d.id, d.text, d.phenotype.inheritance) for d in ps.key_entries] == [
+        ("k1", "DMD", pb.INHERITANCE_X_LINKED_RECESSIVE)
+    ]
+    assert [c.key_id for ind in ps.pedigrees[0].individuals for c in ind.marks] == ["k1", "k1"]
 
 
 def test_migrate_fails_loud_on_disagreeing_inheritance(
@@ -309,7 +312,7 @@ def test_migrate_fails_loud_on_disagreeing_inheritance(
 ) -> None:
     src = tmp_path / "old.pbtxt"
     src.write_text(
-        _PRE_1_0.replace(
+        _PRE_0_4.replace(
             "CONDITION_STATUS_AFFECTED }", "CONDITION_STATUS_AFFECTED inheritance: INHERITANCE_AUTOSOMAL_DOMINANT }"
         )
     )

@@ -67,12 +67,13 @@ suffix (`.ped .fam .psam .pre` → ped), by sniffing (`.json` → a `Family` obj
 - **Sex codes → `Gender`** by the assume-aligned rule (male → MAN, female → WOMAN, unknown/other → UNKNOWN);
   `sex_assigned_at_birth` is never set (no source states it). Phenopackets `OTHER_SEX` and Open Pedigree `other` are
   *sex*, not gender: UNKNOWN + an OTHER annotation carrying the source word.
-- **Conditions are stated by name and declared once.** A format module states each person's conditions by name
-  (`convert.Condition`); `build_set` declares one `ConditionDef` per distinct name across the set, ids `k1`, `k2`, … by
-  first appearance, and points each entry at it (`ir.md`, "Conditions are declared once, by id"). No format states a
-  mode of inheritance, so no declaration has one. A person stating one condition twice (a kinship2 row with both
-  `carrier` and `asymptomatic` set, both the sole unnamed condition) fails loud: an entry holds one status.
-- **A single affected column → one unnamed condition** (`name: ""`); a missing value omits the entry (status not
+- **Conditions are phenotypes, stated by name and declared once.** No format grus imports has a figure key, so every
+  condition a format states is a phenotype. A format module states each person's conditions by name
+  (`convert.Condition`); `build_set` declares one phenotype `KeyEntry` per distinct name across the set, ids `k1`, `k2`,
+  … by first appearance, and marks each person with it (`ir.md`, "The key"). No format states a mode of inheritance, so
+  no entry has one. A person stating one condition twice (a kinship2 row with both `carrier` and `asymptomatic` set,
+  both the sole unnamed condition) fails loud: a mark holds one status.
+- **A single affected column → the implied key's phenotype** (empty text); a missing value omits the mark (status not
   indicated). `CONDITION_STATUS_UNKNOWN` is reserved for a drawn "?", which no data format states.
 - **Missing parent codes** (`0`, `NA`, `.`, `""`) are missing; the other parent is kept as a single parent.
 - **Dates and ages** are verbatim `Annotation`s (`b. …` AGE, `d. …` AGE_AT_DEATH); nothing is normalised.
@@ -157,10 +158,12 @@ heterozygous `[ref, alt]`, homozygous `[alt, alt]`, hemizygous `[alt]` (the X- a
 says one copy is the variant; the importer records the other as the reference, the reading the GA4GH examples use, which
 is wrong only at a multiallelic site where the other copy is a second variant, and one descriptor cannot state that.
 Compound heterozygous maps to heterozygous at each variant: the two descriptors are not linked, so their phase is not
-recorded. An absent or unspecified allelic state states no genotype and the variant is dropped; an unknown term fails
-loud. An interpretation naming a biosample is that biosample's individual's (the subject's when it names none), and one
-naming neither a person nor a biosample fails loud. A packet whose subject is not in `persons` fails loud. Not
-expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity on any other couple.
+recorded. An absent or unspecified allelic state says the person carries the variant but not how many copies, so the
+genotype carries `alt` with its copies not stated; another interpretation of the same variant that states a zygosity
+says more and wins. An unknown term fails loud. An interpretation naming a biosample is that biosample's individual's
+(the subject's when it names none), and one naming neither a person nor a biosample fails loud. A packet whose subject
+is not in `persons` fails loud. Not expressible: twins, adoption, outcomes, counts, consultand, carrier, consanguinity
+on any other couple.
 
 **Open Pedigree / PhenoTips simple JSON** (`_openpedigree.py`; a JSON array of person and relationship objects, keys
 case-insensitive; fixture `simple.openpedigree.json`)

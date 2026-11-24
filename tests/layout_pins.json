@@ -1231,6 +1231,10 @@
         "pedigree": "6a5e7c6da669fedfb94243f2dade8b8fa7787b90da765453245e739bea89cef3",
         "placement": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481"
       },
+      "key_other_entry": {
+        "pedigree": "013b3a50630aec79cccb14d5d5ee139ebb1d112b162612e08087fea29c3d7d5b",
+        "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
+      },
       "lone_parent_sibships": {
         "pedigree": "47ca29d6ba222def010dfd49d733de8d5aae46be9a128af237aaf0bf27a16283",
         "placement": "9bd104943bcb9fec152d8e1ce15da8a0c83758e18f88d7a5f4aa61e32f340352"
@@ -1352,6 +1356,10 @@
       "hinge_offcentre": {
         "pedigree": "6a5e7c6da669fedfb94243f2dade8b8fa7787b90da765453245e739bea89cef3",
         "placement": "1087c27de3f6f0c57e6a7609012949ef9556450eeba8349164ae07993caa5481"
+      },
+      "key_other_entry": {
+        "pedigree": "013b3a50630aec79cccb14d5d5ee139ebb1d112b162612e08087fea29c3d7d5b",
+        "placement": "15f42e8adaafdb938a7b489cef53cea2bb05090f2ef0987ddf86368b16d2a42f"
       },
       "lone_parent_sibships": {
         "pedigree": "47ca29d6ba222def010dfd49d733de8d5aae46be9a128af237aaf0bf27a16283",

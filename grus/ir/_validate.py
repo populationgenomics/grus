@@ -3,7 +3,7 @@
 Two layers, split by what protobuf can express (docs/design/ir.md, "Validation"):
 
 * field-local / single-message rules are protovalidate CEL options on the `.proto` (``Position``
-  components >= 1, ``gender`` and ``Condition.status`` are real values not the zero sentinel,
+  components >= 1, ``gender`` and ``Mark.status`` are real values not the zero sentinel,
   ``twin_type`` set iff ``twin_group``); and
 * cross-message graph invariants — referential integrity, ``Position`` uniqueness, and generation order
   (each child below its parents, siblings on one row) — cannot be expressed field-locally and live here.
@@ -18,6 +18,7 @@ from collections.abc import Sequence
 
 import protovalidate
 
+from grus.ir import _key_entries
 from grus.models import pedigree_pb2 as pb
 
 # The hashable form of a Position — the identity + reference key within one pedigree.
@@ -54,31 +55,38 @@ def _partners(m: pb.Mating) -> list[pb.Position]:
     return partners
 
 
-def validate(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = (), *, loci: Sequence[pb.Locus] = ()) -> None:
+def validate(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), *, loci: Sequence[pb.Locus] = ()) -> None:
     """Fail loud unless ``p`` is a well-formed pedigree IR.
 
     Runs protovalidate (which recurses into every nested message) for the field-local rules, then the
     graph invariants below. Order matters: uniqueness is checked before references so the position set is
     known, and references before generation order so every edge endpoint is a real node.
 
-    ``conditions`` and ``loci`` are the declarations of ``p``'s set, which its condition entries and genotypes
-    reference; a pedigree with none of either needs none.
+    ``key_entries`` and ``loci`` are the declarations of ``p``'s set, which its marks and genotypes reference; a
+    pedigree with none of either needs none. Both are checked as ``validate_set`` checks them, short of each being
+    shown or genotyped by someone in ``p`` (another pedigree of the set may be).
 
     Raises:
         protovalidate.ValidationError: a field-local / single-message rule failed.
         IntegrityError: a cross-message graph invariant failed.
     """
+    _check_loci(loci, {e.id for e in key_entries})
+    _check_key_entries(key_entries, set(), {locus.id: locus for locus in loci})
+    _check_pedigree(p, key_entries, loci)
+
+
+def _check_pedigree(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry], loci: Sequence[pb.Locus]) -> None:
+    """``validate`` short of checking the declarations themselves, which ``validate_set`` checks once per set."""
     protovalidate.validate(p)
     _check_mating_shape(p)
     positions = _check_unique_positions(p)
     _check_references(p, positions)
     _check_reproductive_outcome_terminal(p)
     _check_generation_order(p)
-    declared = {d.id for d in conditions}
-    _check_entries(p, declared)
     by_locus = {locus.id: locus for locus in loci}
+    _check_marks(p, {e.id: e for e in key_entries})
     _check_genotypes(p, by_locus)
-    _check_supports(p, positions, declared, set(by_locus))
+    _check_supports(p, positions, _key_entries.Key(key_entries), set(by_locus))
 
 
 def validate_set(ps: pb.PedigreeSet) -> None:
@@ -90,22 +98,22 @@ def validate_set(ps: pb.PedigreeSet) -> None:
     (its index and labels), chaining the original error.
 
     Citations are set-level: their ids are unique across the set, and every evidence or support id — the set's
-    and each pedigree's — resolves to one (docs/design/ir.md, "Citations"). Condition and locus declarations are
-    set-level too: each is well-formed, its id unique among citation, condition and locus ids, and each is
-    referenced by some entry or genotype.
+    and each pedigree's — resolves to one (docs/design/ir.md, "Citations"). Key entries and loci are set-level
+    too: each is well-formed, its id unique among citation, key entry and locus ids, and each is shown or genotyped
+    by someone.
 
     Raises:
         IntegrityError: some ``Pedigree`` in the set failed field-local or graph validation, or a citation is
             malformed, duplicated or dangling, or a declaration is malformed, duplicated or unreferenced.
     """
     ids = _check_citations(ps)
-    _check_declarations(ps, ids)
-    _check_loci(ps, ids | {d.id for d in ps.conditions})
+    _check_loci(ps.loci, ids | {e.id for e in ps.key_entries})
+    _check_key_entries(ps.key_entries, ids, {locus.id: locus for locus in ps.loci})
     for i, p in enumerate(ps.pedigrees):
         labels = [label.text for label in p.labels]
         tag = f"pedigrees[{i}]" + (f" (labels={labels})" if labels else "")
         try:
-            validate(p, ps.conditions, loci=ps.loci)
+            _check_pedigree(p, ps.key_entries, ps.loci)
         except (protovalidate.ValidationError, IntegrityError) as e:
             raise IntegrityError(f"{tag} is not a valid pedigree: {e}") from e
         for ref in p.evidence:
@@ -115,12 +123,13 @@ def validate_set(ps: pb.PedigreeSet) -> None:
             for ref in support.citations:
                 if ref not in ids:
                     raise IntegrityError(f"{tag}: supports[{j}] ({support.field}) cites unknown citation {ref!r}")
-    referenced = {c.condition_id for p in ps.pedigrees for ind in p.individuals for c in ind.conditions}
-    for k, d in enumerate(ps.conditions):
-        if d.id not in referenced:
+    key = _key_entries.Key(ps.key_entries)
+    shown = {s.key_id for p in ps.pedigrees for ind in p.individuals for s in key.shown(ind)}
+    for k, e in enumerate(ps.key_entries):
+        if e.id not in shown:
             raise IntegrityError(
-                f"conditions[{k}] ({d.id!r}, {d.name!r}) is declared but no entry references it; "
-                "a declaration claims a condition the figure draws"
+                f"key_entries[{k}] ({e.id!r}, {e.text!r}) is declared but no one shows it; "
+                "an entry claims a mark the figure draws"
             )
     genotyped = {g.locus_id for p in ps.pedigrees for ind in p.individuals for g in ind.genotypes}
     for k, locus in enumerate(ps.loci):
@@ -232,7 +241,7 @@ def _check_generation_order(p: pb.Pedigree) -> None:
 
 
 # The closed list of paths a ``Support.field`` may name (docs/design/ir.md, "Citations"), by what it scopes:
-# an individual's fields and a condition's (``condition.*``, naming the condition) scope people; a mating's fields
+# an individual's fields and a mark's (``mark.*``, naming the key entry) scope people; a mating's fields
 # scope couples; an offspring edge's fields scope the child; ``labels`` is the whole pedigree's. The one place the
 # list lives; a test checks each path against the schema.
 _INDIVIDUAL_FIELDS = (
@@ -249,11 +258,12 @@ _INDIVIDUAL_FIELDS = (
     "external_id",
     "annotations",
 )
-SUPPORT_CONDITION_PREFIX = "condition."  # a path with it names a condition and needs Support.condition_id
-# A person's entry (people in scope, or none for everyone who has it) and the declaration (the whole pedigree only:
-# a name or a mode of inheritance belongs to the condition, not to any one person).
-_CONDITION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("status", "onset_age"))
-_DECLARATION_FIELDS = tuple(SUPPORT_CONDITION_PREFIX + name for name in ("name", "inheritance"))
+SUPPORT_MARK_PREFIX = "mark."  # a person's mark: needs Support.key_id
+SUPPORT_KEY_PREFIX = "key."  # a key entry (the whole pedigree only: a text or a mode belongs to the entry): key_id
+# key_id: that the person shows the entry at all, the one fact an other mark states
+_MARK_FIELDS = tuple(SUPPORT_MARK_PREFIX + name for name in ("key_id", "status", "grade", "onset_age"))
+_KEY_FIELDS = tuple(SUPPORT_KEY_PREFIX + name for name in ("text", "inheritance", "grades"))
+_PHENOTYPE_KEY_FIELDS = frozenset(SUPPORT_KEY_PREFIX + name for name in ("inheritance", "grades"))
 SUPPORT_GENOTYPE_PREFIX = "genotype."  # a person's genotypes at some loci: needs Support.loci
 SUPPORT_LOCUS_PREFIX = "locus."  # locus declarations (the whole pedigree only): needs Support.loci
 _GENOTYPE_FIELDS = tuple(SUPPORT_GENOTYPE_PREFIX + name for name in ("alleles", "phase_set"))
@@ -265,8 +275,8 @@ _OFFSPRING_FIELDS = ("twin_group", "twin_type", "parentage", "adoption")
 SUPPORT_FIELDS: dict[str, frozenset[str]] = {}
 for _kind, _paths in (
     ("individual", _INDIVIDUAL_FIELDS),
-    ("condition", _CONDITION_FIELDS),
-    ("declaration", _DECLARATION_FIELDS),
+    ("mark", _MARK_FIELDS),
+    ("key", _KEY_FIELDS),
     ("genotype", _GENOTYPE_FIELDS),
     ("locus", _LOCUS_FIELDS),
     ("mating", _MATING_FIELDS),
@@ -275,6 +285,19 @@ for _kind, _paths in (
 ):
     for _path in _paths:
         SUPPORT_FIELDS[_path] = SUPPORT_FIELDS.get(_path, frozenset()) | {_kind}
+
+
+def _mark_holds(m: pb.Mark, fact: str, phenotype: bool) -> bool:
+    """Whether mark ``m`` can hold ``fact``, a ``mark.*`` support's field.
+
+    Every mark shows its entry (``key_id``); a status or a grade is cited for a mark that has one; an onset age for any
+    phenotype mark, since a source may state an onset the figure does not print.
+    """
+    if fact == "key_id":
+        return True
+    if fact == "onset_age":
+        return phenotype
+    return m.WhichOneof("state") == fact
 
 
 def _check_citations(ps: pb.PedigreeSet) -> set[str]:
@@ -299,37 +322,78 @@ def _mating_ref_key(m: pb.Mating | pb.MatingRef) -> frozenset[Key]:
     return frozenset(_key(getattr(m, role)) for role in ("partner_a", "partner_b") if m.HasField(role))
 
 
-def _check_declarations(ps: pb.PedigreeSet, citation_ids: set[str]) -> None:
-    """Each declaration is well-formed, its id unique and no citation's, and its name declared once."""
+def _check_key_entries(entries: Sequence[pb.KeyEntry], citation_ids: set[str], loci: dict[str, pb.Locus]) -> None:
+    """Each key entry is well-formed, its id unique and no citation's, its text and pattern declared once.
+
+    Only a phenotype may have empty text (the implied key's); a phenotype's grades are unique; a genotype pattern names
+    a declared locus and its symbols.
+    """
     ids: set[str] = set()
-    names: dict[str, str] = {}
-    for k, d in enumerate(ps.conditions):
-        where = f"conditions[{k}] ({d.id!r})"
+    texts: dict[str, str] = {}
+    patterns: dict[tuple[str, tuple[str, ...], bool], str] = {}
+    for k, e in enumerate(entries):
+        where = f"key_entries[{k}] ({e.id!r})"
         try:
-            protovalidate.validate(d)
-        except protovalidate.ValidationError as e:
-            raise IntegrityError(f"{where} is malformed: {e}") from e
-        if d.id in ids:
-            raise IntegrityError(f"{where}: condition id {d.id!r} is declared twice; ids are unique in the set")
-        if d.id in citation_ids:
-            raise IntegrityError(f"{where}: condition id {d.id!r} is also a citation id; ids are unique in the set")
-        if d.name in names:
+            protovalidate.validate(e)
+        except protovalidate.ValidationError as err:
+            raise IntegrityError(f"{where} is malformed: {err}") from err
+        if e.id in ids:
+            raise IntegrityError(f"{where}: key entry id {e.id!r} is declared twice; ids are unique in the set")
+        if e.id in citation_ids:
+            raise IntegrityError(f"{where}: key entry id {e.id!r} is also a citation id; ids are unique in the set")
+        if e.text in texts:
             raise IntegrityError(
-                f"{where}: condition {d.name!r} is already declared as {names[d.name]!r}; one declaration per condition"
+                f"{where}: key entry {e.text!r} is already declared as {texts[e.text]!r}; one declaration per entry"
             )
-        ids.add(d.id)
-        names[d.name] = d.id
+        if not e.text and not e.HasField("phenotype"):
+            raise IntegrityError(f"{where}: only a phenotype may have empty text (the implied key's)")
+        if len(set(e.phenotype.grades)) != len(e.phenotype.grades):
+            raise IntegrityError(f"{where}: a grade is declared twice")
+        if e.HasField("genotype"):
+            _check_pattern(where, e.genotype, loci, patterns, e.id)
+        ids.add(e.id)
+        texts[e.text] = e.id
 
 
-def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
-    """Each locus is well-formed, its id unique and no citation's or condition's, and told apart by what it states.
+def _check_alleles(where: str, locus_id: str, alleles: Sequence[str], loci: dict[str, pb.Locus]) -> None:
+    """``locus_id`` is declared and each of ``alleles`` is one of its symbols."""
+    locus = loci.get(locus_id)
+    if locus is None:
+        raise IntegrityError(
+            f"{where}: locus_id {locus_id!r} is not declared; loci are declared once in PedigreeSet.loci"
+        )
+    symbols = {a.symbol for a in locus.alleles}
+    for allele in alleles:
+        if allele not in symbols:
+            raise IntegrityError(
+                f"{where}: allele {allele!r} at locus {locus_id!r} is not one of its symbols {sorted(symbols)}"
+            )
+
+
+def _check_pattern(
+    where: str,
+    pattern: pb.GenotypePattern,
+    loci: dict[str, pb.Locus],
+    patterns: dict[tuple[str, tuple[str, ...], bool], str],
+    entry_id: str,
+) -> None:
+    """A genotype pattern names a declared locus and its symbols, and no other entry states it."""
+    _check_alleles(where, pattern.locus_id, pattern.alleles, loci)
+    stated = (pattern.locus_id, tuple(sorted(pattern.alleles)), pattern.copies_unstated)
+    if stated in patterns:
+        raise IntegrityError(f"{where}: the same genotype is already keyed as {patterns[stated]!r}")
+    patterns[stated] = entry_id
+
+
+def _check_loci(loci: Sequence[pb.Locus], other_ids: set[str]) -> None:
+    """Each locus is well-formed, its id unique and no citation's or key entry's, and told apart by what it states.
 
     A named locus's (gene, name) is unique; unnamed loci (only their alleles named) may share a gene but not all of
     their alleles (``locus_identity``). Within a locus, allele symbols are unique and at most one is the reference.
     """
     ids: set[str] = set()
     names: dict[LocusIdentity, str] = {}
-    for k, locus in enumerate(ps.loci):
+    for k, locus in enumerate(loci):
         where = f"loci[{k}] ({locus.id!r})"
         try:
             protovalidate.validate(locus)
@@ -339,7 +403,7 @@ def _check_loci(ps: pb.PedigreeSet, other_ids: set[str]) -> None:
             raise IntegrityError(f"{where}: locus id {locus.id!r} is declared twice; ids are unique in the set")
         if locus.id in other_ids:
             raise IntegrityError(
-                f"{where}: locus id {locus.id!r} is also a citation or condition id; ids are unique in the set"
+                f"{where}: locus id {locus.id!r} is also a citation or key entry id; ids are unique in the set"
             )
         name = locus_identity(locus)
         if name in names:
@@ -402,20 +466,10 @@ def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
         seen: set[str] = set()
         ploidy: dict[str, int] = {}
         for g in ind.genotypes:
-            locus = loci.get(g.locus_id)
-            if locus is None:
-                raise IntegrityError(
-                    f"{who}: locus_id {g.locus_id!r} is not declared; loci are declared once in PedigreeSet.loci"
-                )
+            _check_alleles(who, g.locus_id, g.alleles, loci)
             if g.locus_id in seen:
                 raise IntegrityError(f"{who} has two genotypes at locus {g.locus_id!r}")
             seen.add(g.locus_id)
-            symbols = {a.symbol for a in locus.alleles}
-            for allele in g.alleles:
-                if allele not in symbols:
-                    raise IntegrityError(
-                        f"{who}: allele {allele!r} at locus {g.locus_id!r} is not one of its symbols {sorted(symbols)}"
-                    )
             if g.HasField("phase_set"):
                 n = ploidy.setdefault(g.phase_set, len(g.alleles))
                 if n != len(g.alleles):
@@ -444,71 +498,123 @@ def _check_genotypes(p: pb.Pedigree, loci: dict[str, pb.Locus]) -> None:
                 raise IntegrityError(f"matings[{i}]: annotation {a.text!r} names loci; a couple has no genotype")
 
 
-def _check_entries(p: pb.Pedigree, declared: set[str]) -> None:
-    """Every entry's condition is declared, and no person has two entries for one condition."""
+def _check_marks(p: pb.Pedigree, key: dict[str, pb.KeyEntry]) -> None:
+    """Every mark names a declared phenotype or other entry, once per person, in the form its kind takes.
+
+    A phenotype mark has a status or one of its entry's grades; an other mark has neither, nor an onset age. A genotype
+    entry is never marked: a person shows it through their genotype.
+    """
     for ind in p.individuals:
+        who = f"individual {(ind.generation, ind.index)}"
         seen: set[str] = set()
-        for c in ind.conditions:
-            if c.condition_id not in declared:
+        for m in ind.marks:
+            e = key.get(m.key_id)
+            if e is None:
                 raise IntegrityError(
-                    f"individual {(ind.generation, ind.index)}: condition_id {c.condition_id!r} is not declared; "
-                    "conditions are declared once in PedigreeSet.conditions"
+                    f"{who}: key_id {m.key_id!r} is not declared; key entries are declared in PedigreeSet.key_entries"
                 )
-            if c.condition_id in seen:
+            if m.key_id in seen:
+                raise IntegrityError(f"{who} marks key entry {m.key_id!r} twice")
+            seen.add(m.key_id)
+            state = m.WhichOneof("state")
+            if e.HasField("genotype"):
                 raise IntegrityError(
-                    f"individual {(ind.generation, ind.index)} has two entries for condition {c.condition_id!r}"
+                    f"{who} marks genotype entry {m.key_id!r}; a person shows a genotype entry through their genotype"
                 )
-            seen.add(c.condition_id)
+            if e.HasField("other") and (state is not None or m.HasField("onset_age")):
+                raise IntegrityError(
+                    f"{who}: other entry {m.key_id!r} ({e.text!r}) is shown, nothing more; it takes no status, grade "
+                    "or onset age"
+                )
+            if e.HasField("phenotype"):
+                if state is None:
+                    raise IntegrityError(f"{who}: phenotype mark {m.key_id!r} needs a status or a grade")
+                if state == "grade" and m.grade not in e.phenotype.grades:
+                    raise IntegrityError(
+                        f"{who}: grade {m.grade!r} is not one of {m.key_id!r}'s grades {list(e.phenotype.grades)}"
+                    )
 
 
-def _check_supports(p: pb.Pedigree, positions: set[Key], declared: set[str], loci: set[str]) -> None:
-    """Each support names a listed field, a scope that exists and suits it, and a condition or locus iff it needs it."""
+def _check_supports(p: pb.Pedigree, positions: set[Key], key: _key_entries.Key, loci: set[str]) -> None:
+    """Each support names a listed field, a scope that exists and suits it, and a key entry or locus iff it needs it."""
     matings = {_mating_ref_key(m) for m in p.matings}
     children = {_key(off.child) for m in p.matings for off in m.offspring}
     by_key = {(ind.generation, ind.index): ind for ind in p.individuals}
     for j, s in enumerate(p.supports):
         where = f"supports[{j}] ({s.field!r})"
-        kinds = SUPPORT_FIELDS.get(s.field)
-        if kinds is None:
-            raise IntegrityError(f"{where}: unknown field; a support names one of {sorted(SUPPORT_FIELDS)}")
-        people = [_key(pos) for pos in s.individuals]
-        for key in people:
-            if key not in positions:
-                raise IntegrityError(f"{where}: individual {key} is not in the pedigree")
-        for ref in s.matings:
-            if _mating_ref_key(ref) not in matings:
-                raise IntegrityError(f"{where}: no mating of {sorted(_mating_ref_key(ref))} in the pedigree")
-        if s.matings and people:
-            raise IntegrityError(f"{where}: scopes both individuals and matings; a support scopes one kind")
-        if (s.matings or people) and kinds <= {"declaration", "locus"}:
-            raise IntegrityError(f"{where}: {s.field} describes the declaration, so it scopes the whole pedigree")
-        if s.matings and "mating" not in kinds:
-            raise IntegrityError(f"{where}: scopes matings, but {s.field} is not a mating field")
-        if people and not kinds - {"mating", "pedigree", "declaration", "locus"}:
-            raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {'/'.join(sorted(kinds))} field")
-        # The one kind this support describes: only ``annotations`` has two, and couples in scope make it a mating's.
-        kind = "mating" if s.matings else ("individual" if "individual" in kinds else next(iter(kinds)))
-        if kind == "offspring":
-            for key in people:
-                if key not in children:
-                    raise IntegrityError(f"{where}: {key} is no one's child; an offspring field scopes the child")
-        if (kind in ("condition", "declaration")) != s.HasField("condition_id"):
-            raise IntegrityError(f"{where}: names a condition_id iff the field is {SUPPORT_CONDITION_PREFIX}*")
-        if s.HasField("condition_id"):
-            if s.condition_id not in declared:
-                raise IntegrityError(f"{where}: condition_id {s.condition_id!r} is not declared")
-            scope = [by_key[key] for key in people] or list(p.individuals)
-            if not any(c.condition_id == s.condition_id for ind in scope for c in ind.conditions):
-                raise IntegrityError(f"{where}: no one in scope has condition {s.condition_id!r}")
+        people, kind = _support_scope(where, s, positions, matings, children)
+        scope = [by_key[pos] for pos in people] or list(p.individuals)
+        if (kind in ("mark", "key")) != s.HasField("key_id"):
+            raise IntegrityError(
+                f"{where}: names a key_id iff the field is {SUPPORT_MARK_PREFIX}* or {SUPPORT_KEY_PREFIX}*"
+            )
+        if s.HasField("key_id"):
+            _check_support_entry(where, s, kind, scope, key)
         if (kind in ("genotype", "locus")) != bool(s.loci):
             raise IntegrityError(
                 f"{where}: names loci iff the field is {SUPPORT_GENOTYPE_PREFIX}* or {SUPPORT_LOCUS_PREFIX}*"
             )
-        if len(set(s.loci)) != len(s.loci):
-            raise IntegrityError(f"{where}: names a locus twice")
-        scope = [by_key[key] for key in people] or list(p.individuals)
-        for locus_id in s.loci:
-            if locus_id not in loci:
-                raise IntegrityError(f"{where}: locus {locus_id!r} is not declared")
-            if not any(g.locus_id == locus_id for ind in scope for g in ind.genotypes):
-                raise IntegrityError(f"{where}: no one in scope has a genotype at locus {locus_id!r}")
+        _check_support_loci(where, s, scope, loci)
+
+
+def _support_scope(
+    where: str, s: pb.Support, positions: set[Key], matings: set[frozenset[Key]], children: set[Key]
+) -> tuple[list[Key], str]:
+    """The people ``s`` scopes, once they and its couples exist and suit its field, and the one kind it describes."""
+    kinds = SUPPORT_FIELDS.get(s.field)
+    if kinds is None:
+        raise IntegrityError(f"{where}: unknown field; a support names one of {sorted(SUPPORT_FIELDS)}")
+    people = [_key(pos) for pos in s.individuals]
+    for pos in people:
+        if pos not in positions:
+            raise IntegrityError(f"{where}: individual {pos} is not in the pedigree")
+    for ref in s.matings:
+        if _mating_ref_key(ref) not in matings:
+            raise IntegrityError(f"{where}: no mating of {sorted(_mating_ref_key(ref))} in the pedigree")
+    if s.matings and people:
+        raise IntegrityError(f"{where}: scopes both individuals and matings; a support scopes one kind")
+    if (s.matings or people) and kinds <= {"key", "locus"}:
+        raise IntegrityError(f"{where}: {s.field} describes the declaration, so it scopes the whole pedigree")
+    if s.matings and "mating" not in kinds:
+        raise IntegrityError(f"{where}: scopes matings, but {s.field} is not a mating field")
+    if people and not kinds - {"mating", "pedigree", "key", "locus"}:
+        raise IntegrityError(f"{where}: scopes individuals, but {s.field} is a {'/'.join(sorted(kinds))} field")
+    # The one kind this support describes: only ``annotations`` has two, and couples in scope make it a mating's.
+    kind = "mating" if s.matings else ("individual" if "individual" in kinds else next(iter(kinds)))
+    if kind == "offspring":
+        for pos in people:
+            if pos not in children:
+                raise IntegrityError(f"{where}: {pos} is no one's child; an offspring field scopes the child")
+    return people, kind
+
+
+def _check_support_entry(
+    where: str, s: pb.Support, kind: str, scope: Sequence[pb.Individual], key: _key_entries.Key
+) -> None:
+    """A support's key entry is declared, shown (or marked) by someone in scope, and can hold the fact it cites."""
+    if s.key_id not in key:
+        raise IntegrityError(f"{where}: key_id {s.key_id!r} is not declared")
+    phenotype = key.entry(s.key_id).HasField("phenotype")
+    if kind == "mark":
+        marks = [m for ind in scope for m in ind.marks if m.key_id == s.key_id]
+        if not marks:
+            raise IntegrityError(f"{where}: no one in scope marks key entry {s.key_id!r}")
+        fact = s.field.removeprefix(SUPPORT_MARK_PREFIX)
+        if not any(_mark_holds(m, fact, phenotype) for m in marks):
+            raise IntegrityError(f"{where}: no mark of {s.key_id!r} in scope can have a {fact}")
+        return
+    if not any(x.key_id == s.key_id for ind in scope for x in key.shown(ind)):
+        raise IntegrityError(f"{where}: no one in scope shows key entry {s.key_id!r}")
+    if s.field in _PHENOTYPE_KEY_FIELDS and not phenotype:
+        raise IntegrityError(f"{where}: {s.key_id!r} is not a phenotype, so it has no {s.field}")
+
+
+def _check_support_loci(where: str, s: pb.Support, scope: Sequence[pb.Individual], loci: set[str]) -> None:
+    """Each locus a support names is declared, named once, and one someone in scope has a genotype at."""
+    if len(set(s.loci)) != len(s.loci):
+        raise IntegrityError(f"{where}: names a locus twice")
+    for locus_id in s.loci:
+        if locus_id not in loci:
+            raise IntegrityError(f"{where}: locus {locus_id!r} is not declared")
+        if not any(g.locus_id == locus_id for ind in scope for g in ind.genotypes):
+            raise IntegrityError(f"{where}: no one in scope has a genotype at locus {locus_id!r}")

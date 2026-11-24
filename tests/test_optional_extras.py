@@ -40,7 +40,7 @@ def test_reading_and_validating_ir_never_loads_z3() -> None:
 def _trio() -> pb.Pedigree:
     p = test_render._load("trio")
     for ind in p.individuals:
-        del ind.conditions[:]
+        del ind.marks[:]
     return p
 
 

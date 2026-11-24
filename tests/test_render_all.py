@@ -51,7 +51,7 @@ def _with_conditions(p: pb.Pedigree, n: int) -> pb.Pedigree:
         for j, name in enumerate(names):
             status = _STATUSES[(k + j) % len(_STATUSES)]
             if (k >> j) % 2:
-                ind.conditions.append(test_render._entry(status, name))
+                ind.marks.append(test_render._entry(status, name))
     return out
 
 
@@ -61,4 +61,4 @@ def test_every_fuzz_case_that_lays_out_draws(seed: int, conditions: int) -> None
     if not _lays_out(seed):
         pytest.skip("the layout defers this case")
     p = _with_conditions(gen.gen(seed, 4), conditions) if conditions else gen.gen(seed, 4)
-    render.render_svg(p, conditions=test_render._declared(p))  # raises on any drawing-time refusal
+    render.render_svg(p, key_entries=test_render._declared(p))  # raises on any drawing-time refusal

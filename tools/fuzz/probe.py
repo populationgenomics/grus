@@ -1,8 +1,8 @@
 """Lay out and draw one pedigree in a worker, and measure what a renderer change could move.
 
 Runs in a worker from ``tools.fuzz.workers``, so ``grus`` here is the tree under test, while this module is the
-current tooling. Declarations reach the tree's ``grus`` only when a pedigree has some — ``conditions`` when it has
-condition entries, ``loci`` when it has genotypes — so a tree from before either, whose calls do not take it, still
+current tooling. Declarations reach the tree's ``grus`` only when a pedigree has some — ``key_entries`` when it
+shows key entries, ``loci`` when it has genotypes — so a tree from before either, whose calls do not take it, still
 probes every pedigree without them (every generated one); it cannot read an IR file that has them.
 """
 
@@ -68,8 +68,8 @@ def geometry(highs: bool) -> render.Geometry:
 def _passed(declarations: pb.PedigreeSet) -> dict[str, Any]:
     """The declaration keywords to pass the tree's ``grus``: each kind only when there are some."""
     out: dict[str, Any] = {}
-    if declarations.conditions:
-        out["conditions"] = list(declarations.conditions)
+    if declarations.key_entries:
+        out["key_entries"] = list(declarations.key_entries)
     if declarations.loci:
         out["loci"] = list(declarations.loci)
     return out
@@ -107,7 +107,7 @@ def measure(case: corpus.Case, highs: bool) -> Result:
 def outcome_of(data: bytes, highs: bool, declarations: bytes = b"") -> str:
     """The serialized pedigree's SVG digest if it draws, else ``defer: <reason>``, or ``invalid: <error>``.
 
-    ``declarations`` is a serialized ``PedigreeSet`` carrying only the declarations (``conditions``, ``loci``) the
+    ``declarations`` is a serialized ``PedigreeSet`` carrying only the declarations (``key_entries``, ``loci``) the
     pedigree references; empty when it references none.
     """
     p = pb.Pedigree.FromString(data)

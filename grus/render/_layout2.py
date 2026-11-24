@@ -58,7 +58,7 @@ def layout(
     p: pb.Pedigree,
     geometry: _geometry.Geometry | None = None,
     *,
-    conditions: Sequence[pb.ConditionDef] = (),
+    key_entries: Sequence[pb.KeyEntry] = (),
     loci: Sequence[pb.Locus] = (),
 ) -> _layout.Layout:
     """Lay ``p`` out on the (level, x) grid; return the per-level arrays the drawing step reads.
@@ -76,20 +76,20 @@ def layout(
     defers — its one drawn form, a track over the row, read as a sibship (docs/design/layout-v2.md). An avuncular
     cross-generation join draws via the ``ghost`` (a same-row couple on the deeper partner's rank).
 
-    ``conditions`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.conditions``, ``.loci``), which
-    its entries and genotypes reference. Layout does not read genotypes; ``loci`` serves validation alone.
+    ``key_entries`` and ``loci`` are the declarations of ``p``'s set (``PedigreeSet.key_entries``, ``.loci``), which
+    its marks and genotypes reference. Layout reads genotypes only through the genotype entries they show.
 
     Raises:
         grus.ir.ValidationError | grus.ir.IntegrityError: ``p`` is not a well-formed IR.
         DeferredFeatureError: a topology the model does not draw (see :class:`DeferredFeatureError`) — an
             interlocking loop, a child of more than one mating, a couple across generations other than an
-            avuncular join, a routed mating (partners that cannot stand side by side), or a torn sibship whose
-            descent bars would overlap.
+            avuncular join, a routed mating (partners that cannot stand side by side), a torn sibship whose
+            descent bars would overlap, or a mark with a key-defined grade, which has no drawing yet.
     """
     geom = geometry or _geometry.DEFAULT_GEOMETRY
-    prep = _prepare(p, conditions, loci)
+    prep = _prepare(p, key_entries, loci)
     g = prep.graph
-    clinical = _labels.Clinical.of(p, ir.Conditions(conditions))
+    clinical = _labels.Clinical.of(p, ir.Key(key_entries))
 
     ordering = _ordering.order(g, prep.cross)
     if ordering.routed:
@@ -143,13 +143,14 @@ class _Prepared:
     phantom: frozenset[int]
 
 
-def _prepare(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = (), loci: Sequence[pb.Locus] = ()) -> _Prepared:
+def _prepare(p: pb.Pedigree, key_entries: Sequence[pb.KeyEntry] = (), loci: Sequence[pb.Locus] = ()) -> _Prepared:
     """Validate ``p`` and run the layout front end: ghosts, cross/loop detection, ranks, phantoms, pass-throughs.
 
     Order matters: the ghost turns an avuncular join into a same-row couple before ``_rank`` checks that every
     couple shares a row, and pass-throughs are inserted after ranking, from the ranked rows.
     """
-    ir.validate(p, conditions, loci=loci)
+    ir.validate(p, key_entries, loci=loci)
+    _defer_grades(p, ir.Key(key_entries))
     g = _layout._derive(p)
     ghost_of = _layout._duplicate_cross_generation(g, p)
     cross = _layout._cross_matings(g)
@@ -158,6 +159,17 @@ def _prepare(p: pb.Pedigree, conditions: Sequence[pb.ConditionDef] = (), loci: S
     phantom = _layout._insert_phantoms(g)
     passthrough = _layout._insert_passthroughs(g)
     return _Prepared(g, ghost_of, cross, first_generation, passthrough, phantom)
+
+
+def _defer_grades(p: pb.Pedigree, key: ir.Key) -> None:
+    """Defer a pedigree with a key-defined grade: how to draw one is not settled (docs/design/renderer.md)."""
+    for ind in p.individuals:
+        for m in key.marked(ind):
+            if m.grade is not None:
+                raise _layout.DeferredFeatureError(
+                    f"{_labels.position(ind)} is graded {m.grade!r} for {m.text!r}; a grade the key defines is not "
+                    "drawn yet"
+                )
 
 
 def _routed_reason(g: _layout._Graph, routed: frozenset[int]) -> str:

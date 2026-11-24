@@ -10,9 +10,9 @@ sibship left with fewer than two children, an individual in no mating). It stops
 renumbers each generation 1..n in the original order, so the result reads as a figure would.
 
 Predicates run in worker pools on the trees they name, so a pedigree can be minimised against a baseline and a branch
-at once. A candidate that is not valid IR never counts as failing. A pedigree with condition entries is probed with its
-set's declarations; a move that drops everyone with a condition leaves its declaration unreferenced, which a probe of
-one pedigree allows.
+at once. A candidate that is not valid IR never counts as failing. A pedigree with marks or genotypes is probed with
+its set's declarations; a move that drops everyone who shows a key entry leaves it unshown, which a probe of one
+pedigree allows.
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ def tree_search(
 ) -> Search:
     """A ``Search`` for one of ``PREDICATES``, evaluated in ``pools`` (one per tree it names).
 
-    ``declarations`` are the pedigree's set's (``conditions``, ``loci``); passed to the probes only when there are
+    ``declarations`` are the pedigree's set's (``key_entries``, ``loci``); passed to the probes only when there are
     some, so an older tree can still probe a pedigree without them.
 
     ``reason``, when not empty, narrows a deferral to one whose message contains it.
@@ -183,7 +183,7 @@ def tree_search(
         raise ValueError(f"predicate {predicate!r} takes {2 if two else 1} tree(s)")
 
     defs = (
-        (declarations.SerializeToString(),) if declarations and (declarations.conditions or declarations.loci) else ()
+        (declarations.SerializeToString(),) if declarations and (declarations.key_entries or declarations.loci) else ()
     )
 
     def defers(o: str) -> bool:

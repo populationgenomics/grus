@@ -25,14 +25,14 @@ def _sample() -> pb.Pedigree:
                 generation=1,
                 index=2,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_CARRIER)],
+                marks=[pb.Mark(key_id="k1", status=pb.CONDITION_STATUS_CARRIER)],
                 annotations=[pb.Annotation(text="N/M", type=pb.ANNOTATION_TYPE_GENOTYPE)],
             ),
             pb.Individual(
                 generation=2,
                 index=1,
                 gender=pb.GENDER_MAN,
-                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
+                marks=[pb.Mark(key_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
                 proband=True,
                 annotations=[pb.Annotation(text="M/M", type=pb.ANNOTATION_TYPE_GENOTYPE)],
             ),
@@ -40,7 +40,7 @@ def _sample() -> pb.Pedigree:
                 generation=2,
                 index=2,
                 gender=pb.GENDER_WOMAN,
-                conditions=[pb.Condition(condition_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
+                marks=[pb.Mark(key_id="k1", status=pb.CONDITION_STATUS_AFFECTED)],
             ),
         ],
         matings=[
@@ -83,13 +83,15 @@ def test_prior_art_audit_fields_round_trip_and_validate() -> None:
         gender=pb.GENDER_WOMAN,
         external_id="SAMPLE-42",
         documented_evaluation=True,
-        conditions=[
-            pb.Condition(condition_id="cf", status=pb.CONDITION_STATUS_CARRIER, onset_age="40s"),
+        marks=[
+            pb.Mark(key_id="cf", status=pb.CONDITION_STATUS_CARRIER, onset_age="40s"),
         ],
     )
-    cf = pb.ConditionDef(id="cf", name="cystic fibrosis", inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
+    cf = pb.KeyEntry(
+        id="cf", text="cystic fibrosis", phenotype=pb.Phenotype(inheritance=pb.INHERITANCE_AUTOSOMAL_RECESSIVE)
+    )
     protovalidate.validate(cf)
-    assert text_format.Parse(text_format.MessageToString(cf), pb.ConditionDef()) == cf
+    assert text_format.Parse(text_format.MessageToString(cf), pb.KeyEntry()) == cf
     off = pb.Offspring(
         child=pb.Position(generation=2, index=1),
         twin_group=1,
@@ -114,10 +116,15 @@ def test_prior_art_audit_fields_round_trip_and_validate() -> None:
         pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=0),  # a group of no one
         pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=-2),
         pb.Individual(generation=1, index=1, gender=pb.GENDER_MAN, count=3, count_unspecified=True),  # known + unknown
-        pb.Condition(status=pb.CONDITION_STATUS_AFFECTED),  # no condition_id
-        pb.Condition(condition_id="k1"),  # status == CONDITION_STATUS_UNSPECIFIED sentinel
-        pb.ConditionDef(name="cystic fibrosis"),  # no id
-        pb.Support(citations=["cap"], field="condition.status", condition_id=""),  # a present, empty condition_id
+        pb.Mark(status=pb.CONDITION_STATUS_AFFECTED),  # no key_id
+        pb.Mark(key_id="k1", status=pb.CONDITION_STATUS_UNSPECIFIED),  # a status set to the sentinel
+        pb.Mark(key_id="k1", grade=""),  # an empty grade
+        pb.KeyEntry(text="cystic fibrosis", phenotype=pb.Phenotype()),  # no id
+        pb.KeyEntry(id="k1", text="cystic fibrosis"),  # no kind
+        pb.KeyEntry(id="k1", text="CF", phenotype=pb.Phenotype(grades=[""])),  # an empty grade
+        pb.GenotypePattern(locus_id="l1", alleles=["M", "M"], copies_unstated=True),  # carries M, twice
+        pb.GenotypePattern(locus_id="l1"),  # no alleles
+        pb.Support(citations=["cap"], field="mark.status", key_id=""),  # a present, empty key_id
     ],
 )
 def test_invalid_messages_rejected(msg: message.Message) -> None:
