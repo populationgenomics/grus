@@ -46,10 +46,11 @@ _DECLARATION_PATHS = frozenset({"condition.name", "condition.inheritance"})
 
 
 class MigrationError(Exception):
-    """A pre-0.4 record cannot be migrated.
+    """A record cannot be migrated.
 
-    Entries of one condition disagree on inheritance, a person has two entries of one condition, or a support names a
-    condition no one has.
+    The text is a set or pedigree in none of the current, 0.4 or pre-0.4 schemas; or, in a pre-0.4 record, entries of
+    one condition disagree on inheritance, a person has two entries of one condition, or a support names a condition
+    no one has.
     """
 
 

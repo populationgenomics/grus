@@ -58,13 +58,13 @@ fact it draws, so a consumer can select and restyle parts without reading coordi
 * ``<g id="{prefix}key" class="key">`` last, whenever any fill is drawn: one ``<g class="key-entry"
   id="{prefix}key-{status}-{i}" data-condition data-status>`` per fill drawn (``key-entry dot`` /
   ``key-carrier-dot-{i}`` for the X-linked dot, ``key-presymptomatic-{i}`` with ``data-status="presymptomatic"`` and a
-  ``swatch presymptomatic`` line per condition someone is presymptomatic for), in index order, affected first,
+  ``swatch presymptomatic`` line per condition someone is presymptomatic for), in index order, affected or shown first,
   holding a swatch per form the symbols draw the fill in — a whole ``swatch`` square, and/or a section swatch
   (``swatch-backing``, clip path ``{prefix}key-clip-{kind}-{i}``, the ``swatch`` section, its ``divider`` borders,
   ``swatch-outline``) — and a
-  ``key-label`` text: the condition name when affected, ``Carrier: <name>`` when carried, ``Affected`` / ``Carrier``
-  for the unnamed condition (``X-linked carrier`` for the dot). It sits below the drawing and the canvas grows to
-  hold it.
+  ``key-label`` text: the entry's text when affected or shown, ``Carrier: <name>`` when carried, ``Affected`` /
+  ``Carrier`` for the unnamed phenotype (``X-linked carrier`` for the dot). It sits below the drawing and the canvas
+  grows to hold it.
 * ``id_prefix`` goes in front of every id and id reference (clip paths, patterns and the key included); it must be
   empty or an id-safe token (a letter or underscore, then letters, digits, ``_``, ``.``, ``-``). A composed figure
   prefixes its tiles ``p0-``, ``p1-``, … under the caller's prefix; a caller inlining several figures on
