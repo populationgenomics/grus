@@ -31,6 +31,7 @@ from grus.models import pedigree_pb2 as pb
 _PACKAGE = pb.DESCRIPTOR.package
 _V0_4 = f"{_PACKAGE}.v0_4"
 _PRE_0_4 = f"{_PACKAGE}.pre_0_4"
+_DIGEST = f"{_PACKAGE}.digest"
 # 0.4's support paths, by what each became.
 _PATHS = {
     "condition.status": "mark.status",
@@ -58,15 +59,30 @@ def _add_with_deps(pool: descriptor_pool.DescriptorPool, fd: Any, done: set[str]
         done.add(fd.name)
 
 
-def _schema(package: str) -> tuple[descriptor_pb2.FileDescriptorProto, dict[str, descriptor_pb2.DescriptorProto]]:
-    """The frozen 0.4 schema, moved to ``package``, and its messages by name."""
-    fdp = descriptor_pb2.FileDescriptorProto.FromString(_schema_0_4.SERIALIZED)
+def _moved(
+    serialized: bytes, package: str
+) -> tuple[descriptor_pb2.FileDescriptorProto, dict[str, descriptor_pb2.DescriptorProto]]:
+    """A serialized pedigree schema moved to ``package``, and its messages by name."""
+    fdp = descriptor_pb2.FileDescriptorProto.FromString(serialized)
     fdp.name, fdp.package = f"grus/models/pedigree_{package.rsplit('.', 1)[-1]}.proto", package
     for msg in fdp.message_type:
         for field in msg.field:
             if field.type_name.startswith(f".{_PACKAGE}."):
                 field.type_name = f".{package}." + field.type_name.removeprefix(f".{_PACKAGE}.")
     return fdp, {m.name: m for m in fdp.message_type}
+
+
+def _schema(package: str) -> tuple[descriptor_pb2.FileDescriptorProto, dict[str, descriptor_pb2.DescriptorProto]]:
+    """The frozen 0.4 schema, moved to ``package``, and its messages by name."""
+    return _moved(_schema_0_4.SERIALIZED, package)
+
+
+def _named_condition(condition: descriptor_pb2.DescriptorProto, package: str) -> None:
+    """A 0.4 ``Condition`` as before 0.4: its declaration's name and inheritance in place of its id."""
+    _drop(condition, "condition_id")
+    _add(condition, "name", 1, type=_STRING)
+    _add(condition, "inheritance", 3, optional=True, type=descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
+         type_name=f".{package}.Inheritance")  # fmt: skip
 
 
 def _classes(fdp: descriptor_pb2.FileDescriptorProto) -> dict[str, type[Message]]:
@@ -115,27 +131,41 @@ def _v0_4() -> dict[str, type[Message]]:
 
 
 @functools.cache
-def _pre_0_4(*, digest: bool = False) -> dict[str, type[Message]]:
-    """The pre-0.4 classes: 0.4 with each entry's name and inheritance back in place of its id.
-
-    With ``digest``, the ``Condition`` also has ``kind`` and ``grade``, which no pre-0.4 record has: the stored-layout
-    digest (``legacy_pedigree``) writes them for an entry a 0.4 condition could not express, and leaves them unset
-    otherwise. Records are read without them, so a record that sets them fails to parse.
-    """
-    package = f"{_PRE_0_4}_digest" if digest else _PRE_0_4
-    fdp, by_name = _schema(package)
-    condition = by_name["Condition"]
-    _drop(condition, "condition_id")
-    _add(condition, "name", 1, type=_STRING)
-    _add(condition, "inheritance", 3, optional=True, type=descriptor_pb2.FieldDescriptorProto.TYPE_ENUM,
-         type_name=f".{package}.Inheritance")  # fmt: skip
-    if digest:
-        _add(condition, "kind", 10, type=_STRING)
-        _add(condition, "grade", 11, optional=True, type=_STRING)
+def _pre_0_4() -> dict[str, type[Message]]:
+    """The pre-0.4 classes: 0.4 with each entry's name and inheritance back in place of its id."""
+    fdp, by_name = _schema(_PRE_0_4)
+    _named_condition(by_name["Condition"], _PRE_0_4)
     support = by_name["Support"]
     _drop(support, "condition_id")
     _add(support, "condition", 3, optional=True, type=_STRING)
     _drop(by_name["PedigreeSet"], "conditions")
+    return _classes(fdp)
+
+
+@functools.cache
+def _digest_classes() -> dict[str, type[Message]]:
+    """The current schema with each person's marks replaced by pre-0.4 conditions, for the stored-layout digest.
+
+    Built from the live schema, so a field added to it reaches the digest (and its classification test). The
+    ``Condition`` also has ``kind`` and ``grade``, which no pre-0.4 record has: ``legacy_pedigree`` writes them for an
+    entry a pre-0.4 condition could not express, and leaves them unset otherwise.
+    """
+    fdp, by_name = _moved(pb.DESCRIPTOR.serialized_pb, _DIGEST)
+    (condition,) = [m for m in _schema(_DIGEST)[0].message_type if m.name == "Condition"]
+    _named_condition(condition, _DIGEST)
+    _add(condition, "kind", 10, type=_STRING)
+    _add(condition, "grade", 11, optional=True, type=_STRING)
+    fdp.message_type.add().CopyFrom(condition)
+    individual = by_name["Individual"]
+    _drop(individual, "marks")
+    individual.field.add(
+        name="conditions",
+        number=5,
+        label=descriptor_pb2.FieldDescriptorProto.LABEL_REPEATED,
+        type=descriptor_pb2.FieldDescriptorProto.TYPE_MESSAGE,
+        type_name=f".{_DIGEST}.Condition",
+        json_name="conditions",
+    )
     return _classes(fdp)
 
 
@@ -145,16 +175,17 @@ def legacy_pedigree(p: pb.Pedigree, key_entries: Iterable[pb.KeyEntry]) -> Messa
     What a person shows (``Key.shown``: marks, then matched genotype entries) becomes their conditions in that order:
     the entry's text as the name, a phenotype mark's status and the entry's inheritance. A genotype or other entry adds
     its kind, and a graded mark its grade, fields a pre-0.4 record never sets; so a pedigree of phenotype marks with
-    standard statuses encodes as it did before the key. Marks and supports' entry ids do not carry over; genotypes do,
-    and the digest clears them. The stored-layout digest serializes this form, so an entry's id never enters it.
+    standard statuses encodes as it did before the key. Marks do not carry over; every other field does, and the
+    digest clears what layout does not read. The stored-layout digest serializes this form, so an entry's id never
+    enters it.
 
     Raises:
         UndeclaredKeyEntryError: a mark names an undeclared entry.
     """
     key = _key_entries.Key(key_entries)
-    classes = _pre_0_4(digest=True)
+    classes = _digest_classes()
     out: Any = classes["Pedigree"].FromString(p.SerializeToString())
-    out.DiscardUnknownFields()  # marks and supports' key_id
+    out.DiscardUnknownFields()  # the marks
     for ind, legacy_ind in zip(p.individuals, out.individuals, strict=True):
         for shown in key.shown(ind):
             c = legacy_ind.conditions.add(name=shown.text)

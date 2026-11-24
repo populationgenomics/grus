@@ -68,16 +68,15 @@ Case = GenCase | FileCase
 
 
 def referenced_declarations(p: pb.Pedigree, ps: pb.PedigreeSet) -> pb.PedigreeSet:
-    """The key entries and loci of ``ps`` that ``p`` references.
+    """The key entries and loci of ``ps`` that ``p`` references: the entries its people show, the loci they are at.
 
-    Its marks' entries, the loci its people are genotyped at, and the genotype entries at those loci.
+    An entry no one in ``p`` shows is left out, as a set may not declare one.
     """
-    marked = {m.key_id for ind in p.individuals for m in ind.marks}
+    key = ir.Key(ps.key_entries)
+    shown = {s.key_id for ind in p.individuals for s in key.shown(ind)}
     genotyped = {g.locus_id for ind in p.individuals for g in ind.genotypes}
     return pb.PedigreeSet(
-        key_entries=[
-            e for e in ps.key_entries if e.id in marked or (e.HasField("genotype") and e.genotype.locus_id in genotyped)
-        ],
+        key_entries=[e for e in ps.key_entries if e.id in shown],
         loci=[locus for locus in ps.loci if locus.id in genotyped],
     )
 

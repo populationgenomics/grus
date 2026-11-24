@@ -282,12 +282,16 @@ for _kind, _paths in (
         SUPPORT_FIELDS[_path] = SUPPORT_FIELDS.get(_path, frozenset()) | {_kind}
 
 
-def _mark_states(m: pb.Mark, fact: str) -> bool:
-    """Whether mark ``m`` states ``fact``, a ``mark.*`` support's field: its status, its grade or its onset age."""
+def _mark_holds(m: pb.Mark, fact: str, phenotype: bool) -> bool:
+    """Whether mark ``m`` can hold ``fact``, a ``mark.*`` support's field.
+
+    Every mark shows its entry (``key_id``); a status or a grade is cited for a mark that has one; an onset age for any
+    phenotype mark, since a source may state an onset the figure does not print.
+    """
     if fact == "key_id":
         return True
     if fact == "onset_age":
-        return m.HasField("onset_age")
+        return phenotype
     return m.WhichOneof("state") == fact
 
 
@@ -573,8 +577,9 @@ def _check_supports(p: pb.Pedigree, positions: set[Key], key: _key_entries.Key, 
                 if not marks:
                     raise IntegrityError(f"{where}: no one in scope marks key entry {s.key_id!r}")
                 fact = s.field.removeprefix(SUPPORT_MARK_PREFIX)
-                if not any(_mark_states(m, fact) for m in marks):
-                    raise IntegrityError(f"{where}: no mark of {s.key_id!r} in scope has a {fact}")
+                phenotype = key.entry(s.key_id).HasField("phenotype")
+                if not any(_mark_holds(m, fact, phenotype) for m in marks):
+                    raise IntegrityError(f"{where}: no mark of {s.key_id!r} in scope can have a {fact}")
             else:
                 if not any(x.key_id == s.key_id for ind in scope for x in key.shown(ind)):
                     raise IntegrityError(f"{where}: no one in scope shows key entry {s.key_id!r}")

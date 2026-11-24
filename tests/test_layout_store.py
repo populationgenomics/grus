@@ -645,3 +645,14 @@ def test_a_grade_alone_moves_the_digest() -> None:
         return _store.pedigree_digest(p, defs)
 
     assert graded("a") != graded("b")
+
+
+def test_the_digest_encoding_follows_the_live_schema() -> None:
+    # Built from the current schema, so a field added to a message the digest reaches is classified, or fails above.
+    live = {d.name: d for d in pb.DESCRIPTOR.message_types_by_name.values()}
+    for name, desc in _reachable(_DIGESTED).items():
+        if name == "Condition":  # the pre-0.4 entry the digest writes in place of a person's marks
+            continue
+        expected = {f.name for f in live[name].fields} - ({"marks"} if name == "Individual" else set())
+        missing = expected - {f.name for f in desc.fields}
+        assert not missing, f"{name}: the digest encoding misses {sorted(missing)}"

@@ -150,6 +150,18 @@ def test_a_pre_0_4_record_of_only_unnamed_conditions_migrates(migrate: Callable[
     assert _marks(ps) == [[("k1", pb.CONDITION_STATUS_AFFECTED)]]
 
 
+def test_an_onset_age_support_migrates_without_a_drawn_onset() -> None:
+    # 0.4 let a support cite a condition's onset for someone whose entry prints none (the caption states it).
+    old = _V0_4.replace(
+        'supports { citations: "cap" field: "condition.name" condition_id: "k1" }',
+        'supports { citations: "cap" field: "condition.onset_age" condition_id: "k2" '
+        "individuals { generation: 1 index: 2 } }",
+    )
+    assert old != _V0_4
+    (support, _) = ir.migrate_pbtxt(old).pedigrees[0].supports
+    assert (support.field, support.key_id) == ("mark.onset_age", "k2")
+
+
 def test_a_field_only_the_layout_digest_writes_is_not_read() -> None:
     with pytest.raises(ir.MigrationError, match="not a pedigree set or pedigree"):
         ir.migrate_pbtxt(

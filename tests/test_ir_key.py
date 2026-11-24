@@ -205,11 +205,15 @@ _BROKEN: dict[str, tuple[Callable[[pb.PedigreeSet], object], str]] = {
         lambda ps: ps.pedigrees[0].supports.add(
             citations=["legend"], field="mark.grade", key_id="k1", individuals=[pb.Position(generation=2, index=1)]
         ),
-        r"no mark of 'k1' in scope has a grade",
+        r"no mark of 'k1' in scope can have a grade",
     ),
     "a status cited for an other mark": (
         _edit(lambda ps: ps.pedigrees[0].supports[2], "field", "mark.status"),
-        r"no mark of 'k3' in scope has a status",
+        r"no mark of 'k3' in scope can have a status",
+    ),
+    "an onset age cited for an other mark": (
+        _edit(lambda ps: ps.pedigrees[0].supports[2], "field", "mark.onset_age"),
+        r"no mark of 'k3' in scope can have a onset_age",
     ),
     "a key support for a genotype entry no one shows": (
         lambda ps: [
